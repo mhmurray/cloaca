@@ -1,0 +1,43 @@
+GLORY TO ROME CARD LIST,,,,,,,
+,,,,,,,
+Structure,Material,Value,Card Count,Role,Timing,Function,Type
+Academy,Brick,2,3,Legionary,,May perform one THINKER action after turn during which you performed CRAFTSMAN action,Additional Action
+Amphitheatre,Concrete,2,3,Architect,Upon Completion,May perform one CRAFTSMAN action for each INFLUENCE,Additional Action (Influence)
+Aqueduct,Concrete,2,3,Architect,In Addition,When performing PATRON action may take client from HAND.  Maximum CLIENTELE x 2,Increase Limit
+Archway,Brick,2,3,Legionary,,When performing ARCHITECT action may take material from POOL,Change Source
+Atrium,Brick,2,3,Legionary,,When performing MERCHANT action may take from DECK (do not look at card),Change Source
+Bar,Rubble,1,6,Laborer,,When performing PATRON action may take card from DECK,Change Source
+Basilica,Marble,3,3,Patron,In Addition,When performing MERCHANT action may take material from HAND,Change Source
+Bath,Brick,2,3,Legionary,,When performing PATRON action each client you hire may perform its action once as it enters CLIENTELE,Additional Action
+Bridge,Concrete,2,3,Architect,In Addition,When performing LEGIONARY action may take material from STOCKPILE.  Ignore Palisades.  May take from all opponents,Change source
+Catacomb,Stone,3,3,Merchant,Upon Completion,Game ends immediately.  Score as usual,End Game
+Circus,Wood,1,6,Craftsman,,May play two cards of same role as JACK,Wildcards
+Circus Maximus,Stone,3,3,Merchant,,Each client may perform its action twice when you lead or follow its role,Additional Action
+Coliseum,Stone,3,3,Merchant,In Addition,When performing LEGIONARY action may take opponent's client and place in VAULT as material,Change Destination
+Dock,Wood,1,6,Craftsman,In Addition,When performing LABORER action may take material from HAND,Change Source
+Forum,Marble,3,3,Patron,,One client of each role wins game,Winner
+Foundry,Brick,2,3,Legionary,Upon Completion,May perform one LABORER action for each INFLUENCE,Additional Action (Influence)
+Fountain,Marble,3,3,Patron,,When performing CRAFTSMAN action may use cards from DECK.  Retain any unused cards in HAND,Change Source
+Garden,Stone,3,3,Merchant,Upon Completion,May perform one PATRON action for each INFLUENCE,Additional Action (Influence)
+Gate,Brick,2,3,Legionary,,Incomplete MARBLE structures provide FUNCTION,Building Shortcut
+Insula,Rubble,1,6,Laborer,,Maximum CLIENTELE + 2,Increase Limit
+Latrine,Rubble,1,6,Laborer,,Before performing THINKER action may discard one card to POOL,Discard
+Ludus Magna,Marble,3,3,Patron,,Each MERCHANT client counts as any role,Wildcards
+Market,Wood,1,6,Craftsman,,Maximum VAULT + 2,Increase Limit
+Palace,Marble,3,3,Patron,,May play multiple cards of same role in order to perform additional actions,Additional Action
+Palisade,Wood,1,6,Craftsman,,Immune to LEGIONARY,Immunity
+Prison,Stone,3,3,Merchant,Upon Completion,May exchange INFLUENCE for opponent's completed structure,Influence Exchange
+Road,Rubble,1,6,Laborer,,When adding to STONE structure may use any material,Building Shortcut
+School,Brick,2,3,Legionary,Upon Completion,May perform one THINKER action for each INFLUENCE,Additional Action (Influence)
+Scriptorium,Stone,3,3,Merchant,,May use one MARBLE material to complete any structure,Building Shortcut
+Senate,Concrete,2,3,Architect,,May take opponent's JACK into HAND at end of turn in which it is played,Change Destination
+Sewer,Stone,3,3,Merchant,,May place Orders cards used to lead or follow into STOCKPILE at end of turn,Change Destination
+Shrine,Brick,2,3,Legionary,,Maximum HAND + 2,Increase Limit
+Stairway,Marble,3,3,Patron,,When performing ARCHITECT action may add material to opponent's completed STRUCTURE to make function available to all players,Building Shortcut
+Statue,Marble,3,3,Patron,,+ 3 VP. May place Statue on any SITE,Victory Points
+Storeroom,Concrete,2,3,Architect,,All clients count as LABORERS,Wildcards
+Temple,Marble,3,3,Patron,,Maximum HAND + 4,Increase Limit
+Tower,Concrete,2,3,Architect,,May use RUBBLE in any STRUCTURE.  May lay foundation onto any out of town SITE at no extra cost,Building Shortcut
+Villa,Stone,3,3,Merchant,Early Completion,When performing ARCHITECT action may complete Villa with one material,Building Shortcut
+Vomitorium,Concrete,2,3,Architect,,Before performing THINKER action may discard all cards to POOL,Discard
+Wall,Concrete,2,3,Architect,,Immune to LEGIONARY.  + 1 VP for every two materials in STOCKPILE,Immunity/Victory Points
