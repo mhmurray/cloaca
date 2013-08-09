@@ -16,6 +16,8 @@ class Game:
   
   def __init__(self, game_state=None):
     self.game_state = game_state if game_state is not None else GameState()
+    self.leader = None
+    self.priority = None
 
   def __repr__(self):
     rep=('Game(game_state={game_state!r})')
@@ -23,9 +25,38 @@ class Game:
 
   def init_common_piles(self, n_players):
     self.init_library()
-    self.game_state.pool.extend(self.game_state.draw_cards(Game.initial_pool_count))
+    first_player = self.init_pool(n_players)
+    print 'Player {} goes first'.format(self.game_state.players[first_player].name)
+    self.leader = first_player
+    self.priority = first_player
     self.game_state.jack_pile.extend(['Jack'] * Game.initial_jack_count)
     self.init_foundations(n_players)
+  
+  def init_pool(self, n_players):
+    """ Returns the index of the player that goes first. Fills the pool
+    with one card per player, alphabetically first goes first. Resolves
+    ties with more cards.
+    """
+    player_cards = [""]*n_players
+    all_cards_drawn = []
+    has_winner = False
+    winner = None
+    while not has_winner:
+      # Draw new cards for winners, or everyone in the first round
+      for i,card in enumerate(player_cards):
+        if card is None: continue
+        player_cards[i] = self.game_state.draw_cards(1)[0]
+        all_cards_drawn.append(player_cards[i])
+      # Winnow player_cards to only have the alphabetically first cards
+      winning_card = min( [c for c in player_cards if c is not None])
+      has_winner = player_cards.count(winning_card) == 1
+      if has_winner: winner = player_cards.index(winning_card)
+      # Set all players' cards to None if they aren't winners
+      player_cards = map(lambda c : c if c==winning_card else None, player_cards)
+
+    self.game_state.pool.extend(all_cards_drawn)
+    return winner
+    
 
   def init_foundations(self, n_players):
     for key in self.game_state.foundations:
@@ -49,6 +80,9 @@ class Game:
     # of jacks left, # of each foundation left, who's the leader, public
     player information.
     """
+    # print leader and priority
+    print 'Leader : {0},   Priority : {1}'.format(self.leader, self.priority)
+
     # print pool. Counter counts multiplicities for us.
     counter = collections.Counter(self.game_state.pool)
     pool_string = 'Pool: '
@@ -70,13 +104,9 @@ class Game:
     foundation_string.rstrip(', ')
     print foundation_string
 
-    # print players public info
-    for player in self.game_state.players:
-      self.print_public_player_state(player)
-      print ''
-
     print ''
     for player in self.game_state.players:
+      #self.print_public_player_state(player)
       self.print_complete_player_state(player)
       print ''
 
