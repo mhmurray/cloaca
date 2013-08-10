@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """ Contains the Player class, which is a wrapper for all of the
 zones associated with a player. Much like the GameState class,
 this class does not enforce anything more than physical limitations,
@@ -129,3 +131,8 @@ class Player:
     return buildings_string
 
     
+
+if __name__ == '__main__':
+
+  test_player = Player()
+  print test_player
