@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """ Provides the GameState class, which is the physical representation
 of the game. The only rules enforced are physical - such as failing to
 draw a card from an empty pile. 
@@ -6,6 +8,7 @@ draw a card from an empty pile.
 from gtrutils import _get_card_from_zone
 from player import Player
 import random
+import logging
 
 class GameState:
   """ Contains the current game state. The methods of this class
@@ -18,7 +21,8 @@ class GameState:
   def __init__(self, players=None, jack_pile=None, library=None, pool=None, 
                foundations=None):
     self.players = []
-    for player in players: self.add_player(player)
+    if players:
+        for player in players: self.add_player(player)
     self.jack_pile = jack_pile or []
     self.library = library or []
     self.pool = pool or []
@@ -59,6 +63,7 @@ class GameState:
     self.thinker_fillup_for_player(player)
 
   def init_players(self):
+    logging.info('--> Initializing players')
     for player in self.players: self.init_player(player)
     
   def add_cards_to_pool(self, cards):
@@ -86,4 +91,11 @@ class GameState:
       maximal-length-of-list-to-shuffle-with-python-random-shuffle
     """
     random.shuffle(self.library)
+
+
+if __name__ == '__main__':
+
+    
+  test = GameState()
+  print test
 
