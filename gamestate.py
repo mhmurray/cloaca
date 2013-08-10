@@ -23,6 +23,8 @@ class GameState:
     self.players = []
     if players:
         for player in players: self.add_player(player)
+    self.leader = None
+    self.priority = None
     self.jack_pile = jack_pile or []
     self.library = library or []
     self.pool = pool or []
@@ -38,11 +40,21 @@ class GameState:
         }
 
   def __repr__(self):
-    rep = ('GameState(players={players!r}, jack_pile={jack_pile!r}, '
+    rep = ('GameState(players={players!r}, leader={leader!r}, '
+           'priority={priority!r}, jack_pile={jack_pile!r}, '
            'library={library!r}, foundations={foundations!r})'
            )
-    return rep.format(players=self.players, jack_pile=self.jack_pile,
-                      library=self.library, foundations=self.foundations)
+    return rep.format(
+        players=self.players, 
+        leader=self.leader,
+        priority= self.priority,
+        jack_pile=self.jack_pile,
+        library=self.library, 
+        foundations=self.foundations
+    )
+
+  def get_n_players(self):
+      return len(self.players)
 
   def thinker_fillup_for_player(self, player):
     n_cards = player.get_max_hand_size() - len(player.hand)

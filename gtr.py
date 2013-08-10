@@ -16,12 +16,8 @@ class Game:
   max_players = 5
   
   def __init__(self, game_state=None):
-
     logging.info('--> Starting a game...')
-
     self.game_state = game_state if game_state is not None else GameState()
-    self.leader = None
-    self.priority = None
 
   def __repr__(self):
     rep=('Game(game_state={game_state!r})')
@@ -33,8 +29,8 @@ class Game:
     self.init_library()
     first_player = self.init_pool(n_players)
     print 'Player {} goes first'.format(self.game_state.players[first_player].name)
-    self.leader = first_player
-    self.priority = first_player
+    self.game_state.leader = first_player
+    self.game_state.priority = first_player
     self.game_state.jack_pile.extend(['Jack'] * Game.initial_jack_count)
     self.init_foundations(n_players)
   
@@ -91,7 +87,10 @@ class Game:
     """
     logging.info('--> Public game state:')
     # print leader and priority
-    print 'Leader : {0},   Priority : {1}'.format(self.leader, self.priority)
+    print 'Leader : {0},   Priority : {1}'.format(
+      self.game_state.leader,
+      self.game_state.priority,
+    )
 
     # print pool. Counter counts multiplicities for us.
     counter = collections.Counter(self.game_state.pool)
