@@ -8,6 +8,7 @@ from player import Player
 from gtrutils import _get_card_from_zone
 from gamestate import GameState
 import collections
+import logging
 
 class Game:
   initial_pool_count = 5
@@ -15,6 +16,9 @@ class Game:
   max_players = 5
   
   def __init__(self, game_state=None):
+
+    logging.info('--> Starting a game...')
+
     self.game_state = game_state if game_state is not None else GameState()
     self.leader = None
     self.priority = None
@@ -24,6 +28,8 @@ class Game:
     return rep.format(game_state = self.game_state)
 
   def init_common_piles(self, n_players):
+    logging.info('--> Initializing the game')
+
     self.init_library()
     first_player = self.init_pool(n_players)
     print 'Player {} goes first'.format(self.game_state.players[first_player].name)
@@ -37,6 +43,7 @@ class Game:
     with one card per player, alphabetically first goes first. Resolves
     ties with more cards.
     """
+    logging.info('--> Initializing the pool')
     player_cards = [""]*n_players
     all_cards_drawn = []
     has_winner = False
@@ -59,11 +66,13 @@ class Game:
     
 
   def init_foundations(self, n_players):
+    logging.info('--> Initializing the foundations')
     for key in self.game_state.foundations:
       # name is 'Rubble', etc. Foundation name is 'Rubble Foundation'.
       self.game_state.foundations[key] = [key + ' Foundation'] * n_players
 
   def init_library(self):
+    logging.info('--> Initializing the library')
     """ Starts with a minimal set of cards. They're just a list of names
     for now.
     """
@@ -80,6 +89,7 @@ class Game:
     # of jacks left, # of each foundation left, who's the leader, public
     player information.
     """
+    logging.info('--> Public game state:')
     # print leader and priority
     print 'Leader : {0},   Priority : {1}'.format(self.leader, self.priority)
 
@@ -117,6 +127,7 @@ class Game:
     number of cards in vault, stockpile, number of cards/jacks in hand, 
     buildings built, buildings under construction and stage of completion.
     """
+    info.logging('--> Player public state:')
     # print name
     print 'Player {0} :'.format(player.name)
 
@@ -148,6 +159,7 @@ class Game:
     buildings built, buildings under construction and stage of completion.
     """
     # print name
+    logging.info('--> Player complete state:')
     print 'Player {0} :'.format(player.name)
 
     # print hand
@@ -168,21 +180,4 @@ class Game:
     # print Buildings
     if len(player.buildings) > 0:
       print player.describe_buildings()
-
-class Card:
-  def __init__(self, name=None, material=None, value=None, role=None):
-    self.name = name or ''
-    self.short_name = name[:4] if name else ''
-    self.material = material
-    self.value = value or 0
-    self.role = role
-
-  def __repr__(self):
-    rep=('Card(name={name!r}, material={material!r}, '
-         'value={value!r}, role={role!r})')
-    return rep.format(name=self.name, material=self.material,
-      value=self.value, role=self.role)
-
-  def __str__(self):
-    return self.name
 
