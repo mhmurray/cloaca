@@ -16,7 +16,6 @@ class Game:
   max_players = 5
   
   def __init__(self, game_state=None):
-    logging.info('--> Starting a game...')
     self.game_state = game_state if game_state is not None else GameState()
 
   def __repr__(self):
@@ -27,10 +26,11 @@ class Game:
     logging.info('--> Initializing the game')
 
     self.init_library()
-    first_player = self.init_pool(n_players)
-    print 'Player {} goes first'.format(self.game_state.players[first_player].name)
-    self.game_state.leader = first_player
-    self.game_state.priority = first_player
+    first_player_index = self.init_pool(n_players)
+    print 'Player {} goes first'.format(
+        self.game_state.players[first_player_index].name)
+    self.game_state.leader_index = first_player_index
+    self.game_state.priority_index = first_player_index
     self.game_state.jack_pile.extend(['Jack'] * Game.initial_jack_count)
     self.init_foundations(n_players)
   
@@ -88,8 +88,8 @@ class Game:
     logging.info('--> Public game state:')
     # print leader and priority
     print 'Leader : {0},   Priority : {1}'.format(
-      self.game_state.leader,
-      self.game_state.priority,
+      self.game_state.players[self.game_state.leader_index].name,
+      self.game_state.players[self.game_state.priority_index].name,
     )
 
     # print pool. Counter counts multiplicities for us.
@@ -115,8 +115,8 @@ class Game:
 
     print ''
     for player in self.game_state.players:
-      #self.print_public_player_state(player)
-      self.print_complete_player_state(player)
+      self.print_public_player_state(player)
+      #self.print_complete_player_state(player)
       print ''
 
   def print_public_player_state(self, player):
@@ -126,9 +126,8 @@ class Game:
     number of cards in vault, stockpile, number of cards/jacks in hand, 
     buildings built, buildings under construction and stage of completion.
     """
-    info.logging('--> Player public state:')
     # print name
-    print 'Player {0} :'.format(player.name)
+    logging.info('--> Player {0} public state:'.format(player.name))
 
     # print hand
     print player.describe_hand_public()
@@ -158,8 +157,7 @@ class Game:
     buildings built, buildings under construction and stage of completion.
     """
     # print name
-    logging.info('--> Player complete state:')
-    print 'Player {0} :'.format(player.name)
+    logging.info('--> Player {0} complete state:'.format(player.name))
 
     # print hand
     print player.describe_hand_private()

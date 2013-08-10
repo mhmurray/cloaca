@@ -23,8 +23,8 @@ class GameState:
     self.players = []
     if players:
         for player in players: self.add_player(player)
-    self.leader = None
-    self.priority = None
+    self.leader_index = None
+    self.priority_index = None
     self.jack_pile = jack_pile or []
     self.library = library or []
     self.pool = pool or []
@@ -38,6 +38,7 @@ class GameState:
         'Stone'   : [],
         'Marble'  : [],
         }
+    self.is_started = False
 
   def __repr__(self):
     rep = ('GameState(players={players!r}, leader={leader!r}, '
@@ -46,8 +47,8 @@ class GameState:
            )
     return rep.format(
         players=self.players, 
-        leader=self.leader,
-        priority= self.priority,
+        leader=self.leader_index,
+        priority= self.priority_index,
         jack_pile=self.jack_pile,
         library=self.library, 
         foundations=self.foundations
@@ -67,8 +68,10 @@ class GameState:
     player.add_cards_to_hand([self.draw_jack()])
 
   def add_player(self, player):
-    """ Adds a player, which is of class Player. """
+    """ Adds a player, which is of class Player. Returns index of player. """
     self.players.append(player)
+    player_index = len(self.players) - 1
+    return player_index
   
   def init_player(self, player):
     player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
