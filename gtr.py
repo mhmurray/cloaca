@@ -5,7 +5,7 @@
 """
 
 from player import Player
-from gtrutils import _get_card_from_zone
+from gtrutils import get_card_from_zone
 from gamestate import GameState
 import collections
 import logging
