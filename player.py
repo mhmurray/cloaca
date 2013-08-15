@@ -12,6 +12,8 @@ import collections
 class Player:
   """ Contains the piles and items controlled by a player. """
   max_hand_size = 5
+  # Must use this None->(if hand)->[] method because all players end up
+  # pointing to the same list if the default is [].
   def __init__(self, name='Player', hand=None, stockpile=None, clientele=None,
                vault=None, camp=None, buildings=None, influence=None):
     self.name = name
