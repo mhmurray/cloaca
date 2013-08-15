@@ -6,7 +6,7 @@ this class does not enforce anything more than physical limitations,
 like failing to get a card from an empty stack.
 """
 
-from gtrutils import _get_card_from_zone
+from gtrutils import get_card_from_zone
 import collections
 
 class Player:
@@ -36,22 +36,22 @@ class Player:
     return Player.max_hand_size
 
   def get_card_from_hand(self, card):
-    return _get_card_from_zone(card, self.hand)
+    return get_card_from_zone(card, self.hand)
 
   def get_card_from_stockpile(self, card):
-    return _get_card_from_zone(card, self.stockpile)
+    return get_card_from_zone(card, self.stockpile)
 
   def get_card_from_vault(self, card):
-    return _get_card_from_zone(card, self.vault)
+    return get_card_from_zone(card, self.vault)
 
   def get_card_from_clientele(self, card):
-    return _get_card_from_zone(card, self.clientele)
+    return get_card_from_zone(card, self.clientele)
 
   def get_card_from_influence(self, card):
-    return _get_card_from_zone(card, self.influence)
+    return get_card_from_zone(card, self.influence)
 
   def get_card_from_camp(self,card):
-    return _get_card_from_zone(card, self.camp)
+    return get_card_from_zone(card, self.camp)
 
   def add_cards_to_hand(self, cards):
     self.hand.extend(cards)

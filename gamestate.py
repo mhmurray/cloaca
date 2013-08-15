@@ -5,7 +5,7 @@ of the game. The only rules enforced are physical - such as failing to
 draw a card from an empty pile. 
 """
 
-from gtrutils import _get_card_from_zone
+from gtrutils import get_card_from_zone
 from player import Player
 import random
 import logging
@@ -85,7 +85,7 @@ class GameState:
     self.pool.extend(cards)
 
   def get_card_from_pool(self, card):
-    return _get_card_from_zone(card, pool)
+    return get_card_from_zone(card, pool)
     
   def draw_jack(self):
     return self.jack_pile.pop()
