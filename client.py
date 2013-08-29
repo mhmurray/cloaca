@@ -45,6 +45,7 @@ def wait_for_my_turn(my_index):
   priority_index = None
   # keep checking game state until it is my turn
   while my_index is not priority_index:
+    time.sleep(0.1)
     game_state = get_game_state()
     priority_index = game_state.priority_index
     leader_index = game_state.leader_index
@@ -79,25 +80,65 @@ def main():
 
 
   # prompt player to join game when desired number of players is reached
-  response = 'n'
-  while response is not 'y':
-    game_state = get_game_state()
-    n_players = game_state.get_n_players() 
-    print '--> There are {n!r} players.'.format(n=n_players)
-    response = raw_input('--> Would you like to start? [y/n]: ')
+  response = '-'
+  while True:
     if response is 'y':
+      break
+    elif response is 'n':
+      logging.warn('Goodbye!')
+      exit()
+    else:
       game_state = get_game_state()
+      n_players = game_state.get_n_players() 
+      print '--> There are {0:d} players.'.format(n_players)
+      response = raw_input('--> Would you like to start? [y/n]: ')
+      if response is 'y':
+        game_state = get_game_state()
 
-      # check whether someone else has started the game
-      if not game_state.is_started:
-        game = gtr.Game(game_state=game_state)
-        game_state.is_started = True
-        # initialize the game
-        game.init_common_piles(n_players=n_players)
-        game.game_state.init_players()
-        save_game_state(game_state=game_state)
+        # check whether someone else has started the game
+        if not game_state.is_started:
+          game = gtr.Game(game_state=game_state)
+          game_state.is_started = True
+          # initialize the game
+          game.init_common_piles(n_players=n_players)
+          game.game_state.init_players()
+          save_game_state(game_state=game_state)
 
-  wait_for_my_turn(my_index=my_index)
+  while True:
+    time.sleep(0.1)
+    wait_for_my_turn(my_index=my_index)
+    # It is now my turn and the game state was just printed
+    while True:
+      # Just take the first character of the reposnse, lower case.
+      response_string=raw_input(
+        '--> Take an action: [M]ove a card between zones, [T]hinker: ')
+      response = response_string.lower()[0]
+      if response == 'm':
+        card_name, source, dest = MoveACardDialog()
+      elif response == 't':
+        thinker_type = ThinkerTypeDialog()
+
+def MoveACardDialog():
+  while True:
+    response_str = raw_input(
+      '--> Move a Card: Please input the card name ([q]uit, [s]tart over): ')
+    if response_str in ['q', 'quit']: continue
+    elif response_str in ['s', 'start over']: return ('','','')
+    else: card_name = response_str.lower()
+
+    response_str = raw_input('--> Card Source: ')
+    if response_str in ['q', 'quit']: continue
+    elif response_str in ['s', 'start over']: return ('','','')
+    else: card_source = response_str.lower()
+
+    response_str = raw_input('--> Card Destination: ')
+    if response_str in ['q', 'quit']: continue
+    elif response_str in ['s', 'start over']: return ('','','')
+    else: card_destination = response_str.lower()
+
+  return (card_name, card_source, card_destination)
+
+
 
 
 if __name__ == '__main__':

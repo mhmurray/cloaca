@@ -106,6 +106,11 @@ class GameState:
       maximal-length-of-list-to-shuffle-with-python-random-shuffle
     """
     random.shuffle(self.library)
+    
+  def pass_priority(self):
+    self.priority_index += 1;
+    while self.priority_index >= len(self.players):
+      self.priority_index -= len(self.players)
 
 
 if __name__ == '__main__':
