@@ -19,7 +19,7 @@ class GameState:
   """
 
   def __init__(self, players=None, jack_pile=None, library=None, pool=None, 
-               foundations=None):
+               foundations=None, card_definitions_dict=None):
     self.players = []
     if players:
         for player in players: self.add_player(player)
@@ -83,7 +83,7 @@ class GameState:
       self.leader_index))
 
   def print_turn_info(self):
-      logging.info('----------------------------------')
+      logging.info('----------------------------------------------------------')
       logging.info('--> Turn {0} | leader: {1} | priority: {2} | phase {3!s}'.format(
         self.turn_index, 
         self.players[self.leader_index].name,

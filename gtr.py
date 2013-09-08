@@ -7,6 +7,7 @@
 from player import Player
 from gtrutils import get_card_from_zone
 from gamestate import GameState
+import card_definition_reader  
 import collections
 import logging
 
@@ -68,14 +69,24 @@ class Game:
       self.game_state.foundations[key] = [key + ' Foundation'] * n_players
 
   def init_library(self):
-    logging.info('--> Initializing the library')
-    """ Starts with a minimal set of cards. They're just a list of names
-    for now.
-    """
-    initial_cards = [
-      'Latrine', 'Vomitorium', 'Colisseum', 'Statue', 'Pallisade', 'Atrium'
-      ]
-    self.game_state.library = initial_cards * 5
+    """ Starts with just a list of names for now.  """
+
+    # read in card definitions from csv file:
+    card_definitions_dict = card_definition_reader.get_cards_dict()
+
+    self.game_state.library = []
+    # the keys of the card dict are the card names:
+    for (card_name, card_dict) in card_definitions_dict.items():
+        
+        card_count = card_dict['card_count']
+        card_count = int(card_count)
+        self.game_state.library.extend([card_name]*card_count)
+
+    #self.game_state.library.sort()
+    #print self.game_state.library
+        
+    logging.info('--> Initializing the library ({0} cards)'.format(
+      len(self.game_state.library)))
     self.game_state.shuffle_library()
 
   def show_public_game_state(self):
