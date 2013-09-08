@@ -7,7 +7,7 @@ like failing to get a card from an empty stack.
 """
 
 from gtrutils import get_card_from_zone
-import collections
+from gtrutils import get_short_zone_summary
 
 class Player:
   """ Contains the piles and items controlled by a player. """
@@ -88,12 +88,8 @@ class Player:
   def describe_hand_private(self):
     """ Returns a string describing all of the player's hand.
     """
-    counter = collections.Counter(self.hand)
-    hand_string = 'Hand : '
-    for card, count in counter.items():
-      hand_string += '{0}[{1:d}], '.format(card[:4], count)
-    hand_string.rstrip(', ')
-    return hand_string
+    cards_string = 'Hand : ' + get_short_zone_summary(self.hand)
+    return cards_string
 
   def describe_vault_public(self):
     """ Returns a string describing the player's public-facing vault.
@@ -105,32 +101,24 @@ class Player:
   def describe_clientele(self):
     """ Returns a string describing a player's clientele.
     """
-    counter = collections.Counter(self.clientele)
-    clientele_string = 'Clientele : '
-    for card, count in counter.items():
-      clientele_string += '{0}[{1:d}], '.format(card[:4], count)
-    clientele_string.rstrip(', ')
-    return clientele_string
+    cards_string = 'Clientele : ' + get_short_zone_summary(self.clientele)
+    return cards_string
 
   def describe_stockpile(self):
     """ Returns a string describing a player's stockpile.
     """
-    counter = collections.Counter(self.stockpile)
-    stockpile_string = 'Stockpile : '
-    for card, count in counter.items():
-      stockpile_string += '{0}[{1:d}], '.format(card[:4], count)
-    stockpile_string.rstrip(', ')
-    return stockpile_string
+    cards_string = 'Stockpile : ' + get_short_zone_summary(self.stockpile)
+    return cards_string
 
   def describe_buildings(self):
     """ Returns a string describing the player's buildings.
     """
-    counter = collections.Counter(player.buildings)
-    buildings_string = 'Buildings : '
-    for card, count in counter.items():
-      buildings_string += '{0}[{1:d}], '.format(card[:4], count)
-    buildings_string.rstrip(', ')
-    return buildings_string
+    cards_string = 'Buildings : ' + get_short_zone_summary(self.buildings)
+    return cards_string
+
+  def describe_camp(self):
+    cards_string = 'Camp : ' + get_short_zone_summary(self.camp)
+    return cards_string
 
     
 

@@ -87,10 +87,7 @@ class Game:
     """
     logging.info('--> Public game state:')
     # print leader and priority
-    print 'Leader : {0},   Priority : {1}'.format(
-      self.game_state.players[self.game_state.leader_index].name,
-      self.game_state.players[self.game_state.priority_index].name,
-    )
+    self.game_state.print_turn_info()
 
     # print pool. Counter counts multiplicities for us.
     counter = collections.Counter(self.game_state.pool)
@@ -118,6 +115,7 @@ class Game:
       self.print_public_player_state(player)
       #self.print_complete_player_state(player)
       print ''
+
 
   def print_public_player_state(self, player):
     """ Prints a player's public information.
@@ -147,6 +145,10 @@ class Game:
     # print Buildings
     if len(player.buildings) > 0:
       print player.describe_buildings()
+
+    # print Camp
+    if len(player.camp) > 0:
+      print player.describe_camp()
 
 
   def print_complete_player_state(self, player):
