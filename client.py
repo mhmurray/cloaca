@@ -151,7 +151,7 @@ def MoveACardDialog(game_state, player_index):
   logging.info('Move a Card: Choose the destination zone:')
   possible_zones = get_possible_zones_list(game_state, player_index)
   while True:
-    response_str = raw_input('--> Card Destination: ')
+    response_str = raw_input('--> Card Destination ([q]uit, [s]tart over): ')
     if response_str in ['s', 'start over']: continue
     elif response_str in ['q', 'quit']: return ('','','')
     try:
@@ -166,10 +166,33 @@ def MoveACardDialog(game_state, player_index):
   card_source, card_destination))
   return (card_name, card_source, card_destination)
 
-def ThinkerTypeDialog():
-    logging.info('Thinking...')
-    logging.error('Thinking is not implemented yet.')
-    return
+
+def ThinkerTypeDialog(game_state, player_index):
+
+  logging.info('Thinker:')
+  player = game_state.players[player_index]
+  n_possible_cards = player.get_max_hand_size() - len(player.hand)
+  if n_possible_cards == 0:
+      n_possible_cards = 1
+  logging.info('[1] Jack')
+  logging.info('[2] Fill up from library ({0} cards)'.format(n_possible_cards))
+  while True:
+    response_str = raw_input('--> Your choice ([q]uit, [s]tart over): ')
+    if response_str in ['s', 'start over']: continue
+    elif response_str in ['q', 'quit']: return ('','','')
+    try:
+      response_int = int(response_str)
+      break
+    except:
+      logging.info('your response was {0!s}... try again'.format(response_str))
+    if response_int == 1:
+      game_state.draw_one_jack_for_player(player)
+    elif response_int == 2:
+      game_state.thinker_fillup_for_player(player)
+    else:
+      continue
+
+    
 
 def main():
 
@@ -241,7 +264,7 @@ def main():
         except: continue
 
       elif response == 't':
-        thinker_type = ThinkerTypeDialog()
+        thinker_type = ThinkerTypeDialog(game_state, my_index)
         save_game_state(game_state)
 
       elif response == 'e':
