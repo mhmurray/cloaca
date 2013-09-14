@@ -68,24 +68,38 @@ def get_possible_zones_list(game_state, player_index):
   possible_zones = []
   possible_zones.append(('your camp', player.camp))
   possible_zones.append(('your hand', player.hand))
-  possible_zones.append(('your buildings', player.buildings))
   possible_zones.append(('pool', game_state.pool))
   possible_zones.append(('foundations', game_state.foundations))
+  
+
+  empty_site_exists = False
+  for building in player.buildings:
+      if not building:
+          empty_site_exists = True
+          name = 'Start a new building'
+      else:
+          name = 'Building {0}'.format(building[0])
+      possible_zones.append((name, building))
+  if not empty_site_exists:
+      # add an empty site
+      building = []
+      player.buildings.append(building)
+      possible_zones.append(('Start a new building', building))
 
   # print these possiblities
-  for zone_index in xrange(len(possible_zones)):
-    (name, zone) = possible_zones[zone_index]
-    logging.info('  [{0}] {1}'.format(zone_index, name))
-
+  for zone_index, (name, zone) in enumerate(possible_zones):
+    logging.info('  [{0}] {1}'.format(zone_index+1, name))
   return possible_zones
 
 def get_possible_cards_list(card_list):
   """ Returns list of cards, prints an indexed menu """
 
-  for card_index in xrange(len(card_list)):
-      logging.info('  [{0}] {1}'.format(card_index, card_list[card_index]))
+  for card_index, card_name in enumerate(card_list):
+      logging.info('  [{0}] {1}'.format(card_index+1, card_name))
   return card_list
 
+def get_possible_buildings_list(game_state, player_index):
+  player = game_state.players[player_index]
 
 
 
@@ -101,11 +115,21 @@ def MoveACardDialog(game_state, player_index):
     elif response_str in ['q', 'quit']: return ('','','')
     try:
       response_int = int(response_str)
-      (name, card_source) = possible_zones[response_int]
+      (name, card_source) = possible_zones[response_int-1]
       logging.debug('source zone = {0!s}'.format(name))
-      break
     except:
       logging.info('your response was {0!s}... try again'.format(response_str))
+
+
+    # buildings is a "zone of zones!"
+
+    player = game_state.players[player_index]
+    if card_source is player.buildings:
+      logging.debug('card source is buildings!')
+
+    
+    break
+
 
   # choose the card
   logging.info('Move a Card: Choose the card to move:')
@@ -117,7 +141,7 @@ def MoveACardDialog(game_state, player_index):
     elif response_str in ['q', 'quit']: return ('','','')
     try:
       response_int = int(response_str)
-      card_name = possible_cards[response_int]
+      card_name = possible_cards[response_int-1]
       logging.debug('card_name = {0!s}'.format(card_name))
       break
     except:
@@ -132,8 +156,8 @@ def MoveACardDialog(game_state, player_index):
     elif response_str in ['q', 'quit']: return ('','','')
     try:
       response_int = int(response_str)
-      (name, card_destination) = possible_zones[response_int]
-      logging.debug('source zone = {0!s}'.format(name))
+      (name, card_destination) = possible_zones[response_int-1]
+      logging.debug('destination zone = {0!s}'.format(name))
       break
     except:
       logging.info('your response was {0!s}... try again'.format(response_str))
@@ -204,7 +228,10 @@ def main():
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
         '--> Take an action: [M]ove a card between zones, [T]hinker, [E]nd turn phase: ')
-      response = response_string.lower()[0]
+      try:
+        response = response_string.lower()[0]
+      except IndexError:
+        continue
       if response == 'm':
         card_name, source, dest = MoveACardDialog(game_state, my_index)
         try:
