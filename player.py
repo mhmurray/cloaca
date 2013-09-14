@@ -8,6 +8,8 @@ like failing to get a card from an empty stack.
 
 from gtrutils import get_card_from_zone
 from gtrutils import get_short_zone_summary
+from gtrutils import get_detailed_card_summary
+import collections
 
 class Player:
   """ Contains the piles and items controlled by a player. """
@@ -88,7 +90,13 @@ class Player:
   def describe_hand_private(self):
     """ Returns a string describing all of the player's hand.
     """
-    cards_string = 'Hand : ' + get_short_zone_summary(self.hand)
+    #cards_string = 'Hand : ' + get_short_zone_summary(self.hand)
+
+    cards_string = ''
+    counter = collections.Counter(self.hand)
+    for card, count in counter.items():
+      cards_string += get_detailed_card_summary(card, count)
+        
     return cards_string
 
   def describe_vault_public(self):
