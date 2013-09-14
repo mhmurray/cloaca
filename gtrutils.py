@@ -2,6 +2,7 @@
 
 import logging
 import collections
+import card_manager
 
 """ Utility functions for GTR.
 """
@@ -34,6 +35,24 @@ def get_short_zone_summary(card_list):
     cards_string += '{0}[{1:d}], '.format(card[:4], count)
   cards_string.rstrip(', ')
   return cards_string
+
+def get_detailed_card_summary(card, count=None):
+  """ return a single-line string to describe one card in detail """
+
+  card_string = '{0}'.format(card[:4])
+  if count:
+    card_string += '[{0:d}]'.format(count)
+  if card != 'Jack':
+    material = card_manager.get_material_of_card(card)
+    role = card_manager.get_role_of_card(card)
+    value = card_manager.get_value_of_card(card)
+    function = card_manager.get_function_of_card(card)
+    card_string += ' | {0}'.format(material[:3])
+    card_string += ' | {0}'.format(role[:3])
+    card_string += ' | {0}'.format(value)
+    card_string += ' | {0}'.format(function)
+  card_string += '\n'
+  return card_string
 
 
 
