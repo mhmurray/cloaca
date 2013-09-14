@@ -54,6 +54,40 @@ def get_detailed_card_summary(card, count=None):
   card_string += '\n'
   return card_string
 
+def get_building_info(building):
+    """ Return a string to describe a building """
+
+    # each building is a list where the 0th card defines the building, the other
+    # orders cards are the materials, and there may be a site card
+
+    # the 0th card is the title card
+    if not building:
+        return ''
+    title_card = building[0]
+    function = card_manager.get_function_of_card(title_card)
+    
+  
+    has_site = False
+    has_materials = False
+    materials_string = ''
+    for card in building[1:]:
+      try:
+        material = card_manager.get_material_of_card(card)
+        materials_string += material[0]
+        has_materials = True
+      except: 
+        site_material = card
+        has_site = True
+        
+    info = '{0} | '.format(title_card)
+    if has_site:
+        info += '{0} site '.format(site_material[:3])
+    if has_materials:
+        info += '+ '
+    info += '{0} '.format(materials_string)
+    info +=  ' | {0}'.format(function)
+    return info
+
 
 
 if __name__ == '__main__':
