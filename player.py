@@ -9,6 +9,7 @@ like failing to get a card from an empty stack.
 from gtrutils import get_card_from_zone
 from gtrutils import get_short_zone_summary
 from gtrutils import get_detailed_card_summary
+from gtrutils import get_building_info
 import collections
 
 class Player:
@@ -92,8 +93,11 @@ class Player:
     """
     #cards_string = 'Hand : ' + get_short_zone_summary(self.hand)
 
-    cards_string = ''
+    cards_string = '{0}: \n'.format(self.describe_hand_public())
     counter = collections.Counter(self.hand)
+
+    cards_string += 'Card    | Mat | Rol | $ | Description \n'
+
     for card, count in counter.items():
       cards_string += get_detailed_card_summary(card, count)
         
@@ -121,8 +125,15 @@ class Player:
   def describe_buildings(self):
     """ Returns a string describing the player's buildings.
     """
-    cards_string = 'Buildings : ' + get_short_zone_summary(self.buildings)
+    # buildings are lists of lists, where the 
+    cards_string = 'Buildings: \n' 
+    for building in self.buildings:
+        cards_string += get_building_info(building)
+        cards_string += '\n'
+
     return cards_string
+
+
 
   def describe_camp(self):
     cards_string = 'Camp : ' + get_short_zone_summary(self.camp)
