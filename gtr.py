@@ -7,7 +7,7 @@
 from player import Player
 from gtrutils import get_card_from_zone
 from gamestate import GameState
-import card_definition_reader  
+import card_manager 
 import collections
 import logging
 
@@ -72,14 +72,15 @@ class Game:
     """ Starts with just a list of names for now.  """
 
     # read in card definitions from csv file:
-    card_definitions_dict = card_definition_reader.get_cards_dict()
+    card_definitions_dict = card_manager.get_cards_dict_from_json_file()
+    # the keys of the card dict are the card names:
+    card_names = card_definitions_dict.keys()
+    card_names.sort()
 
     self.game_state.library = []
-    # the keys of the card dict are the card names:
-    for (card_name, card_dict) in card_definitions_dict.items():
+    for card_name in card_names:
         
-        card_count = card_dict['card_count']
-        card_count = int(card_count)
+        card_count = card_manager.get_count_of_card(card_name)
         self.game_state.library.extend([card_name]*card_count)
 
     #self.game_state.library.sort()
