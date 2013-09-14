@@ -144,6 +144,7 @@ def MoveACardDialog(game_state, player_index):
 
 def ThinkerTypeDialog():
     logging.info('Thinking...')
+    logging.error('Thinking is not implemented yet.')
     return
 
 def main():
