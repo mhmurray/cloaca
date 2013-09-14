@@ -1,0 +1,202 @@
+{
+  "Academy": {
+    "card_count": "3", 
+    "function": "May perform one THINKER action after turn during which you performed CRAFTSMAN action", 
+    "material": "Brick"
+  }, 
+  "Amphitheatre": {
+    "card_count": "3", 
+    "function": "May perform one CRAFTSMAN action for each INFLUENCE", 
+    "material": "Concrete"
+  }, 
+  "Aqueduct": {
+    "card_count": "3", 
+    "function": "When performing PATRON action may take client from HAND.  Maximum CLIENTELE x 2", 
+    "material": "Concrete"
+  }, 
+  "Archway": {
+    "card_count": "3", 
+    "function": "When performing ARCHITECT action may take material from POOL", 
+    "material": "Brick"
+  }, 
+  "Atrium": {
+    "card_count": "3", 
+    "function": "When performing MERCHANT action may take from DECK (do not look at card)", 
+    "material": "Brick"
+  }, 
+  "Bar": {
+    "card_count": "6", 
+    "function": "When performing PATRON action may take card from DECK", 
+    "material": "Rubble"
+  }, 
+  "Basilica": {
+    "card_count": "3", 
+    "function": "When performing MERCHANT action may take material from HAND", 
+    "material": "Marble"
+  }, 
+  "Bath": {
+    "card_count": "3", 
+    "function": "When performing PATRON action each client you hire may perform its action once as it enters CLIENTELE", 
+    "material": "Brick"
+  }, 
+  "Bridge": {
+    "card_count": "3", 
+    "function": "When performing LEGIONARY action may take material from STOCKPILE.  Ignore Palisades.  May take from all opponents", 
+    "material": "Concrete"
+  }, 
+  "Catacomb": {
+    "card_count": "3", 
+    "function": "Game ends immediately.  Score as usual", 
+    "material": "Stone"
+  }, 
+  "Circus": {
+    "card_count": "6", 
+    "function": "May play two cards of same role as JACK", 
+    "material": "Wood"
+  }, 
+  "Circus Maximus": {
+    "card_count": "3", 
+    "function": "Each client may perform its action twice when you lead or follow its role", 
+    "material": "Stone"
+  }, 
+  "Coliseum": {
+    "card_count": "3", 
+    "function": "When performing LEGIONARY action may take opponent's client and place in VAULT as material", 
+    "material": "Stone"
+  }, 
+  "Dock": {
+    "card_count": "6", 
+    "function": "When performing LABORER action may take material from HAND", 
+    "material": "Wood"
+  }, 
+  "Forum": {
+    "card_count": "3", 
+    "function": "One client of each role wins game", 
+    "material": "Marble"
+  }, 
+  "Foundry": {
+    "card_count": "3", 
+    "function": "May perform one LABORER action for each INFLUENCE", 
+    "material": "Brick"
+  }, 
+  "Fountain": {
+    "card_count": "3", 
+    "function": "When performing CRAFTSMAN action may use cards from DECK.  Retain any unused cards in HAND", 
+    "material": "Marble"
+  }, 
+  "Garden": {
+    "card_count": "3", 
+    "function": "May perform one PATRON action for each INFLUENCE", 
+    "material": "Stone"
+  }, 
+  "Gate": {
+    "card_count": "3", 
+    "function": "Incomplete MARBLE structures provide FUNCTION", 
+    "material": "Brick"
+  }, 
+  "Insula": {
+    "card_count": "6", 
+    "function": "Maximum CLIENTELE + 2", 
+    "material": "Rubble"
+  }, 
+  "Latrine": {
+    "card_count": "6", 
+    "function": "Before performing THINKER action may discard one card to POOL", 
+    "material": "Rubble"
+  }, 
+  "Ludus Magna": {
+    "card_count": "3", 
+    "function": "Each MERCHANT client counts as any role", 
+    "material": "Marble"
+  }, 
+  "Market": {
+    "card_count": "6", 
+    "function": "Maximum VAULT + 2", 
+    "material": "Wood"
+  }, 
+  "Palace": {
+    "card_count": "3", 
+    "function": "May play multiple cards of same role in order to perform additional actions", 
+    "material": "Marble"
+  }, 
+  "Palisade": {
+    "card_count": "6", 
+    "function": "Immune to LEGIONARY", 
+    "material": "Wood"
+  }, 
+  "Prison": {
+    "card_count": "3", 
+    "function": "May exchange INFLUENCE for opponent's completed structure", 
+    "material": "Stone"
+  }, 
+  "Road": {
+    "card_count": "6", 
+    "function": "When adding to STONE structure may use any material", 
+    "material": "Rubble"
+  }, 
+  "School": {
+    "card_count": "3", 
+    "function": "May perform one THINKER action for each INFLUENCE", 
+    "material": "Brick"
+  }, 
+  "Scriptorium": {
+    "card_count": "3", 
+    "function": "May use one MARBLE material to complete any structure", 
+    "material": "Stone"
+  }, 
+  "Senate": {
+    "card_count": "3", 
+    "function": "May take opponent's JACK into HAND at end of turn in which it is played", 
+    "material": "Concrete"
+  }, 
+  "Sewer": {
+    "card_count": "3", 
+    "function": "May place Orders cards used to lead or follow into STOCKPILE at end of turn", 
+    "material": "Stone"
+  }, 
+  "Shrine": {
+    "card_count": "3", 
+    "function": "Maximum HAND + 2", 
+    "material": "Brick"
+  }, 
+  "Stairway": {
+    "card_count": "3", 
+    "function": "When performing ARCHITECT action may add material to opponent's completed STRUCTURE to make function available to all players", 
+    "material": "Marble"
+  }, 
+  "Statue": {
+    "card_count": "3", 
+    "function": "+ 3 VP. May place Statue on any SITE", 
+    "material": "Marble"
+  }, 
+  "Storeroom": {
+    "card_count": "3", 
+    "function": "All clients count as LABORERS", 
+    "material": "Concrete"
+  }, 
+  "Temple": {
+    "card_count": "3", 
+    "function": "Maximum HAND + 4", 
+    "material": "Marble"
+  }, 
+  "Tower": {
+    "card_count": "3", 
+    "function": "May use RUBBLE in any STRUCTURE.  May lay foundation onto any out of town SITE at no extra cost", 
+    "material": "Concrete"
+  }, 
+  "Villa": {
+    "card_count": "3", 
+    "function": "When performing ARCHITECT action may complete Villa with one material", 
+    "material": "Stone"
+  }, 
+  "Vomitorium": {
+    "card_count": "3", 
+    "function": "Before performing THINKER action may discard all cards to POOL", 
+    "material": "Concrete"
+  }, 
+  "Wall": {
+    "card_count": "3", 
+    "function": "Immune to LEGIONARY.  + 1 VP for every two materials in STOCKPILE", 
+    "material": "Concrete"
+  }
+}
