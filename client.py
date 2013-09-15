@@ -80,7 +80,7 @@ def wait_for_my_turn(my_index):
 
   logging.info('--> You have priority!')
   # print hand
-  game_state.players[my_index].describe_hand_private()
+  logging.info(game_state.players[my_index].describe_hand_private())
 
 
 def get_possible_zones_list(game_state, player_index):
