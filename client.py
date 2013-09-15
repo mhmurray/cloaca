@@ -38,7 +38,7 @@ def get_previous_game_state(log_file_prefix='log_state'):
   time_stamp = log_file_name.split('_')[-1].split('.')[0:1]
   time_stamp = '.'.join(time_stamp)
   asc_time = time.asctime(time.localtime(float(time_stamp)))
-  logging.debug('Retrieving game state from {0}'.format(asc_time))
+  #logging.debug('Retrieving game state from {0}'.format(asc_time))
 
   log_file = file(log_file_name, 'r')
   game_state = pickle.load(log_file)
@@ -52,6 +52,7 @@ def save_game_state(game_state, log_file_prefix='log_state'):
   """
   # get the current time, in seconds 
   time_stamp = time.time()
+  game_state.time_stamp = time_stamp
   file_name = '{0}_{1}.log'.format(log_file_prefix, time_stamp)
   log_file = file(file_name, 'w')
   pickle.dump(game_state, log_file)
@@ -274,6 +275,8 @@ def main():
     # It is now my turn and the game state was just printed
     while True:
       game_state = get_previous_game_state()
+      asc_time = time.asctime(time.localtime(game_state.time_stamp))
+      logging.debug('--> Previous game state is from {0}'.format(asc_time))
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
         '--> Take an action: [M]ove a card between zones, [T]hinker, [E]nd turn phase: ')
