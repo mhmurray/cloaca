@@ -192,10 +192,8 @@ def ThinkerTypeDialog(game_state, player_index):
 
   logging.info('Thinker:')
   player = game_state.players[player_index]
-  n_possible_cards = player.get_max_hand_size() - len(player.hand)
-  if n_possible_cards == 0:
-      n_possible_cards = 1
   logging.info('[1] Jack')
+  n_possible_cards = player.get_n_possible_thinker_cards()
   logging.info('[2] Fill up from library ({0} cards)'.format(n_possible_cards))
   while True:
     response_str = raw_input('--> Your choice ([q]uit, [s]tart over): ')
@@ -203,15 +201,17 @@ def ThinkerTypeDialog(game_state, player_index):
     elif response_str in ['q', 'quit']: return ('','','')
     try:
       response_int = int(response_str)
+      if response_int == 1:
+        game_state.draw_one_jack_for_player(player)
+      elif response_int == 2:
+        game_state.thinker_fillup_for_player(player)
+      else:
+        continue
+      logging.info(player.describe_hand_private())
+      save_game_state(game_state)
       break
     except:
       logging.info('your response was {0!s}... try again'.format(response_str))
-    if response_int == 1:
-      game_state.draw_one_jack_for_player(player)
-    elif response_int == 2:
-      game_state.thinker_fillup_for_player(player)
-    else:
-      continue
 
     
 
@@ -252,9 +252,6 @@ def main():
       game_state = get_previous_game_state()
       n_players = game_state.get_n_players() 
       logging.info('--> There are {0:d} players including you.'.format(n_players))
-      if game_state.is_started:
-        logging.error('--> This game has started already!!')
-        return
       response = raw_input(
         '--> Would you like to start? [y/n/wait for more players] : ')
       if response is 'y':
