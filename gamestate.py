@@ -26,7 +26,6 @@ class GameState:
     self.leader_index = None
     self.priority_index = None
     self.turn_index = 0
-    self.is_phase_two = False # the playing phase
     self.jack_pile = jack_pile or []
     self.library = library or []
     self.pool = pool or []
@@ -62,16 +61,11 @@ class GameState:
       self.priority_index = self.priority_index + 1
       if self.priority_index >= self.get_n_players():
         self.priority_index = 0
-        if self.is_phase_two: # increment the leader at phase 2 end
-          self.increment_leader_index()
-        # toggle between game phase 1 (lead/follow) and 2 (play):
-        self.is_phase_two = not self.is_phase_two
       logging.debug(
-        'priority index changed from {0} to {1}; turn {2}, phase {3!s}'.format(
+        'priority index changed from {0} to {1}; turn {2}'.format(
           prev_index,
           self.priority_index,
           self.turn_index,
-          self.is_phase_two+1,
       ))
 
   def increment_leader_index(self):
@@ -84,12 +78,10 @@ class GameState:
       self.leader_index))
 
   def print_turn_info(self):
-      logging.info('----------------------------------------------------------')
-      logging.info('--> Turn {0} | leader: {1} | priority: {2} | phase {3!s}'.format(
+      logging.info('--> Turn {0} | leader: {1} | priority: {2}'.format(
         self.turn_index, 
         self.players[self.leader_index].name,
         self.players[self.priority_index].name,
-        self.is_phase_two+1,
       )) 
 
   def get_n_players(self):
