@@ -88,7 +88,11 @@ class GameState:
       return len(self.players)
 
   def thinker_fillup_for_player(self, player):
-    n_cards = player.get_max_hand_size() - len(player.hand)
+    n_cards = player.get_n_possible_thinker_cards()
+    logging.debug('Adding {0} cards to player {1} hand'.format(
+      n_cards,
+      player.name
+    ))
     player.add_cards_to_hand(self.draw_cards(n_cards))
 
   def draw_one_card_for_player(self, player):
