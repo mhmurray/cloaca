@@ -19,7 +19,7 @@ class GameState:
   """
 
   def __init__(self, players=None, jack_pile=None, library=None, pool=None, 
-               foundations=None, card_definitions_dict=None):
+               foundations=None, card_definitions_dict=None, time_stamp=None):
     self.players = []
     if players:
         for player in players: self.add_player(player)
@@ -41,6 +41,7 @@ class GameState:
         'Marble'  : [],
         }
     self.is_started = False
+    self.time_stamp = time_stamp
 
   def __repr__(self):
     rep = ('GameState(players={players!r}, leader={leader!r}, '
