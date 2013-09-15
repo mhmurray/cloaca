@@ -134,15 +134,16 @@ class Player:
     # buildings are lists of lists, where the 
     cards_string = 'Buildings: \n' 
     for building in self.buildings:
-        cards_string += get_building_info(building)
-        cards_string += '\n'
+        if building:
+          cards_string += get_building_info(building)
+          cards_string += '\n'
 
     return cards_string
 
 
 
   def describe_camp(self):
-    cards_string = 'Camp : ' + get_short_zone_summary(self.camp)
+    cards_string = 'Camp : \n' + get_detailed_zone_summary(self.camp)
     return cards_string
 
     
