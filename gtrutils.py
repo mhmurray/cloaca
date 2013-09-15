@@ -7,15 +7,9 @@ import card_manager
 """ Utility functions for GTR.
 """
 
-def print_line():
+def print_line(symbol='-'):
   """ Print a line for visual division of info """
-  logging.info(
-    '-------------------------------'
-    '-------------------------------'
-    '-------------------------------'
-    '-------------------------------'
-
-  )
+  logging.info(symbol*80)
 
 def get_card_from_zone(card, zone):
   """ Wrapper around the possible exception caused by trying to 
@@ -63,6 +57,16 @@ def get_detailed_card_summary(card, count=None):
     card_string += ' | {0}'.format(function)
   card_string += '\n'
   return card_string
+
+def get_detailed_zone_summary(zone):
+  """ return a multi-line description of cards in zone """
+
+  counter = collections.Counter(zone)
+  zone_string = 'Card    | Mat | Rol | $ | Description \n'
+  for card, count in counter.items():
+    zone_string += get_detailed_card_summary(card, count)
+  return zone_string
+
 
 def get_building_info(building):
     """ Return a string to describe a building """
