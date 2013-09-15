@@ -7,7 +7,7 @@
 from player import Player
 from gtrutils import get_card_from_zone
 from gamestate import GameState
-from gtrutils import print_line
+import gtrutils
 import card_manager 
 
 import collections
@@ -100,20 +100,16 @@ class Game:
     player information.
     """
 
-    print_line()
+    gtrutils.print_line()
     logging.info('--> Public game state:')
-    print_line()
 
     # print leader and priority
     self.game_state.print_turn_info()
 
-    # print pool. Counter counts multiplicities for us.
-    counter = collections.Counter(self.game_state.pool)
-    pool_string = 'Pool: '
-    for card, count in counter.items():
-      pool_string += '{0}[{1:d}], '.format(card[:4], count)
-    pool_string.rstrip(', ')
-    print pool_string
+    # print pool. 
+    pool_string = 'Pool: \n'
+    pool_string += gtrutils.get_detailed_zone_summary(self.game_state.pool)
+    logging.info(pool_string)
     
     # print N cards in library
     print 'Library : {0:d} cards'.format(len(self.game_state.library))
