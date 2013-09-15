@@ -7,7 +7,9 @@
 from player import Player
 from gtrutils import get_card_from_zone
 from gamestate import GameState
+from gtrutils import print_line
 import card_manager 
+
 import collections
 import logging
 
@@ -97,7 +99,11 @@ class Game:
     # of jacks left, # of each foundation left, who's the leader, public
     player information.
     """
+
+    print_line()
     logging.info('--> Public game state:')
+    print_line()
+
     # print leader and priority
     self.game_state.print_turn_info()
 
