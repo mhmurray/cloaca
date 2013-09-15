@@ -272,14 +272,15 @@ def main():
   while True:
     time.sleep(0.1)
     wait_for_my_turn(my_index=my_index)
+    game_state = get_previous_game_state()
     # It is now my turn and the game state was just printed
     while True:
-      game_state = get_previous_game_state()
+      #game_state = get_previous_game_state()
       asc_time = time.asctime(time.localtime(game_state.time_stamp))
       logging.debug('--> Previous game state is from {0}'.format(asc_time))
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
-        '--> Take an action: [M]ove a card between zones, [T]hinker, [E]nd turn phase: ')
+        '--> Take an action: [M]ove card between zones, [T]hinker, [P]ass priority, [E]nd turn: ')
       try:
         response = response_string.lower()[0]
       except IndexError:
@@ -289,15 +290,23 @@ def main():
         try:
           gtrutils.get_card_from_zone(card_name, source)
           gtrutils.add_card_to_zone(card_name, dest)
-          save_game_state(game_state)
-        except: continue
+          #save_game_state(game_state)
+        except: 
+          logging.warning('Move was not successful')
+          continue
 
       elif response == 't':
         thinker_type = ThinkerTypeDialog(game_state, my_index)
-        save_game_state(game_state)
+        #save_game_state(game_state)
 
+      elif response == 'p':
+        game_state.increment_priority_index()
+        save_game_state(game_state)
+        break
+        
       elif response == 'e':
         game_state.increment_priority_index()
+        game_state.increment_leader_index()
         save_game_state(game_state)
         break
         
