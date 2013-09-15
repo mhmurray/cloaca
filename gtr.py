@@ -158,7 +158,12 @@ class Game:
 
     # print Buildings
     if len(player.buildings) > 0:
-      print player.describe_buildings()
+      # be sure there is at least one non-empty site
+      for building in player.buildings:
+          if building:
+              print player.describe_buildings()
+              break
+
 
     # print Camp
     if len(player.camp) > 0:
@@ -192,5 +197,9 @@ class Game:
 
     # print Buildings
     if len(player.buildings) > 0:
-      print player.describe_buildings()
+      # be sure there is at least one non-empty site
+      for building in player.buildings:
+          if building:
+              print player.describe_buildings()
+              break
 
