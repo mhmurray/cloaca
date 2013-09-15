@@ -10,6 +10,7 @@ from gtrutils import get_card_from_zone
 from gtrutils import get_short_zone_summary
 from gtrutils import get_detailed_card_summary
 from gtrutils import get_building_info
+from gtrutils import get_detailed_zone_summary
 import collections
 
 class Player:
@@ -39,6 +40,16 @@ class Player:
 
   def get_max_hand_size(self):
     return Player.max_hand_size
+
+  def get_n_possible_thinker_cards(self):
+    """ get number of cards that can be drawn when thiking """
+    n_possible_cards = self.get_max_hand_size() - len(self.hand)
+    if n_possible_cards < 1:
+      n_possible_cards = 1
+    if n_possible_cards == 0:
+        n_possible_cards = 1
+    return n_possible_cards
+
 
   def get_card_from_hand(self, card):
     return get_card_from_zone(card, self.hand)
@@ -94,12 +105,7 @@ class Player:
     #cards_string = 'Hand : ' + get_short_zone_summary(self.hand)
 
     cards_string = '{0}: \n'.format(self.describe_hand_public())
-    counter = collections.Counter(self.hand)
-
-    cards_string += 'Card    | Mat | Rol | $ | Description \n'
-
-    for card, count in counter.items():
-      cards_string += get_detailed_card_summary(card, count)
+    cards_string += get_detailed_zone_summary(self.hand)
         
     return cards_string
 
