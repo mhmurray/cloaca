@@ -79,7 +79,8 @@ def wait_for_my_turn(my_index):
       logging.info('--> Waiting to get priority...')
 
   logging.info('--> You have priority!')
-  game.print_complete_player_state(game_state.players[my_index])
+  # print hand
+  game_state.players[my_index].describe_hand_private()
 
 
 def get_possible_zones_list(game_state, player_index):
@@ -87,10 +88,14 @@ def get_possible_zones_list(game_state, player_index):
 
   player = game_state.players[player_index]
   possible_zones = []
-  possible_zones.append(('your camp', player.camp))
-  possible_zones.append(('your hand', player.hand))
-  possible_zones.append(('pool', game_state.pool))
-  possible_zones.append(('foundations', game_state.foundations))
+  possible_zones.append(('Your camp', player.camp))
+  possible_zones.append(('Your hand', player.hand))
+  possible_zones.append(('Your clientele', player.clientele))
+  possible_zones.append(('Your stockpile', player.stockpile))
+  possible_zones.append(('Your influence', player.influence))
+  possible_zones.append(('Your vault', player.vault))
+  possible_zones.append(('Pool', game_state.pool))
+  possible_zones.append(('Foundations', game_state.foundations))
   
 
   empty_site_exists = False
@@ -114,7 +119,7 @@ def get_possible_zones_list(game_state, player_index):
 
 def get_possible_cards_list(card_list):
   """ Returns list of cards, prints an indexed menu """
-
+  card_list.sort()
   for card_index, card_name in enumerate(card_list):
       logging.info('  [{0}] {1}'.format(card_index+1, card_name))
   return card_list
@@ -253,7 +258,7 @@ def main():
       n_players = game_state.get_n_players() 
       logging.info('--> There are {0:d} players including you.'.format(n_players))
       response = raw_input(
-        '--> Would you like to start? [y/n/wait for more players] : ')
+        '--> Would you like to start? [y/n (enter=wait for more players)] : ')
       if response is 'y':
         game_state = get_previous_game_state()
 
