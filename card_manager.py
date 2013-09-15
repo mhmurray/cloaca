@@ -8,10 +8,13 @@ Currently there is barely any error handling! -- AGS 13 Sep 2013
 
 import json
 import logging
+from os import path
   
 def get_cards_dict_from_json_file():
   """ Return dict of data for ALL cards from the json file.  """
-  json_file = file('GTR_cards.json', 'r')
+  # json should be in the GTR directory, with this module
+  gtr_dir = path.dirname( __file__)
+  json_file = file('{0}/GTR_cards.json'.format(gtr_dir), 'r')
   cards_dict = json.load(json_file)
   json_file.close()
   return cards_dict
