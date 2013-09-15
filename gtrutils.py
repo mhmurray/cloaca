@@ -11,6 +11,10 @@ def print_line(symbol='-'):
   """ Print a line for visual division of info """
   logging.info(symbol*80)
 
+def print_header(title, symbol='-'):
+  n_symbol = 80 - len(title)
+  logging.info('{0}: {1}'.format(title, symbol*n_symbol))
+
 def get_card_from_zone(card, zone):
   """ Wrapper around the possible exception caused by trying to 
   find a non-existent card in a list. Prints an error and 
@@ -62,8 +66,12 @@ def get_detailed_zone_summary(zone):
   """ return a multi-line description of cards in zone """
 
   counter = collections.Counter(zone)
-  zone_string = 'Card    | Mat | Rol | $ | Description \n'
-  for card, count in counter.items():
+  counter_dict = dict(counter)
+  cards = counter_dict.keys()
+  cards.sort() # alphabetize
+  zone_string = 'CARD    | MAT | ROL | $ | DESCRIPTION \n'
+  for card in cards:
+    count = counter_dict[card]
     zone_string += get_detailed_card_summary(card, count)
   return zone_string
 
