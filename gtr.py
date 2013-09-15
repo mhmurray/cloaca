@@ -100,8 +100,7 @@ class Game:
     player information.
     """
 
-    gtrutils.print_line()
-    logging.info('--> Public game state:')
+    gtrutils.print_header('Public game state', '+')
 
     # print leader and priority
     self.game_state.print_turn_info()
