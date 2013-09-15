@@ -7,6 +7,16 @@ import card_manager
 """ Utility functions for GTR.
 """
 
+def print_line():
+  """ Print a line for visual division of info """
+  logging.info(
+    '-------------------------------'
+    '-------------------------------'
+    '-------------------------------'
+    '-------------------------------'
+
+  )
+
 def get_card_from_zone(card, zone):
   """ Wrapper around the possible exception caused by trying to 
   find a non-existent card in a list. Prints an error and 
