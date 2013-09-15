@@ -6,6 +6,8 @@ A simple client.  Maybe this should be a class
 """
 
 
+import os
+import glob
 import time
 import json
 import glob
@@ -20,20 +22,38 @@ from player import Player
 from gamestate import GameState
 
 
-def get_game_state(log_file_name='log_state.log'):
+def get_previous_game_state(log_file_prefix='log_state'):
   """
   Return saved game state from file
   """
+  log_files = glob.glob('{0}*.log'.format(log_file_prefix))
+  log_files.sort()
+  #for log_file in log_files: # print all log file names, for debugging
+  #  logging.debug(log_file)
+
+  if not log_files:
+    return None
+
+  log_file_name = log_files[-1] # last element
+  time_stamp = log_file_name.split('_')[-1].split('.')[0:1]
+  time_stamp = '.'.join(time_stamp)
+  asc_time = time.asctime(time.localtime(float(time_stamp)))
+  logging.debug('Retrieving game state from {0}'.format(asc_time))
+
   log_file = file(log_file_name, 'r')
   game_state = pickle.load(log_file)
   log_file.close()
   return game_state
 
-def save_game_state(game_state, log_file_name='log_state.log'):
+
+def save_game_state(game_state, log_file_prefix='log_state'):
   """
   Save game state to file
   """
-  log_file = file(log_file_name, 'w')
+  # get the current time, in seconds 
+  time_stamp = time.time()
+  file_name = '{0}_{1}.log'.format(log_file_prefix, time_stamp)
+  log_file = file(file_name, 'w')
   pickle.dump(game_state, log_file)
   log_file.close()
 
@@ -46,14 +66,14 @@ def wait_for_my_turn(my_index):
   # keep checking game state until it is my turn
   while my_index is not priority_index:
     time.sleep(0.1)
-    game_state = get_game_state()
+    game_state = get_previous_game_state()
     priority_index = game_state.priority_index
     leader_index = game_state.leader_index
     # print info about changes to priority
     if previous_priority_index is not priority_index:
       previous_priority_index = priority_index
       # print the current game state after every change
-      game = gtr.Game(game_state=get_game_state())
+      game = gtr.Game(game_state=get_previous_game_state())
       game.show_public_game_state()
       logging.info('--> Waiting to get priority...')
 
@@ -202,13 +222,16 @@ def main():
   logging.info('--> Welcome to the game!')
 
   # add player to game
-  my_name = raw_input('Enter your name: ')
+  default_name = os.getenv('USER')
+  my_name = raw_input('Enter your name [{0}]: '.format(default_name))
+  if my_name == '':
+    my_name = default_name
 
   # check whether game exists, if not start a new one
-  try:
-    game_state = get_game_state()
+  game_state = get_previous_game_state()
+  if game_state:  
     logging.info('--> Joining existing game...')  
-  except IOError:
+  else:
     logging.info('--> Starting a new game...')
     game_state = GameState()
 
@@ -225,13 +248,16 @@ def main():
       logging.warn('Goodbye!')
       exit()
     else:
-      game_state = get_game_state()
+      game_state = get_previous_game_state()
       n_players = game_state.get_n_players() 
-      print '--> There are {0:d} players including you.'.format(n_players)
+      logging.info('--> There are {0:d} players including you.'.format(n_players))
+      if game_state.is_started:
+        logging.error('--> This game has started already!!')
+        return
       response = raw_input(
         '--> Would you like to start? [y/n/wait for more players] : ')
       if response is 'y':
-        game_state = get_game_state()
+        game_state = get_previous_game_state()
 
         # check whether someone else has started the game
         if not game_state.is_started:
@@ -247,7 +273,7 @@ def main():
     wait_for_my_turn(my_index=my_index)
     # It is now my turn and the game state was just printed
     while True:
-      game_state = get_game_state()
+      game_state = get_previous_game_state()
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
         '--> Take an action: [M]ove a card between zones, [T]hinker, [E]nd turn phase: ')
