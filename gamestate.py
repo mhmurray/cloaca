@@ -101,10 +101,22 @@ class GameState:
   def draw_one_jack_for_player(self, player):
     player.add_cards_to_hand([self.draw_jack()])
 
-  def add_player(self, player):
-    """ Adds a player, which is of class Player. Returns index of player. """
-    self.players.append(player)
-    player_index = len(self.players) - 1
+  def find_or_add_player(self, player_name):
+    """ Finds the index of a named player, otherwise creates a new
+    Player object with the given name, appending it to the list of 
+    players. """
+    players_match = filter(lambda x : x.name==player_name, self.players)
+    if len(players_match) > 1:
+      logging.critical(
+        'Fatal error! Two instances of player {0}.'.format(players_match[0].name))
+      raise Exception('Cannot create two players with the same name.')
+    elif len(players_match) == 1:
+      logging.info('Found existing player {0}.'.format(players_match[0].name))
+      player_index = self.players.index(players_match[0])
+    else:
+      logging.info('Adding player {0}.'.format(player_name))
+      self.players.append(Player(player_name))
+      player_index = len(self.players) - 1
     return player_index
   
   def init_player(self, player):

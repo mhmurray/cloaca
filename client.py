@@ -241,7 +241,7 @@ def main():
     logging.info('--> Starting a new game...')
     game_state = GameState()
 
-  my_index = game_state.add_player(Player(name=my_name))
+  my_index = game_state.find_or_add_player(my_name)
   save_game_state(game_state)
 
 
