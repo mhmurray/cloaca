@@ -58,6 +58,11 @@ def save_game_state(game_state, log_file_prefix='log_state'):
   pickle.dump(game_state, log_file)
   log_file.close()
 
+def describe_game_for_player(game, player_index):
+  game.show_public_game_state()
+  logging.info(game.game_state.players[player_index].describe_hand_private())
+
+
 def wait_for_my_turn(my_index):
   """
   Wait until this player has priority
@@ -75,8 +80,7 @@ def wait_for_my_turn(my_index):
       previous_priority_index = priority_index
       # print the current game state after every change
       game = gtr.Game(game_state=get_previous_game_state())
-      game.show_public_game_state()
-      logging.info(game_state.players[my_index].describe_hand_private())
+      describe_game_for_player(game, my_index)
       logging.info('--> Waiting to get priority...')
 
   asc_time = time.asctime(time.localtime(game_state.time_stamp))
@@ -99,9 +103,8 @@ def get_possible_zones_list(game_state, player_index):
   except AttributeError:
     player.revealed = []
     possible_zones.append(('Your revealed cards', player.revealed))
-  except AttributeError:
-    possible_zones.append(('Pool', game_state.pool))
-    possible_zones.append(('Foundations', game_state.foundations))
+  possible_zones.append(('Pool', game_state.pool))
+  possible_zones.append(('Foundations', game_state.foundations))
   try:
     possible_zones.append(('Exchange area', game_state.exchange_area))
   except AttributeError:
@@ -132,7 +135,8 @@ def get_possible_cards_list(card_list):
   """ Returns list of cards, prints an indexed menu """
   card_list.sort()
   for card_index, card_name in enumerate(card_list):
-      logging.info('  [{0}] {1}'.format(card_index+1, card_name))
+      card_description = gtrutils.get_detailed_card_summary(card_name)
+      logging.info('  [{0}] {1}'.format(card_index+1, card_description))
   return card_list
 
 def get_possible_buildings_list(game_state, player_index):
@@ -252,8 +256,11 @@ def main():
     logging.info('--> Starting a new game...')
     game_state = GameState()
 
+  n_players = game_state.get_n_players()
   my_index = game_state.find_or_add_player(my_name)
-  save_game_state(game_state)
+  # only save the game state if player was added
+  if n_players < game_state.get_n_players():
+    save_game_state(game_state)
 
 
   # prompt player to join game when desired number of players is reached
@@ -293,7 +300,7 @@ def main():
       logging.debug('--> Previous game state is from {0}'.format(asc_time))
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
-        '--> Take an action: [M]ove card between zones, [T]hinker, [P]ass priority, [E]nd turn: ')
+        '--> Take action: [M]ove card, [T]hinker, [P]ass priority, [E]nd turn, [R]eprint game state: ')
       try:
         response = response_string.lower()[0]
       except IndexError:
@@ -303,14 +310,14 @@ def main():
         try:
           gtrutils.get_card_from_zone(card_name, source)
           gtrutils.add_card_to_zone(card_name, dest)
-          #save_game_state(game_state)
+          save_game_state(game_state)
         except: 
           logging.warning('Move was not successful')
           continue
 
       elif response == 't':
         thinker_type = ThinkerTypeDialog(game_state, my_index)
-        #save_game_state(game_state)
+        save_game_state(game_state)
 
       elif response == 'p':
         game_state.increment_priority_index()
@@ -322,6 +329,12 @@ def main():
         game_state.increment_leader_index()
         save_game_state(game_state)
         break
+
+      elif response == 'r':
+        #game = gtr.Game(game_state=game_state)
+        #describe_game_for_player(game, my_index)
+        break
+      
         
 
 
