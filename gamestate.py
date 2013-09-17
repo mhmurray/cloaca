@@ -19,7 +19,8 @@ class GameState:
   """
 
   def __init__(self, players=None, jack_pile=None, library=None, pool=None, 
-               foundations=None, card_definitions_dict=None, time_stamp=None):
+               foundations=None, card_definitions_dict=None, time_stamp=None,
+               exchange_area=None):
     self.players = []
     if players:
         for player in players: self.add_player(player)
@@ -29,6 +30,7 @@ class GameState:
     self.jack_pile = jack_pile or []
     self.library = library or []
     self.pool = pool or []
+    self.exchange_area = exchange_area or []
     self.foundations = foundations
     if self.foundations is None:
       self.foundations = {
@@ -131,7 +133,13 @@ class GameState:
     self.pool.extend(cards)
 
   def get_card_from_pool(self, card):
-    return get_card_from_zone(card, pool)
+    return get_card_from_zone(card, self.pool)
+
+  def add_cards_to_exchange_area(self, card):
+    self.exchange_area.extend(cards)
+
+  def get_card_from_exchange_area(self, card):
+    return get_card_from_zone(card, self.exchange_area)
     
   def draw_jack(self):
     return self.jack_pile.pop()
