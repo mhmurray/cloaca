@@ -110,6 +110,15 @@ class Game:
     pool_string += gtrutils.get_detailed_zone_summary(self.game_state.pool)
     logging.info(pool_string)
     
+    # print exchange area. 
+    try: 
+      exchange_string = 'Exchange area: \n'
+      exchange_string += gtrutils.get_detailed_zone_summary(
+        self.game_state.exchange_area)
+      logging.info(exchange_string)
+    except AttributeError: # backwards-compatibility for old games
+      self.game_state.exchange_area = []
+      
     # print N cards in library
     print 'Library : {0:d} cards'.format(len(self.game_state.library))
 
@@ -167,6 +176,13 @@ class Game:
     # print Camp
     if len(player.camp) > 0:
       print player.describe_camp()
+
+    # print Revealed cards
+    try:
+      if len(player.revealed) > 0:
+        print player.describe_revealed()
+    except AttributeError:
+      player.revealed = []
 
 
   def print_complete_player_state(self, player):
