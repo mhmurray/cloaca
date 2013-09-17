@@ -112,10 +112,11 @@ class Game:
     
     # print exchange area. 
     try: 
-      exchange_string = 'Exchange area: \n'
-      exchange_string += gtrutils.get_detailed_zone_summary(
-        self.game_state.exchange_area)
-      logging.info(exchange_string)
+      if self.game_state.exchange_area:
+        exchange_string = 'Exchange area: \n'
+        exchange_string += gtrutils.get_detailed_zone_summary(
+          self.game_state.exchange_area)
+        logging.info(exchange_string)
     except AttributeError: # backwards-compatibility for old games
       self.game_state.exchange_area = []
       
