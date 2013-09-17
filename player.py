@@ -19,7 +19,8 @@ class Player:
   # Must use this None->(if hand)->[] method because all players end up
   # pointing to the same list if the default is [].
   def __init__(self, name='Player', hand=None, stockpile=None, clientele=None,
-               vault=None, camp=None, buildings=None, influence=None):
+               vault=None, camp=None, buildings=None, influence=None,
+               revealed=None):
     self.name = name
     self.hand = hand if hand is not None else []
     self.stockpile = stockpile if stockpile is not None else []
@@ -28,6 +29,7 @@ class Player:
     self.camp = camp if camp is not None else []
     self.buildings = buildings if buildings is not None else []
     self.influence = influence if influence is not None else []
+    self.revealed = revealed or []
 
   def __repr__(self):
     rep = ('Player(name={name!r}, hand={hand!r}, stockpile={stockpile!r}, '
@@ -144,6 +146,10 @@ class Player:
 
   def describe_camp(self):
     cards_string = 'Camp : \n' + get_detailed_zone_summary(self.camp)
+    return cards_string
+
+  def describe_revealed(self):
+    cards_string = 'Revealed : \n' + get_detailed_zone_summary(self.revealed)
     return cards_string
 
     
