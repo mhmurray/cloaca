@@ -94,9 +94,19 @@ def get_possible_zones_list(game_state, player_index):
   possible_zones.append(('Your stockpile', player.stockpile))
   possible_zones.append(('Your influence', player.influence))
   possible_zones.append(('Your vault', player.vault))
-  possible_zones.append(('Pool', game_state.pool))
-  possible_zones.append(('Foundations', game_state.foundations))
-  possible_zones.append(('Exchange area', game_state.exchange_area))
+  try:
+    possible_zones.append(('Your revealed cards', player.revealed))
+  except AttributeError:
+    player.revealed = []
+    possible_zones.append(('Your revealed cards', player.revealed))
+  except AttributeError:
+    possible_zones.append(('Pool', game_state.pool))
+    possible_zones.append(('Foundations', game_state.foundations))
+  try:
+    possible_zones.append(('Exchange area', game_state.exchange_area))
+  except AttributeError:
+    game_state.exchange_area = []
+    possible_zones.append(('Exchange area', game_state.exchange_area))
   
 
   empty_site_exists = False
