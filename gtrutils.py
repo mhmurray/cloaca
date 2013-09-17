@@ -59,7 +59,6 @@ def get_detailed_card_summary(card, count=None):
     card_string += ' | {0}'.format(role[:3])
     card_string += ' | {0}'.format(value)
     card_string += ' | {0}'.format(function)
-  card_string += '\n'
   return card_string
 
 def get_detailed_zone_summary(zone):
@@ -72,7 +71,8 @@ def get_detailed_zone_summary(zone):
   zone_string = 'CARD    | MAT | ROL | $ | DESCRIPTION \n'
   for card in cards:
     count = counter_dict[card]
-    zone_string += get_detailed_card_summary(card, count)
+    zone_string += get_detailed_card_summary(card, count) 
+    zone_string += '\n'
   return zone_string
 
 
