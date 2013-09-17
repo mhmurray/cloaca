@@ -11,6 +11,7 @@ from gtrutils import get_short_zone_summary
 from gtrutils import get_detailed_card_summary
 from gtrutils import get_building_info
 from gtrutils import get_detailed_zone_summary
+import card_manager
 import collections
 
 class Player:
@@ -121,13 +122,19 @@ class Player:
   def describe_clientele(self):
     """ Returns a string describing a player's clientele.
     """
-    cards_string = 'Clientele : ' + get_short_zone_summary(self.clientele)
+    roles = []
+    for card in self.clientele:
+      roles.append(card_manager.get_role_of_card(card))
+    cards_string = 'Clientele : ' + get_short_zone_summary(roles)
     return cards_string
 
   def describe_stockpile(self):
     """ Returns a string describing a player's stockpile.
     """
-    cards_string = 'Stockpile : ' + get_short_zone_summary(self.stockpile)
+    materials = []
+    for card in self.stockpile:
+      materials.append(card_manager.get_material_of_card(card))
+    cards_string = 'Stockpile : ' + get_short_zone_summary(materials)
     return cards_string
 
   def describe_buildings(self):
