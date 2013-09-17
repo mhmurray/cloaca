@@ -76,11 +76,11 @@ def wait_for_my_turn(my_index):
       # print the current game state after every change
       game = gtr.Game(game_state=get_previous_game_state())
       game.show_public_game_state()
+      logging.info(game_state.players[my_index].describe_hand_private())
       logging.info('--> Waiting to get priority...')
 
-  logging.info('--> You have priority!')
-  # print hand
-  logging.info(game_state.players[my_index].describe_hand_private())
+  asc_time = time.asctime(time.localtime(game_state.time_stamp))
+  logging.info('--> You have priority (as of {0})!'.format(asc_time))
 
 
 def get_possible_zones_list(game_state, player_index):
@@ -96,6 +96,7 @@ def get_possible_zones_list(game_state, player_index):
   possible_zones.append(('Your vault', player.vault))
   possible_zones.append(('Pool', game_state.pool))
   possible_zones.append(('Foundations', game_state.foundations))
+  possible_zones.append(('Exchange area', game_state.exchange_area))
   
 
   empty_site_exists = False
@@ -189,7 +190,7 @@ def MoveACardDialog(game_state, player_index):
       logging.info('your response was {0!s}... try again'.format(response_str))
 
   logging.debug('attempting to move {0} from {1} to {2}'.format(card_name,
-  card_source, card_destination))
+    card_source, card_destination))
   return (card_name, card_source, card_destination)
 
 
@@ -223,7 +224,7 @@ def ThinkerTypeDialog(game_state, player_index):
 def main():
 
   # options:
-  logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+  logging.basicConfig(level=logging.INFO, format='%(message)s')
 
   logging.info('--> Welcome to the game!')
 
