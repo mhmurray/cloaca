@@ -12,6 +12,8 @@ from gtrutils import get_detailed_card_summary
 from gtrutils import get_building_info
 from gtrutils import get_detailed_zone_summary
 import card_manager
+
+import logging
 import collections
 
 class Player:
@@ -146,10 +148,23 @@ class Player:
         if building:
           cards_string += get_building_info(building)
           cards_string += '\n'
-
     return cards_string
 
+  def get_influence_points(self):
+    # influence cards are foundations, of form "[Material] Foundation"
+    influence = 2
+    for card in self.influence:
+      material = card.split(' ')[0]
+      value = card_manager.get_value_of_material(material)
+      if value is None:
+        logging.error('Unexpected card {0} in influence'.format(card))
+      else:
+        influence += value
+    return influence
 
+  def describe_influence(self):
+    influence_string = 'Influence : {0}'.format(self.get_influence_points())
+    return influence_string
 
   def describe_camp(self):
     cards_string = 'Camp : \n' + get_detailed_zone_summary(self.camp)
