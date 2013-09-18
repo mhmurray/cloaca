@@ -157,6 +157,9 @@ class Game:
     if len(player.vault) > 0:
       print player.describe_vault_public()
 
+    # print influence
+    print player.describe_influence()
+
     # print clientele
     if len(player.clientele) > 0:
       print player.describe_clientele()
