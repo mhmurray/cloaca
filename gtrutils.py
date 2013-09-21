@@ -87,6 +87,7 @@ def get_building_info(building):
         return ''
     title_card = building[0]
     function = card_manager.get_function_of_card(title_card)
+    title_material = card_manager.get_material_of_card(title_card)
     
   
     has_site = False
@@ -101,7 +102,7 @@ def get_building_info(building):
         site_material = card
         has_site = True
         
-    info = '  * {0} | '.format(title_card)
+    info = '  * {0} = {1} | '.format(title_card, title_material)
     if has_site:
         info += '{0} site '.format(site_material[:3])
     if has_materials:
