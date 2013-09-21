@@ -133,11 +133,16 @@ def get_possible_zones_list(game_state, player_index):
 
 def get_possible_cards_list(card_list):
   """ Returns list of cards, prints an indexed menu """
-  card_list.sort()
-  for card_index, card_name in enumerate(card_list):
-      card_description = gtrutils.get_detailed_card_summary(card_name)
-      logging.info('  [{0}] {1}'.format(card_index+1, card_description))
-  return card_list
+  try:
+    card_list.sort()
+    for card_index, card_name in enumerate(card_list):
+        card_description = gtrutils.get_detailed_card_summary(card_name)
+        logging.info('  [{0}] {1}'.format(card_index+1, card_description))
+    return card_list
+  except AttributeError:
+    # special handling for foundations, which are dicts of lists
+    card_list = card_list.keys()
+      
 
 def get_possible_buildings_list(game_state, player_index):
   player = game_state.players[player_index]

@@ -68,10 +68,10 @@ def get_detailed_zone_summary(zone):
   counter_dict = dict(counter)
   cards = counter_dict.keys()
   cards.sort() # alphabetize
-  zone_string = 'CARD    | MAT | ROL | $ | DESCRIPTION \n'
+  zone_string = '  Card      | Mat | Rol | $ | Description \n'
   for card in cards:
     count = counter_dict[card]
-    zone_string += get_detailed_card_summary(card, count) 
+    zone_string += '  * ' + get_detailed_card_summary(card, count) 
     zone_string += '\n'
   return zone_string
 
@@ -101,7 +101,7 @@ def get_building_info(building):
         site_material = card
         has_site = True
         
-    info = '{0} | '.format(title_card)
+    info = '  * {0} | '.format(title_card)
     if has_site:
         info += '{0} site '.format(site_material[:3])
     if has_materials:

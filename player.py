@@ -144,10 +144,11 @@ class Player:
     """
     # buildings are lists of lists, where the 
     cards_string = 'Buildings: \n' 
+    buildings_info = []
     for building in self.buildings:
         if building:
-          cards_string += get_building_info(building)
-          cards_string += '\n'
+          buildings_info.append(get_building_info(building))
+    cards_string += '\n'.join(buildings_info)
     return cards_string
 
   def get_influence_points(self):

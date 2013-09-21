@@ -147,44 +147,44 @@ class Game:
     number of cards in vault, stockpile, number of cards/jacks in hand, 
     buildings built, buildings under construction and stage of completion.
     """
-    # print name
+    # name
     logging.info('--> Player {0} public state:'.format(player.name))
 
-    # print hand
-    print player.describe_hand_public()
+    # hand
+    logging.info(player.describe_hand_public())
     
-    # print Vault
+    # Vault
     if len(player.vault) > 0:
-      print player.describe_vault_public()
+      logging.info(player.describe_vault_public())
 
-    # print influence
-    print player.describe_influence()
+    # influence
+      logging.info(player.describe_influence())
 
-    # print clientele
+    # clientele
     if len(player.clientele) > 0:
-      print player.describe_clientele()
+      logging.info(player.describe_clientele())
 
-    # print Stockpile
+    # Stockpile
     if len(player.stockpile) > 0:
-      print player.describe_stockpile()
+      logging.info(player.describe_stockpile())
 
-    # print Buildings
+    # Buildings
     if len(player.buildings) > 0:
       # be sure there is at least one non-empty site
       for building in player.buildings:
           if building:
-              print player.describe_buildings()
+              logging.info(player.describe_buildings())
               break
 
 
-    # print Camp
+    # Camp
     if len(player.camp) > 0:
-      print player.describe_camp()
+      logging.info(player.describe_camp())
 
-    # print Revealed cards
+    # Revealed cards
     try:
       if len(player.revealed) > 0:
-        print player.describe_revealed()
+        logging.info(player.describe_revealed())
     except AttributeError:
       player.revealed = []
 
