@@ -86,6 +86,11 @@ def get_value_of_card(card_name):
   material = get_material_of_card(card_name)
   value = get_value_of_material(material)
   return value
+
+def get_all_roles():
+  """ Returns a list of all 6 possible roles. """
+  return ['Patron', 'Laborer', 'Architect', 
+          'Craftsman', 'Legionnary', 'Merchant']
   
 
 if __name__ == '__main__':
@@ -103,6 +108,8 @@ if __name__ == '__main__':
     print get_count_of_card(card_name)
     print get_role_of_card(card_name)
     print get_value_of_card(card_name)
+
+  print get_all_roles()
 
 
 
