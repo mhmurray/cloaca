@@ -112,7 +112,8 @@ def get_possible_zones_list(game_state, player_index):
     player.revealed = []
     possible_zones.append(('Your revealed cards', player.revealed))
   possible_zones.append(('Pool', game_state.pool))
-  possible_zones.append(('Foundations', game_state.foundations))
+  possible_zones.append(('In town foundations', game_state.in_town_foundations))
+  possible_zones.append(('Out of town foundations', game_state.out_of_town_foundations))
   try:
     possible_zones.append(('Exchange area', game_state.exchange_area))
   except AttributeError:
@@ -123,10 +124,13 @@ def get_possible_zones_list(game_state, player_index):
   empty_site_exists = False
   for building in player.buildings:
       if not building:
-          empty_site_exists = True
-          name = 'Start a new building'
+        empty_site_exists = True
+        name = 'Start a new building'
       else:
-          name = 'Building {0}'.format(building[0])
+        building_name = building[0]
+        building_function = card_manager.get_function_of_card(building_name)
+        #name = 'Building {0}'.format(building[0])
+        name = 'Building {0} | {1}'.format(building_name, building_function)
       possible_zones.append((name, building))
   if not empty_site_exists:
       # add an empty site
@@ -136,26 +140,27 @@ def get_possible_zones_list(game_state, player_index):
 
   # print these possiblities
   for zone_index, (name, zone) in enumerate(possible_zones):
-    logging.info('  [{0}] {1}'.format(zone_index+1, name))
+    logging.info('  ({0}) {1}'.format(zone_index+1, name))
   return possible_zones
 
 def get_possible_cards_list(card_list):
   """ Returns list of cards, prints an indexed menu """
-  try:
-    card_list.sort()
-    for card_index, card_name in enumerate(card_list):
-        card_description = gtrutils.get_detailed_card_summary(card_name)
-        logging.info('  [{0}] {1}'.format(card_index+1, card_description))
-    return card_list
-  except AttributeError:
-    # special handling for foundations, which are dicts of lists
-    card_list = card_list.keys()
-      
+  counter = collections.Counter(card_list)
+  items = counter.items()
+  items.sort()
+  possible_cards = []
+  for card_index, (card_name, n_cards) in enumerate(items):
+    try:
+      card_description = gtrutils.get_detailed_card_summary(card_name, n_cards)
+    except:
+      card_description = '{0} [{1}]'.format(card_name, n_cards)
+    logging.info('  ({0}) {1}'.format(card_index+1, card_description))
+    possible_cards.append(card_name)
+  return possible_cards
+
 
 def get_possible_buildings_list(game_state, player_index):
   player = game_state.players[player_index]
-
-
 
  
 def MoveACardDialog(game_state, player_index):
