@@ -47,7 +47,7 @@ def get_short_zone_summary(card_list, n_letters=4):
 def get_detailed_card_summary(card, count=None):
   """ return a single-line string to describe one card in detail """
 
-  card_string = '{0}'.format(card[:4])
+  card_string = '{0:<4}'.format(card[:4])
   if count:
     card_string += '[{0:d}]'.format(count)
   if card != 'Jack':
