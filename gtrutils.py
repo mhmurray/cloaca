@@ -33,14 +33,14 @@ def add_card_to_zone(card, zone):
   logging.debug('adding card {0!s} to zone {1!s}'.format(card, zone))
   zone.append(card)
 
-def get_short_zone_summary(card_list):
-  """ Return a single-line string with 4-letter card abbreviations and numbers
+def get_short_zone_summary(card_list, n_letters=4):
+  """ Return a single-line string with n-letter card abbreviations and numbers
   of card instances.
   """
   counter = collections.Counter(card_list)
   cards_string = ''
   for card, count in counter.items():
-    cards_string += '{0}[{1:d}], '.format(card[:4], count)
+    cards_string += '{0}[{1:d}], '.format(card[:n_letters], count)
   cards_string.rstrip(', ')
   return cards_string
 
@@ -56,8 +56,8 @@ def get_detailed_card_summary(card, count=None):
     value = card_manager.get_value_of_card(card)
     function = card_manager.get_function_of_card(card)
     card_string += ' | {0}'.format(material[:3])
-    card_string += ' | {0}'.format(role[:3])
-    card_string += ' | {0}'.format(value)
+    card_string += '-{0}'.format(role[:3])
+    card_string += '-{0}'.format(value)
     card_string += ' | {0}'.format(function)
   return card_string
 
@@ -68,7 +68,7 @@ def get_detailed_zone_summary(zone):
   counter_dict = dict(counter)
   cards = counter_dict.keys()
   cards.sort() # alphabetize
-  zone_string = '  Card      | Mat | Rol | $ | Description \n'
+  zone_string = '  Card      | Mat-Rol-$ | Description \n'
   for card in cards:
     count = counter_dict[card]
     zone_string += '  * ' + get_detailed_card_summary(card, count) 
@@ -87,9 +87,9 @@ def get_building_info(building):
         return ''
     title_card = building[0]
     function = card_manager.get_function_of_card(title_card)
+    value = card_manager.get_value_of_card(title_card)
     title_material = card_manager.get_material_of_card(title_card)
     
-  
     has_site = False
     has_materials = False
     materials_string = ''
@@ -102,13 +102,12 @@ def get_building_info(building):
         site_material = card
         has_site = True
         
-    info = '  * {0} = {1} | '.format(title_card, title_material)
+    info = '  * {0} | {1}-{2} | '.format(title_card, title_material[:3], value)
     if has_site:
         info += '{0} site '.format(site_material[:3])
-    if has_materials:
+    if has_site and has_materials:
         info += '+ '
-    info += '{0} '.format(materials_string)
-    info +=  ' | {0}'.format(function)
+    info += '{0} | {1}'.format(materials_string, function)
     return info
 
 
