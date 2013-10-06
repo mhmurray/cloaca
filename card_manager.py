@@ -9,6 +9,7 @@ Currently there is barely any error handling! -- AGS 13 Sep 2013
 import json
 import logging
 from os import path
+
   
 def get_cards_dict_from_json_file():
   """ Return dict of data for ALL cards from the json file.  """
@@ -92,6 +93,19 @@ def get_all_roles():
   return ['Patron', 'Laborer', 'Architect', 
           'Craftsman', 'Legionnary', 'Merchant']
   
+def get_all_materials():
+  """ Returns a list of all possible materials """
+  foundations = [
+    'Brick',
+    'Cement',
+    'Marble',
+    'Rubble',
+    'Stone',
+    'Wood',
+  ]
+  return foundations
+
+
 
 if __name__ == '__main__':
 
