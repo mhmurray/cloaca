@@ -19,7 +19,8 @@ class GameState:
   """
 
   def __init__(self, players=None, jack_pile=None, library=None, pool=None, 
-               foundations=None, card_definitions_dict=None, time_stamp=None,
+               in_town_foundations=None, out_of_town_foundations=None,
+               card_definitions_dict=None, time_stamp=None,
                exchange_area=None):
     self.players = []
     if players:
@@ -31,16 +32,8 @@ class GameState:
     self.library = library or []
     self.pool = pool or []
     self.exchange_area = exchange_area or []
-    self.foundations = foundations
-    if self.foundations is None:
-      self.foundations = {
-        'Rubble'  : [],
-        'Wood'    : [],
-        'Cement'  : [],
-        'Brick'   : [],
-        'Stone'   : [],
-        'Marble'  : [],
-        }
+    self.in_town_foundations = in_town_foundations or []
+    self.out_of_town_foundations = out_of_town_foundations or []
     self.is_started = False
     self.time_stamp = time_stamp
 
@@ -55,7 +48,7 @@ class GameState:
         priority= self.priority_index,
         jack_pile=self.jack_pile,
         library=self.library, 
-        foundations=self.foundations
+        foundations=self.in_town_foundations
     )
 
   def increment_priority_index(self):

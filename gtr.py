@@ -66,9 +66,8 @@ class Game:
 
   def init_foundations(self, n_players):
     logging.info('--> Initializing the foundations')
-    for key in self.game_state.foundations:
-      # name is 'Rubble', etc. Foundation name is 'Rubble Foundation'.
-      self.game_state.foundations[key] = [key + ' Foundation'] * n_players
+    for material in card_manager.get_materials():
+      self.game_state.foundations.extend(material* n_players)
 
   def init_library(self):
     """ Starts with just a list of names for now.  """

@@ -45,6 +45,17 @@ def get_count_of_card(card_name):
   count =  int(count)
   return count
 
+def get_materials():
+  materials = [
+    'Brick',
+    'Concrete',
+    'Marble',
+    'Rubble',
+    'Stone',
+    'Wood'
+  ]
+  return materials
+
 def get_role_of_material(material):
   if material == 'Brick':
       return 'Legionary'

@@ -152,11 +152,10 @@ class Player:
     return cards_string
 
   def get_influence_points(self):
-    # influence cards are foundations, of form "[Material] Foundation"
+    # influence cards are foundations, of form "Material"
     influence = 2
     for card in self.influence:
-      material = card.split(' ')[0]
-      value = card_manager.get_value_of_material(material)
+      value = card_manager.get_value_of_material(card)
       if value is None:
         logging.error('Unexpected card {0} in influence'.format(card))
       else:
