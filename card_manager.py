@@ -91,13 +91,13 @@ def get_value_of_card(card_name):
 def get_all_roles():
   """ Returns a list of all 6 possible roles. """
   return ['Patron', 'Laborer', 'Architect', 
-          'Craftsman', 'Legionnary', 'Merchant']
+          'Craftsman', 'Legionary', 'Merchant']
   
 def get_all_materials():
   """ Returns a list of all possible materials """
   foundations = [
     'Brick',
-    'Cement',
+    'Concrete',
     'Marble',
     'Rubble',
     'Stone',
