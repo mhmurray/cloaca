@@ -33,9 +33,12 @@ def add_card_to_zone(card, zone):
   logging.debug('adding card {0!s} to zone {1!s}'.format(card, zone))
   zone.append(card)
 
-def get_short_zone_summary(card_list, n_letters=4):
+def get_short_zone_summary(card_list, n_letters=3):
   """ Return a single-line string with n-letter card abbreviations and numbers
   of card instances.
+
+  Note that n_letters=3 activates the coloring of the output text. 4-letter
+  strings are not colorized. 
   """
   counter = collections.Counter(card_list)
   cards_string = ''
