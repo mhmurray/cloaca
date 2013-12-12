@@ -17,12 +17,37 @@ import logging
 import pickle
 import collections
 import card_manager
+import termcolor
+import re
 
 import gtr
 import gtrutils
 from player import Player
 from gamestate import GameState
 
+
+class RoleColorFilter(logging.Filter):
+    """ This is a filter which colorizes roles with ANSI color sequences.
+    """
+    def filter(self, record):
+      record.msg = colorize_role(record.msg)
+      return True
+
+class MaterialColorFilter(logging.Filter):
+    """ This is a filter which colorizes roles with ANSI color sequences.
+    """
+    def filter(self, record):
+      record.msg = colorize_material(record.msg)
+      return True
+
+logger = logging.getLogger()
+logger.addFilter(RoleColorFilter())
+logger.addFilter(MaterialColorFilter())
+
+def test_logging():
+  logging.basicConfig(level=logging.INFO, format='%(message)s')
+
+  logging.info("Lay a merchant before LEG with Lab cards in the Patron pool")
 
 class StartOverException(Exception):
   pass
@@ -477,7 +502,50 @@ def main():
         break
       
         
+def colorize_role(any_string):
+  """ Applies color to the role string (eg. 'Legionary', 'Laborer', etc.)
+  """
+  # The alteration operator | is never greedy. That is, it will take the
+  # first match it finds. Thus, we need to make sure there are no overlaps
+  # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
+  role_regex_color_dict = {
+    '[Ll]egionary|[Ll]eg|LEGIONARY|LEG' : ('red',None),
+    '[Ll]aborer|[Ll]ab|LABORER|LAB' : ('yellow',None),
+    '[Cc]raftsman|[Cc]ra|CRAFTSMAN|CRA' : ('green',None),
+    '[Aa]rchitect|[Aa]rc|ARCHITECT|ARC' : ('white',None),
+    '[Mm]erchant|[Mm]er|MERCHANT|MER' : ('cyan',None),
+    '[Pp]atron|[Pp]at|PATRON|PAT' : ('magenta',None),
+    '[Jj]acks?|JACKS?' : ('grey','on_white'),
+  }
 
+  out_string=any_string
+  for k,v in role_regex_color_dict.items():
+    out_string = re.sub(k,lambda x : termcolor.colored(x.group(0),color=v[0],
+      on_color=v[1],attrs=['bold']), out_string)
+
+  return out_string
+        
+def colorize_material(any_string):
+  """ Applies color to the material string (eg. 'Stone', 'Rub', etc.)
+  """
+  # The alteration operator | is never greedy. That is, it will take the
+  # first match it finds. Thus, we need to make sure there are no overlaps
+  # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
+  material_regex_color_dict = {
+    r'\b([Bb]ricks?\b|[Bb]ri|BRICK|BRI)\b' : ('red',None),
+    r'\b([Rr]ubble|[Rr]ub|RUBBLE|RUB)\b' : ('yellow',None),
+    r'\b([Ww]ood|[Ww]oo|WOOD|WOO)\b' : ('green',None),
+    r'\b([Cc]oncrete|[Cc]on|CONCRETE|CON)\b' : ('white',None),
+    r'\b([Ss]tone|[Ss]to|STONE|STO)\b' : ('cyan',None),
+    r'\b([Mm]arble|[Mm]ar|MARBLE|MAR)\b' : ('magenta',None),
+  }
+
+  out_string=any_string
+  for k,v in material_regex_color_dict.items():
+    out_string = re.sub(k,lambda x : termcolor.colored(x.group(0),color=v[0],
+      on_color=v[1],attrs=['bold']), out_string)
+
+  return out_string
 
 
 if __name__ == '__main__':
