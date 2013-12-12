@@ -15,12 +15,20 @@ import pickle
 import sys
 import logging
 import pickle
+import collections
+import card_manager
 
 import gtr
 import gtrutils
 from player import Player
 from gamestate import GameState
 
+
+class StartOverException(Exception):
+  pass
+
+class CancelDialogException(Exception):
+  pass
 
 def get_previous_game_state(log_file_prefix='log_state'):
   """
@@ -104,7 +112,8 @@ def get_possible_zones_list(game_state, player_index):
     player.revealed = []
     possible_zones.append(('Your revealed cards', player.revealed))
   possible_zones.append(('Pool', game_state.pool))
-  possible_zones.append(('Foundations', game_state.foundations))
+  possible_zones.append(('In town foundations', game_state.in_town_foundations))
+  possible_zones.append(('Out of town foundations', game_state.out_of_town_foundations))
   try:
     possible_zones.append(('Exchange area', game_state.exchange_area))
   except AttributeError:
@@ -115,10 +124,13 @@ def get_possible_zones_list(game_state, player_index):
   empty_site_exists = False
   for building in player.buildings:
       if not building:
-          empty_site_exists = True
-          name = 'Start a new building'
+        empty_site_exists = True
+        name = 'Start a new building'
       else:
-          name = 'Building {0}'.format(building[0])
+        building_name = building[0]
+        building_function = card_manager.get_function_of_card(building_name)
+        #name = 'Building {0}'.format(building[0])
+        name = 'Building {0} | {1}'.format(building_name, building_function)
       possible_zones.append((name, building))
   if not empty_site_exists:
       # add an empty site
@@ -128,26 +140,27 @@ def get_possible_zones_list(game_state, player_index):
 
   # print these possiblities
   for zone_index, (name, zone) in enumerate(possible_zones):
-    logging.info('  [{0}] {1}'.format(zone_index+1, name))
+    logging.info('  ({0}) {1}'.format(zone_index+1, name))
   return possible_zones
 
 def get_possible_cards_list(card_list):
   """ Returns list of cards, prints an indexed menu """
-  try:
-    card_list.sort()
-    for card_index, card_name in enumerate(card_list):
-        card_description = gtrutils.get_detailed_card_summary(card_name)
-        logging.info('  [{0}] {1}'.format(card_index+1, card_description))
-    return card_list
-  except AttributeError:
-    # special handling for foundations, which are dicts of lists
-    card_list = card_list.keys()
-      
+  counter = collections.Counter(card_list)
+  items = counter.items()
+  items.sort()
+  possible_cards = []
+  for card_index, (card_name, n_cards) in enumerate(items):
+    try:
+      card_description = gtrutils.get_detailed_card_summary(card_name, n_cards)
+    except:
+      card_description = '{0} [{1}]'.format(card_name, n_cards)
+    logging.info('  ({0}) {1}'.format(card_index+1, card_description))
+    possible_cards.append(card_name)
+  return possible_cards
+
 
 def get_possible_buildings_list(game_state, player_index):
   player = game_state.players[player_index]
-
-
 
  
 def MoveACardDialog(game_state, player_index):
@@ -212,7 +225,107 @@ def MoveACardDialog(game_state, player_index):
     card_source, card_destination))
   return (card_name, card_source, card_destination)
 
+def print_selections(choices_list):
+  for i, choice in enumerate(choices_list):
+    logging.info('  [{0}] {1}'.format(i+1, choice))
 
+def choices_dialog(choices_list, 
+                   prompt = 'Please make a selection'):
+  """ Returns the index in the choices_list selected by the user or
+  raises a StartOverException or a CancelDialogExeption. """
+
+  print_selections(choices_list)
+  
+  while True:
+    prompt_str = '--> {0} [1-{1}] ([q]uit, [s]tart over): '
+    response_str = raw_input(prompt_str.format(prompt, len(choices_list)))
+    if response_str in ['s', 'start over']: raise StartOverException
+    elif response_str in ['q', 'quit']: raise CancelDialogException
+    try:
+      response_int = int(response_str)
+    except:
+      logging.info('your response was {0!s}... try again'.format(response_str))
+      continue
+    if response_int <= len(choices_list) and response_int > 0:
+      # return the 0-indexed choice
+      return response_int-1
+    else:
+      logging.info('Invalid selection ({0}). Please enter a number between 1 and {1}'.format(response_int, len(choices_list)))
+
+
+  
+
+def LeadOrFollowRoleDialog(game_state, player_index):
+  """ Players can only lead or follow from their hands to their camp. 
+  Returns a list of [<role>, <card1>, <card2>, ...] where <role> is
+  the role being lead or followed and the remainder of the list
+  are the card or cards used to lead/follow.
+  This is usually only one card, but petitioning allows the player
+  to use 3 cards as a jack.
+  Raises a StartOverException if the user enters the Start Over option
+  or if the user attempts an illegal action (petition without the needed
+  multiple of a single role).
+  """
+  # Choose the role card
+  logging.info('Lead or Follow a role: choose the card:')
+  hand = game_state.players[player_index].hand
+  sorted_hand = sorted(hand)
+  card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+  card_choices.append('Jack')
+  card_choices.append('Petition')
+
+  card_index = choices_dialog(card_choices, 'Select a card to lead/follow')
+
+
+  role_index = -1
+  # If it's a jack, figure out what role it needs to be
+  if card_choices[card_index] == 'Jack':
+    role_index = choices_dialog(card_manager.get_all_roles(), 
+                                'Select a role for the Jack')
+    return (card_manager.get_all_roles()[role_index], 'Jack')
+
+  elif card_index == card_choices.index('Petition'):
+    # check if petition is possible
+    petition_count = 3   # 2 for circus
+    non_jack_hand = filter(lambda x:x!='Jack', game_state.players[player_index].hand)
+    hand_roles = map(card_manager.get_role_of_card, non_jack_hand)
+    role_counts = collections.Counter(hand_roles)
+    possible_petitions = [role for (role,count) in role_counts.items()
+                          if count>=petition_count]
+
+    if len(possible_petitions) < 1:
+      logging.info('Petitioning requires {0} cards of the same role'.format(petition_count))
+      raise StartOverException
+
+    # Petition can be used for any role
+    role_index = choices_dialog(card_manager.get_all_roles(), 'Select a role to petition')
+    petition_role = card_manager.get_all_roles()[role_index]
+
+    # Determine which cards will be used to petition
+    cards_to_petition = []
+    petition_cards = filter(
+      lambda x : role_counts[card_manager.get_role_of_card(x)] >= petition_count, non_jack_hand)
+    # Get first petition card, then filter out the roles that don't match
+    for i in range(0, petition_count):
+      card_index = choices_dialog(petition_cards, 
+        "Select {0:d} cards to use for petition".format(petition_count - len(cards_to_petition)))
+      cards_to_petition.append(petition_cards.pop(card_index))
+
+      if len(cards_to_petition) == 1:
+        def roles_match_petition(card): 
+          return card_manager.get_role_of_card(card) == \
+                    card_manager.get_role_of_card(cards_to_petition[0])
+        
+        petition_cards = filter(roles_match_petition, petition_cards)
+
+    ret_value = ['Petition']
+    ret_value.extend(cards_to_petition)
+    return ret_value
+
+  else:
+    card = sorted_hand[card_index]
+    return [card_manager.get_role_of_card(card), card]
+    
 def ThinkerTypeDialog(game_state, player_index):
 
   logging.info('Thinker:')
@@ -305,7 +418,7 @@ def main():
       logging.debug('--> Previous game state is from {0}'.format(asc_time))
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
-        '--> Take action: [M]ove card, [T]hinker, [P]ass priority, [E]nd turn, [R]eprint game state: ')
+        '--> Take action: [M]ove card, [T]hinker, [L]ead or Follow a role, [P]ass priority, [E]nd turn, [R]eprint game state: ')
       try:
         response = response_string.lower()[0]
       except IndexError:
@@ -319,6 +432,29 @@ def main():
         except: 
           logging.warning('Move was not successful')
           continue
+
+      if response == 'l':
+        try:
+          resp_list = LeadOrFollowRoleDialog(game_state, my_index)
+          print 'resp_list = ' + str(resp_list)
+        except StartOverException:
+          logging.debug('Start over exception caught')
+          continue
+        except CancelDialogException:
+          logging.debug('Cancel dialog exception caught')
+          continue
+        role, cards = resp_list[0], resp_list[1:]
+        source = game_state.players[my_index].hand
+        dest = game_state.players[my_index].camp
+        for card in cards:
+          try:
+            gtrutils.get_card_from_zone(card, source)
+            gtrutils.add_card_to_zone(card, dest)
+          except: 
+            raise
+            logging.warning('Move was not successful')
+            continue
+        save_game_state(game_state)
 
       elif response == 't':
         thinker_type = ThinkerTypeDialog(game_state, my_index)

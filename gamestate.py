@@ -40,7 +40,9 @@ class GameState:
   def __repr__(self):
     rep = ('GameState(players={players!r}, leader={leader!r}, '
            'priority={priority!r}, jack_pile={jack_pile!r}, '
-           'library={library!r}, foundations={foundations!r})'
+           'library={library!r}, '
+           'in_town_foundations={in_town_foundations!r}'
+           'out_of_town_foundations={out_of_town_foundations!r})'
            )
     return rep.format(
         players=self.players, 
@@ -48,7 +50,8 @@ class GameState:
         priority= self.priority_index,
         jack_pile=self.jack_pile,
         library=self.library, 
-        foundations=self.in_town_foundations
+        in_town_foundations=self.in_town_foundations,
+        out_of_town_foundations=self.out_of_town_foundations,
     )
 
   def increment_priority_index(self):

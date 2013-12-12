@@ -66,8 +66,10 @@ class Game:
 
   def init_foundations(self, n_players):
     logging.info('--> Initializing the foundations')
-    for material in card_manager.get_materials():
-      self.game_state.foundations.extend(material* n_players)
+    n_out_of_town = 6 - n_players
+    for material in card_manager.get_all_materials():
+      self.game_state.in_town_foundations.extend([material]*n_players)
+      self.game_state.out_of_town_foundations.extend([material]*n_out_of_town)
 
   def init_library(self):
     """ Starts with just a list of names for now.  """
@@ -126,11 +128,13 @@ class Game:
     print 'Jacks : {0:d} cards'.format(len(self.game_state.jack_pile))
 
     # print Foundations
-    foundation_string = 'Foundations: '
-    for name, card_list in self.game_state.foundations.items():
-      foundation_string += '{0}[{1:d}], '.format(name, len(card_list))
-    foundation_string.rstrip(', ')
-    print foundation_string
+    logging.info('Foundation materials:')
+    foundation_string = '  In town: ' + gtrutils.get_short_zone_summary(
+      self.game_state.in_town_foundations, 3)
+    logging.info(foundation_string)
+    foundation_string = '  Out of town: ' + gtrutils.get_short_zone_summary(
+      self.game_state.out_of_town_foundations, 3)
+    logging.info(foundation_string)
 
     print ''
     for player in self.game_state.players:
@@ -157,6 +161,7 @@ class Game:
       logging.info(player.describe_vault_public())
 
     # influence
+    if player.influence:
       logging.info(player.describe_influence())
 
     # clientele
