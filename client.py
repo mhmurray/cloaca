@@ -509,13 +509,13 @@ def colorize_role(any_string):
   # first match it finds. Thus, we need to make sure there are no overlaps
   # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
   role_regex_color_dict = {
-    '[Ll]egionary|[Ll]eg|LEGIONARY|LEG' : ('red',None),
-    '[Ll]aborer|[Ll]ab|LABORER|LAB' : ('yellow',None),
-    '[Cc]raftsman|[Cc]ra|CRAFTSMAN|CRA' : ('green',None),
-    '[Aa]rchitect|[Aa]rc|ARCHITECT|ARC' : ('white',None),
-    '[Mm]erchant|[Mm]er|MERCHANT|MER' : ('cyan',None),
-    '[Pp]atron|[Pp]at|PATRON|PAT' : ('magenta',None),
-    '[Jj]acks?|JACKS?' : ('grey','on_white'),
+    r'\b([Ll]egionaries|[Ll]egionary|[Ll]eg|LEGIONARIES|LEGIONARY|LEG)\b' : ('red',None),
+    r'\b([Ll]aborers?|[Ll]ab|LABORERS?|LAB)\b' : ('yellow',None),
+    r'\b([Cc]raftsmen|[Cc]raftsman|[Cc]ra|CRAFTSMEN|CRAFTSMAN|CRA)\b' : ('green',None),
+    r'\b([Aa]rchitects?|[Aa]rc|ARCHITECTS?|ARC)\b' : ('white',None),
+    r'\b([Mm]erchants?|[Mm]er|MERCHANTS?|MER)\b' : ('cyan',None),
+    r'\b([Pp]atrons?|[Pp]at|PATRONS?|PAT)\b' : ('magenta',None),
+    r'\b([Jj]acks?|JACKS?)\b' : ('grey','on_white'),
   }
 
   out_string=any_string
@@ -532,7 +532,7 @@ def colorize_material(any_string):
   # first match it finds. Thus, we need to make sure there are no overlaps
   # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
   material_regex_color_dict = {
-    r'\b([Bb]ricks?\b|[Bb]ri|BRICK|BRI)\b' : ('red',None),
+    r'\b([Bb]ricks?|[Bb]ri|BRICKS?|BRI)\b' : ('red',None),
     r'\b([Rr]ubble|[Rr]ub|RUBBLE|RUB)\b' : ('yellow',None),
     r'\b([Ww]ood|[Ww]oo|WOOD|WOO)\b' : ('green',None),
     r'\b([Cc]oncrete|[Cc]on|CONCRETE|CON)\b' : ('white',None),
