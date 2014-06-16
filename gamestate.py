@@ -152,8 +152,7 @@ class GameState:
     random.shuffle has a finite period, which is apparently 2**19937-1.
     This means lists of length >~ 2080 will not get a completely random
     shuffle. See the SO question
-      http://stackoverflow.com/questions/3062741/
-      maximal-length-of-list-to-shuffle-with-python-random-shuffle
+      http://stackoverflow.com/questions/3062741/maximal-length-of-list-to-shuffle-with-python-random-shuffle
     """
     random.shuffle(self.library)
     
