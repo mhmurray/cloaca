@@ -1,0 +1,84 @@
+This is a walkthrough of a sample game. This example can be used to
+walk through a server's actions.
+
+Game events:
+
+Start:
+P1 has 3x Insula, 1x Dock, 1xJack in hand
+P2 has 3x Shrine, 1x Temple, 1xJack in hand
+
+Pool has 1x Aqueduct, 1x Villa
+
+1st Turn, P1:
+P1 leads Laborer with Jack.
+P2 follows with Jack.
+P1 moves Villa to his stockpile.
+P2 moves Aqueduct to his stockpile.
+
+1st Turn, P2:
+P2 thinks for a Jack.
+
+2nd Turn, P1:
+P1 petitions with 3 Insulas to lead Craftsman.
+P2 follows with Jack.
+P1 starts a Dock on a Wood site.
+P2 starts a Shrine on a Brick site.
+
+2nd Turn, P2:
+P2 leads Patron with Temple card.
+P1 thinks for 5 cards.
+P2 moves Insula into clientele.
+
+
+
+
+
+
+MVCServer walkthrough - skipping game_state manipulation errors
+=====================
+server = MVCServer(game_state)
+
+# Initializes to our game state, P1 starts.
+server.run()
+  --> server.take_turn(p1)
+
+# Asks for think or lead
+server.take_turn(p1)
+  should_think = REQUEST(p1, think_or_lead) # p1: "LEAD"
+  if should_think:
+    --> server.perform_thinker_action(p1)
+  else:
+    role_being_led = --> server.lead_role_action(p1)
+    leading_or_following_players = [p1]
+    for player in non_active_players:
+      should_think = REQUEST(player, think_or_follow) # p2: "follow"
+      if should_think:
+        --> server.perform_thinker_action(player)
+      else:
+        --> server.follow_role_action(player, role_being_led)
+        leading_or_following_players.append(player)
+    
+    for player in leading_or_following_players:
+      --> server.perform_role_being_led(player)
+
+    --> server.end_turn()
+    
+server.lead_role_action(p1):
+  cards_to_lead, role = REQUEST(p1, cards_to_lead) # p1: "Jack, Laborer"
+  verify_legal_lead(p1, cards_to_lead, role)
+  game_state.MoveCardsFromHandToCamp(p1, cards_to_lead)
+
+server.follow_role_action(player, role_being_led):
+  
+
+# Asks for cards to thinker
+server.perform_thinker_action(p1):
+  think_for_jack = REQUEST(p1, think_for_jack_or_cards) # p1: "YES"
+  if think_for_jack:
+    game_state.ThinkerForJack(p1)
+  else:
+    game_state.ThinkerForCards(p1)
+  else:
+      
+
+
