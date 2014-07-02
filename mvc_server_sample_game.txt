@@ -40,6 +40,7 @@ server = MVCServer(game_state)
 
 # Initializes to our game state, P1 starts.
 server.run()
+  p1 = server.initialize()
   --> server.take_turn(p1)
 
 # Asks for think or lead
@@ -48,20 +49,20 @@ server.take_turn(p1)
   if should_think:
     --> server.perform_thinker_action(p1)
   else:
-    role_being_led = --> server.lead_role_action(p1)
+    role_being_led = --> server.lead_role_action(p1) # p1: "LABORER w/ JACK"
     leading_or_following_players = [p1]
     for player in non_active_players:
-      should_think = REQUEST(player, think_or_follow) # p2: "follow"
+      should_think = REQUEST(player, think_or_follow) # p2: "FOLLOW"
       if should_think:
         --> server.perform_thinker_action(player)
       else:
-        --> server.follow_role_action(player, role_being_led)
+        --> server.follow_role_action(player, role_being_led) # p2: "w/ JACK"
         leading_or_following_players.append(player)
     
     for player in leading_or_following_players:
       --> server.perform_role_being_led(player)
 
-    --> server.end_turn()
+  --> server.end_turn()
     
 server.lead_role_action(p1):
   cards_to_lead, role = REQUEST(p1, cards_to_lead) # p1: "Jack, Laborer"

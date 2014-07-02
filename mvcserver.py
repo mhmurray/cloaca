@@ -132,6 +132,8 @@ manipulating the game state to take that action.
 # ACTION(kids_in_pool) : senate, sewer hooks into this
 
 
+from gamestate import GameState
+
 class MVCServer:
   """ Manipulates the game state at the requests of registered clients.
   Maintains the "state" of the game, advancing through phases.
@@ -142,11 +144,27 @@ class MVCServer:
     self.game_state = game_state
     self.state = None
     self.action_stack = []
+    self.players = []
 
   def run(self):
-    """ Main game loop """
-    player = initialize_and_get_starting_player()
-    take_turn(player)
+    """ Main game loop. This should be called after the server has
+    been initialized with connected players and game settings
+    have been determined.
+    """
+    self.initialize()
+    player = game_state.get_leader()
+    while not self.game_state.finished:
+      take_turn(player)
+
+    self.evaluate_winner()
+        
+  def initialize(self):
+    """ Sets up the GameState, shuffling the deck, 
+    filling the pool, and determining starting player.
+    """
+    self.game_state = GameState()
+    for player in self.players:
+      self.game_state.find_or_add_player(player.name)
 
 
   def take_turn(self, player):
