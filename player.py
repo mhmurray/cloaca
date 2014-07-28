@@ -74,6 +74,42 @@ class Player:
   def get_card_from_camp(self,card):
     return get_card_from_zone(card, self.camp)
 
+  def get_completed_buildings(self):
+    """ Returns a list of just the building names for all
+    completed buildings.
+    """
+    # Each "building" is a list of lists, with b[0] being the 
+    # actual buidling, and the site and materials making up the rest
+    # So check if the site (ie. "Brick", "Marble", etc.) is in the list,
+    # indicating an incomplete building.
+    completed_buildings = []
+    materials = card_manager.get_all_materials()
+    for b in self.buildings:
+      completed = len(filter(lambda x : x in materials, b))
+      if completed:
+        completed_buildings.append(b[0])
+
+    return completed_buildings
+
+  def get_active_buildings(self):
+    """ Returns a list of just the building names for all buildings
+    that are active. This includes eg. a Temple with no marble added while
+    we have a completed Gate.
+
+    This doesn't check other player for Stairway modifications
+    """
+    # "buildings" is a list of lists. The first element is the building name
+    active_buildings = [x[0] for x in self.get_completed_buildings()]
+    if "Gate" in completed_buildings:
+      # find marble buildings and append to active buildings list
+      for b in self.buildings:
+        if card_manager.get_material_of_card(b[0]) == "Marble":
+          if b[0] not in active_buildings
+            active_buildings.append(b[0])
+
+    return active_buildings
+
+
   def add_cards_to_hand(self, cards):
     self.hand.extend(cards)
 
