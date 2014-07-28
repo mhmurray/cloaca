@@ -14,6 +14,9 @@ import collections
 import logging
 import pickle
 
+class CancelDialogException(Exception):
+  pass
+
 class Game:
   initial_pool_count = 5
   initial_jack_count = 6
@@ -235,15 +238,10 @@ class Game:
     if thinker:
       perform_thinker_action(player)
       end_turn()
-
-    if lead_role:
+    else:
       role = self.lead_role_action(player)
       for p in get_other_players():
         self.follow_role_action(p, role)
-
-      post_game_state()
-      game_state = wait_for_priority()
-      self.game_state = game_state
 
       perform_role_being_led(player)
       for p in get_following_players():
@@ -264,13 +262,25 @@ class Game:
     3) Ask thinking_player for thinker type (jack or # cards)
     4) Draw cards for player.
     """
-    if player_has_latrine(thinking_player):
+    # still doesn't check for stairway-activated buildings
+    if "Latrine" in thinking_player.get_active_buildings():
       latrine_card = client.UseLatrineDialog(thinking_player)
+    else: latrine_card = None
 
-    thinker_type = client.ThinkerDialog()
+    if "Vomitorium" in thinking_player.get_active_buildings():
+      should_discard = client.UseVomitoriumDialog(thinking_player)
+    else: should_discard_all = False
+
+    if should_discard_all:
+      game_state.discard_all_for_player(thinking_player)
+    
+    if latrine_card:
+      game_state.discard_for_player(latrine_card)
+
+    thinker_type = self.ThinkerTypeDialog()
     if thinker_type == "Jack":
       game_state.draw_one_jack_for_player(thinking_player)
-    if thinker_type == "FillUp":
+    if thinker_type == "Cards":
       game_state.thinker_fillup_for_player(thinking_player)
 
   def lead_role_action(self, leading_player):
@@ -280,6 +290,7 @@ class Game:
     3) Ask for role clarification if necessary
     4) Move cards to camp, set this turn's role that was led.
     """
+    
     pass
 
   def follow_role_action(self, following_player, role):
@@ -454,5 +465,100 @@ class Game:
     return game_state
 
 
+  def ThinkerTypeDialog(game_state, player):
+    """ Returns 'Jack' or 'Cards' for which type of thinker to
+    perform.
+    """
+    logging.info('Thinker:')
+    logging.info('[1] Jack')
+    n_possible_cards = player.get_n_possible_thinker_cards()
+    logging.info('[2] Fill up from library ({0} cards)'.format(n_possible_cards))
+    while True:
+      response_str = raw_input('--> Your choice ([q]uit, [s]tart over): ')
+      if response_str in ['s', 'start over']: continue
+      elif response_str in ['q', 'quit']: return ('','','')
+      try:
+        response_int = int(response_str)
+        if response_int == 1:
+          return 'Jack'
+        elif response_int == 2:
+          return 'Cards'
+        else:
+          logging.info('your response was {0!s}... try again'.format(response_str))
+          continue
+        logging.info(player.describe_hand_private())
+        save_game_state(game_state)
+        break
+      except:
+        logging.info('your response was {0!s}... try again'.format(response_str))
 
 
+  def LeadOrFollowRoleDialog(game_state, player):
+    """ Players can only lead or follow from their hands to their camp. 
+    Returns a list of [<role>, <card1>, <card2>, ...] where <role> is
+    the role being lead or followed and the remainder of the list
+    are the card or cards used to lead/follow.
+    This is usually only one card, but petitioning allows the player
+    to use 3 cards as a jack.
+    Raises a StartOverException if the user enters the Start Over option
+    or if the user attempts an illegal action (petition without the needed
+    multiple of a single role).
+    """
+    # Choose the role card
+    logging.info('Lead or Follow a role: choose the card:')
+    hand = player.hand
+    sorted_hand = sorted(hand)
+    card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+    card_choices.append('Jack')
+    card_choices.append('Petition')
+
+    card_index = choices_dialog(card_choices, 'Select a card to lead/follow')
+
+    role_index = -1
+    # If it's a jack, figure out what role it needs to be
+    if card_choices[card_index] == 'Jack':
+      role_index = choices_dialog(card_manager.get_all_roles(), 
+                                  'Select a role for the Jack')
+      return (card_manager.get_all_roles()[role_index], 'Jack')
+
+    elif card_index == card_choices.index('Petition'):
+      # check if petition is possible
+      petition_count = 3   # 2 for circus
+      non_jack_hand = filter(lambda x:x!='Jack', game_state.players[player_index].hand)
+      hand_roles = map(card_manager.get_role_of_card, non_jack_hand)
+      role_counts = collections.Counter(hand_roles)
+      possible_petitions = [role for (role,count) in role_counts.items()
+                            if count>=petition_count]
+
+      if len(possible_petitions) < 1:
+        logging.info('Petitioning requires {0} cards of the same role'.format(petition_count))
+        raise StartOverException
+
+      # Petition can be used for any role
+      role_index = choices_dialog(card_manager.get_all_roles(), 'Select a role to petition')
+      petition_role = card_manager.get_all_roles()[role_index]
+
+      # Determine which cards will be used to petition
+      cards_to_petition = []
+      petition_cards = filter(
+        lambda x : role_counts[card_manager.get_role_of_card(x)] >= petition_count, non_jack_hand)
+      # Get first petition card, then filter out the roles that don't match
+      for i in range(0, petition_count):
+        card_index = choices_dialog(petition_cards, 
+          "Select {0:d} cards to use for petition".format(petition_count - len(cards_to_petition)))
+        cards_to_petition.append(petition_cards.pop(card_index))
+
+        if len(cards_to_petition) == 1:
+          def roles_match_petition(card): 
+            return card_manager.get_role_of_card(card) == \
+                      card_manager.get_role_of_card(cards_to_petition[0])
+          
+          petition_cards = filter(roles_match_petition, petition_cards)
+
+      ret_value = ['Petition']
+      ret_value.extend(cards_to_petition)
+      return ret_value
+
+    else:
+      card = sorted_hand[card_index]
+      return [card_manager.get_role_of_card(card), card]
