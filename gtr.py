@@ -12,6 +12,7 @@ import card_manager
 
 import collections
 import logging
+import pickle
 
 class Game:
   initial_pool_count = 5
@@ -250,6 +251,9 @@ class Game:
           
     pass
 
+  def post_game_state(self):
+      save_game_state(self)
+
   def perform_thinker_action(self, thinking_player):
     """
     1) If thinking_player has a Latrine, ask for discard.
@@ -412,5 +416,43 @@ class Game:
     """ Placeholder for all building resolutions
     """
     pass
+
+  def save_game_state(self, log_file_prefix='log_state'):
+    """
+    Save game state to file
+    """
+    # get the current time, in seconds 
+    time_stamp = time.time()
+    self.game_state.time_stamp = time_stamp
+    file_name = '{0}_{1}.log'.format(log_file_prefix, time_stamp)
+    log_file = file(file_name, 'w')
+    pickle.dump(game_state, log_file)
+    log_file.close()
+
+  def get_previous_game_state(self, log_file_prefix='log_state'):
+    """
+    Return saved game state from file
+    """
+    log_files = glob.glob('{0}*.log'.format(log_file_prefix))
+    log_files.sort()
+    #for log_file in log_files: # print all log file names, for debugging
+    #  logging.debug(log_file)
+
+    if not log_files:
+      return None
+
+    log_file_name = log_files[-1] # last element
+    time_stamp = log_file_name.split('_')[-1].split('.')[0:1]
+    time_stamp = '.'.join(time_stamp)
+    asc_time = time.asctime(time.localtime(float(time_stamp)))
+    #logging.debug('Retrieving game state from {0}'.format(asc_time))
+
+    log_file = file(log_file_name, 'r')
+    game_state = pickle.load(log_file)
+    log_file.close()
+    self.game_state = game_state
+    return game_state
+
+
 
 

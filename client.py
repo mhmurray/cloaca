@@ -3,6 +3,10 @@
 """
 A simple client.  Maybe this should be a class
 10 Aug 2013 Starting with pickle -- AGS
+
+Now the client is using gtr.Game() to manipulate the game_state. Later the
+client will exchange info with a server. 
+27 July 2014 AGS
 """
 
 
@@ -11,10 +15,8 @@ import glob
 import time
 import json
 import glob
-import pickle
 import sys
 import logging
-import pickle
 import collections
 import card_manager
 import re
@@ -23,8 +25,6 @@ import gtr
 import gtrutils
 from player import Player
 from gamestate import GameState
-
-
 
 
 def test_logging():
@@ -38,53 +38,18 @@ class StartOverException(Exception):
 class CancelDialogException(Exception):
   pass
 
+
 class Client:
 
     def __init__(self):
         self.game = None
-
-    def get_previous_game_state(self, log_file_prefix='log_state'):
-      """
-      Return saved game state from file
-      """
-      log_files = glob.glob('{0}*.log'.format(log_file_prefix))
-      log_files.sort()
-      #for log_file in log_files: # print all log file names, for debugging
-      #  logging.debug(log_file)
-
-      if not log_files:
-        return None
-
-      log_file_name = log_files[-1] # last element
-      time_stamp = log_file_name.split('_')[-1].split('.')[0:1]
-      time_stamp = '.'.join(time_stamp)
-      asc_time = time.asctime(time.localtime(float(time_stamp)))
-      #logging.debug('Retrieving game state from {0}'.format(asc_time))
-
-      log_file = file(log_file_name, 'r')
-      game_state = pickle.load(log_file)
-      log_file.close()
-      return game_state
-
-
-    def save_game_state(self, game_state, log_file_prefix='log_state'):
-      """
-      Save game state to file
-      """
-      # get the current time, in seconds 
-      time_stamp = time.time()
-      game_state.time_stamp = time_stamp
-      file_name = '{0}_{1}.log'.format(log_file_prefix, time_stamp)
-      log_file = file(file_name, 'w')
-      pickle.dump(game_state, log_file)
-      log_file.close()
 
     def describe_game_for_player(self, game, player_index):
       game.show_public_game_state()
       logging.info(game.game_state.players[player_index].describe_hand_private())
 
 
-    def wait_for_my_turn(self, my_index):
+    def wait_for_priority(self, my_index):
       """
       Wait until this player has priority
       """
@@ -93,26 +58,18 @@ class Client:
       # keep checking game state until it is my turn
       while my_index is not priority_index:
         time.sleep(0.1)
-        game_state = self.get_previous_game_state()
+        game_state = self.game.get_previous_game_state()
         priority_index = game_state.priority_index
         leader_index = game_state.leader_index
         # print info about changes to priority
         if previous_priority_index is not priority_index:
           previous_priority_index = priority_index
           # print the current game state after every change
-          self.game.game_state = self.get_previous_game_state()
           self.describe_game_for_player(self.game, my_index)
           logging.info('--> Waiting to get priority...')
 
       asc_time = time.asctime(time.localtime(game_state.time_stamp))
       logging.info('--> You have priority (as of {0})!'.format(asc_time))
-
-
-      ###
-      #while True:
-      #  player = self.game.get_active_player()
-      #  take_turn(player)
-      ###
 
 
     def get_possible_zones_list(self, game_state, player_index):
@@ -366,7 +323,7 @@ class Client:
           else:
             continue
           logging.info(player.describe_hand_private())
-          save_game_state(game_state)
+          self.game.save_game_state(game_state)
           break
         except:
           logging.info('your response was {0!s}... try again'.format(response_str))
@@ -393,7 +350,7 @@ def main():
     my_name = default_name
 
   # check whether game exists, if not start a new one
-  game_state = client.get_previous_game_state()
+  game_state = client.game.get_previous_game_state()
   if game_state:  
     logging.info('--> Joining existing game...')  
   else:
@@ -405,7 +362,7 @@ def main():
   my_index = game_state.find_or_add_player(my_name)
   # only save the game state if player was added
   if n_players < game_state.get_n_players():
-    client.save_game_state(game_state)
+    client.game.save_game_state(game_state)
 
 
   # prompt player to join game when desired number of players is reached
@@ -417,13 +374,13 @@ def main():
       logging.warn('Goodbye!')
       exit()
     else:
-      game_state = client.get_previous_game_state()
+      game_state = client.game.get_previous_game_state()
       n_players = game_state.get_n_players() 
       logging.info('--> There are {0:d} players including you.'.format(n_players))
       response = raw_input(
         '--> Would you like to start? [y/n (enter=wait for more players)] : ')
       if response is 'y':
-        game_state = client.get_previous_game_state()
+        game_state = client.game.get_previous_game_state()
 
         # check whether someone else has started the game
         if not game_state.is_started:
@@ -433,17 +390,32 @@ def main():
           # initialize the game
           game.init_common_piles(n_players=n_players)
           game.game_state.init_players()
-          save_game_state(game_state=game_state)
+          self.game.save_game_state(game_state=game_state)
 
   while True:
     time.sleep(0.1)
-    client.wait_for_my_turn(my_index=my_index)
-    game_state = client.get_previous_game_state()
+    client.wait_for_priority(my_index=my_index)
+    game_state = client.game.get_previous_game_state()
     # It is now my turn and the game state was just printed
-    while True:
-      #game_state = get_previous_game_state()
-      asc_time = time.asctime(time.localtime(game_state.time_stamp))
-      logging.debug('--> Previous game state is from {0}'.format(asc_time))
+    asc_time = time.asctime(time.localtime(game_state.time_stamp))
+    logging.debug('--> Previous game state is from {0}'.format(asc_time))
+
+
+    game.game_state = game_state
+
+    # if I am the leader, take turn:
+    if leader_index == my_index:
+        # check whether a card has been led yet:
+        if game_state.is_role_led is False:
+            game.take_turn(player=game_state.players[my_index])
+            game.game_state.is_role_led = True
+            game.save_game_state(game.game_state)
+            continue
+
+    else:
+        
+
+
       # Just take the first character of the reponse, lower case.
       response_string=raw_input(
         '--> Take action: [M]ove card, [T]hinker, [L]ead or Follow a role, [P]ass priority, [E]nd turn, [R]eprint game state: ')
@@ -456,7 +428,7 @@ def main():
         try:
           gtrutils.get_card_from_zone(card_name, source)
           gtrutils.add_card_to_zone(card_name, dest)
-          save_game_state(game_state)
+          game.save_game_state(game_state)
         except: 
           logging.warning('Move was not successful')
           continue
@@ -482,7 +454,7 @@ def main():
             raise
             logging.warning('Move was not successful')
             continue
-        save_game_state(game_state)
+        game.save_game_state(game_state)
 
       elif response == 't':
         thinker_type = ThinkerTypeDialog(game_state, my_index)
