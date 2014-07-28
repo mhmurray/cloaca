@@ -112,12 +112,20 @@ def wait_for_my_turn(my_index):
     if previous_priority_index is not priority_index:
       previous_priority_index = priority_index
       # print the current game state after every change
-      game = gtr.Game(game_state=get_previous_game_state())
+      #game = gtr.Game(game_state=get_previous_game_state())
+      game.game_state = get_previous_game_state()
       describe_game_for_player(game, my_index)
       logging.info('--> Waiting to get priority...')
 
   asc_time = time.asctime(time.localtime(game_state.time_stamp))
   logging.info('--> You have priority (as of {0})!'.format(asc_time))
+
+
+###
+while True:
+  player = game.get_active_player()
+  take_turn(player)
+###
 
 
 def get_possible_zones_list(game_state, player_index):
@@ -425,7 +433,8 @@ def main():
 
         # check whether someone else has started the game
         if not game_state.is_started:
-          game = gtr.Game(game_state=game_state)
+          #game = gtr.Game(game_state=game_state)
+          game.game_state = game_state
           game_state.is_started = True
           # initialize the game
           game.init_common_piles(n_players=n_players)
