@@ -26,6 +26,10 @@ class GameState:
     if players:
         for player in players: self.add_player(player)
     self.leader_index = None
+    self.is_decision_phase = True # 2 phases: decision, action
+    self.do_respond_to_legionary = False
+    self.is_role_led = False
+    self.role_led = None
     self.priority_index = None
     self.turn_index = 0
     self.jack_pile = jack_pile or []
