@@ -99,6 +99,16 @@ class GameState:
   def draw_one_jack_for_player(self, player):
     player.add_cards_to_hand([self.draw_jack()])
 
+  def discard_for_player(self, player, card):
+    if card not in player.hand:
+      raise Exception('Card {} not found in hand.'.format(card))
+
+    self.pool.append(player.get_card_from_hand(card))
+
+  def discard_all_for_player(self, player):
+    for card in player.hand:
+      self.pool.append(player.get_card_from_hand(card))
+
   def find_or_add_player(self, player_name):
     """ Finds the index of a named player, otherwise creates a new
     Player object with the given name, appending it to the list of 
