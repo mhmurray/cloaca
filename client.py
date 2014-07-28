@@ -112,12 +112,20 @@ def wait_for_my_turn(my_index):
     if previous_priority_index is not priority_index:
       previous_priority_index = priority_index
       # print the current game state after every change
-      game = gtr.Game(game_state=get_previous_game_state())
+      #game = gtr.Game(game_state=get_previous_game_state())
+      game.game_state = get_previous_game_state()
       describe_game_for_player(game, my_index)
       logging.info('--> Waiting to get priority...')
 
   asc_time = time.asctime(time.localtime(game_state.time_stamp))
   logging.info('--> You have priority (as of {0})!'.format(asc_time))
+
+
+###
+while True:
+  player = game.get_active_player()
+  take_turn(player)
+###
 
 
 def get_possible_zones_list(game_state, player_index):
@@ -425,7 +433,8 @@ def main():
 
         # check whether someone else has started the game
         if not game_state.is_started:
-          game = gtr.Game(game_state=game_state)
+          #game = gtr.Game(game_state=game_state)
+          game.game_state = game_state
           game_state.is_started = True
           # initialize the game
           game.init_common_piles(n_players=n_players)
@@ -509,13 +518,13 @@ def colorize_role(any_string):
   # first match it finds. Thus, we need to make sure there are no overlaps
   # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
   role_regex_color_dict = {
-    '[Ll]egionary|[Ll]eg|LEGIONARY|LEG' : ('red',None),
-    '[Ll]aborer|[Ll]ab|LABORER|LAB' : ('yellow',None),
-    '[Cc]raftsman|[Cc]ra|CRAFTSMAN|CRA' : ('green',None),
-    '[Aa]rchitect|[Aa]rc|ARCHITECT|ARC' : ('white',None),
-    '[Mm]erchant|[Mm]er|MERCHANT|MER' : ('cyan',None),
-    '[Pp]atron|[Pp]at|PATRON|PAT' : ('magenta',None),
-    '[Jj]acks?|JACKS?' : ('grey','on_white'),
+    r'\b([Ll]egionaries|[Ll]egionary|[Ll]eg|LEGIONARIES|LEGIONARY|LEG)\b' : ('red',None),
+    r'\b([Ll]aborers?|[Ll]ab|LABORERS?|LAB)\b' : ('yellow',None),
+    r'\b([Cc]raftsmen|[Cc]raftsman|[Cc]ra|CRAFTSMEN|CRAFTSMAN|CRA)\b' : ('green',None),
+    r'\b([Aa]rchitects?|[Aa]rc|ARCHITECTS?|ARC)\b' : ('white',None),
+    r'\b([Mm]erchants?|[Mm]er|MERCHANTS?|MER)\b' : ('cyan',None),
+    r'\b([Pp]atrons?|[Pp]at|PATRONS?|PAT)\b' : ('magenta',None),
+    r'\b([Jj]acks?|JACKS?)\b' : ('grey','on_white'),
   }
 
   out_string=any_string
@@ -532,7 +541,7 @@ def colorize_material(any_string):
   # first match it finds. Thus, we need to make sure there are no overlaps
   # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
   material_regex_color_dict = {
-    r'\b([Bb]ricks?\b|[Bb]ri|BRICK|BRI)\b' : ('red',None),
+    r'\b([Bb]ricks?|[Bb]ri|BRICKS?|BRI)\b' : ('red',None),
     r'\b([Rr]ubble|[Rr]ub|RUBBLE|RUB)\b' : ('yellow',None),
     r'\b([Ww]ood|[Ww]oo|WOOD|WOO)\b' : ('green',None),
     r'\b([Cc]oncrete|[Cc]on|CONCRETE|CON)\b' : ('white',None),
