@@ -109,6 +109,33 @@ class Player:
 
     return active_buildings
 
+  def get_n_clients(self, role=None):
+    """ Return the number of clients of the specified role. This counts
+    the effect of Storeroom and Ludus Magna, but not Circus Maximus.
+
+    If role is not specified or is None, returns the number of clients
+    of all roles.
+    """
+    if role is None:
+      n_clients = len(self.clientele)
+    elif role == 'Laborer' and 'Storeroom' in self.get_active_buildings():
+      n_clients = len(self.clientele)
+    else:
+      role_list = map(card_manager.get_role_of_card, self.clientele)
+      n_clients = role_list.count(role)
+
+      # Ludus Magna adds to any non-Merchant count.
+      if role != 'Merchant' and 'Ludus Magna' in self.get_active_buildings():
+        n_clients += role_list.count('Merchant')
+
+    return n_clients
+
+  def get_n_client_cards_of_role(self, role):
+    role_list = [card_manager.get_role_of_card(x) for x in self.clientele]
+    return role_list.count(role)
+
+  def is_following_or_leading(self):
+    return len(self.camp) > 0
 
   def add_cards_to_hand(self, cards):
     self.hand.extend(cards)
@@ -216,3 +243,5 @@ if __name__ == '__main__':
 
   test_player = Player()
   print test_player
+
+# vim: ts=8:sts=2:sw=2:et

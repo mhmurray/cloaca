@@ -326,18 +326,161 @@ class Game:
     5) While the player has clientele actions { -->ACTION(perform_clientele_action) }
        Have to forward out_of_town_allowed.
     """
-    pass
+    # Skip the whole palace thing.
+    
+    # The clients are simple for Laborer, Merchant, and Legionary.
+    # We can calculate how many actions you get before doing any of them.
+    # Before all of them do the role that was led or followed
+    #
+    if role in ['Laborer', 'Merchant', 'Legionary']:
+      has_cm = 'Circus Maximus' in player.get_active_buildings()
 
-  def perform_clientele_action(self, player, role, out_of_town_allowed):
+      n_actions = player.get_n_clients(role)
+
+      if player.is_following_or_leading():
+        self.perform_role_action(player, role)
+        if has_cm : n_actions *= 2
+
+      for i in range(n_actions):
+        self.perform_clientele_action(player, role)
+
+
+    # For Patron, anything is possible, since the Bath lets the player
+    # perform arbitrary actions between Patron actions
+    # For Craftsman and Architect, similarly, arbitrary things can happen
+    # between actions as buildings are completed. Additionally, we need
+    # to keep track of whether we have 2 Cra/Arch actions that can be used
+    # to start a building out-of-town.
+    # 
+    # Things that can change the calculation of how many actions a player gets:
+    #   1) Building a Circus Maximus - doubles unused clients
+    #   2) Building a Ludus Magna - activates Merchant clients for other roles
+    #
+    # However note that clients that are new this turn *don't* get to perform
+    # the action, regardless of how they were acquired.
+    #
+    # To handle this, we lock in the number of Patron and Merchant clients
+    # at the beginning. Then we do all the real Patron-card client activations.
+    # At that point we can check if there's a Ludus Magna, in which case we
+    # do all the Merchant-card Patron actions.
+    #
+    
+    if role == 'Patron':
+      n_patron = player.get_n_client_cards_of_role('Patron')
+      n_merchant = player.get_n_client_cards_of_role('Merchant')
+
+      if player.is_following_or_leading():
+        self.perform_patron_action(player)
+      
+      patrons_used=0
+      merchants_used=0
+
+      while patrons_used < n_patron:
+        self.perform_clientele_action(player, 'Patron')
+        patrons_used += 1
+
+      # Now if the player has build a Ludus Magna somehow, use the Merchants
+      if 'Ludus Magna' in player.get_active_buildings():
+        while merchants_used < n_merchant:
+          self.perform_clientele_action(player, 'Patron')
+          merchants_used += 1
+
+
+    # Craftsman is similar to Patron, except that we need to check whether
+    # we're allowed to out-of-town each action as we do it.
+    # For the led role, we just check if there are any clients.
+    # For the clients, we check if there are Craftsman yet to be used
+    # then for the last guy, if there's a LM and a Merchant client.
+    # If there's a CM, these checks only apply to the second action for
+    # each client, since the first is always allowed to out-of-town.
+    #
+    # The same logic applies for architects, so we can combine the two.
+    
+    if role in ['Craftsman', 'Architect']:
+      n_clients = player.get_n_client_cards_of_role(role)
+      n_merchant = player.get_n_client_cards_of_role('Merchant')
+
+      has_lm = 'Ludus Magna' in player.get_active_buildings()
+      
+      used_oot = False
+      if player.is_following_or_leading():
+        can_oot = n_clients > 0 or (has_lm and n_merchant > 0)
+        used_oot = self.perform_role_action(player, role, oot)
+
+      clients_used = 0
+      merchants_used = 0
+
+      def check_merchants():
+        has_lm = 'Ludus Magna' in player.get_active_buildings()
+        has_merchant = (n_merchants-merchants_used > 0)
+        return has_lm and has_merchant
+
+      while clients_used < n_clients:
+        can_oot = (n_clients - clients_used) > 1 or check_merchants()
+        used_oot = self.perform_clientele_action(player, role, can_oot, used_oot)
+
+        clients_used += 1
+
+      while check_merchants():
+        can_oot = (n_merchants - merchants_used) > 1
+        used_oot = self.perform_clientele_action(player, role, can_oot, used_oot)
+
+        merchants_used += 1
+
+    #ugh! done. Probably should test this one.
+
+
+  def perform_clientele_action(self, player, role, out_of_town_allowed=False, out_of_town_used=False):
     """
     This function will activate one client. It makes two actions 
     if the player has a Circus Maximus. This function doesn't keep track
     of which clients have been used.
     1) -->ACTION(perform_<role>_action), forwarding out_of_town_allowed to architect/craftsman
-    1) If the player has a Circus Maximus, do it again
-    """
-    pass
+    2) If the player has a Circus Maximus, do it again
 
+    If out_of_town_allowed is True, there's another action after this one, so out_of_town_allowed
+    is true for the last action we do here.
+
+    Returns True if the last action was used to start an out-of-town site.
+    """
+    used_oot = out_of_town_used
+    if 'Circus Maximus' in player.get_active_buildings():
+      if used_oot: used_oot = False
+      else:
+        used_oot = self.perform_role_action(player, role, out_of_town_allowed)
+
+    if used_oot: used_oot = False
+    else:
+      used_oot = self.perform_clientele_action(player, role, out_of_town_allowed)
+
+    return used_oot
+
+  def perform_role_action(self, player, role, out_of_town_allowed):
+    """ Multiplexer function for arbitrary roles. 
+    Calls perform_<role>_action(), etc.
+
+    It returns the value the role action returns. If this is a Craftsman
+    or an Architect, it's whether or not the action was ued to start an
+    out of town site. Otherwise it's None.
+    """
+    if role=='Patron':
+      self.perform_patron_action(player)
+      return False
+    elif role=='Laborer':
+      self.perform_laborer_action(player)
+      return False
+    elif role=='Architect':
+      return self.perform_architect_action(player)
+    elif role=='Craftsman':
+      return self.perform_craftsman_action(player)
+    elif role=='Legionary':
+      self.perform_legionary_action(player)
+      return False
+    elif role=='Merchant':
+      self.perform_merchant_action(player)
+      return False
+    else:
+      raise Exception('Illegal role: {}'.format(role))
 
   def perform_laborer_action(self, player):
     """
@@ -651,3 +794,5 @@ class Game:
     else:
       card = sorted_hand[card_index]
       return [card]
+
+# vim: ts=8:sts=2:sw=2:et
