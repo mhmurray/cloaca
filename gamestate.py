@@ -89,6 +89,12 @@ class GameState:
   def get_n_players(self):
       return len(self.players)
 
+  def get_following_players_in_order(self):
+      # rotates the list so players are in order from the leader,
+      # and removes the leader
+      n = self.leader_index
+      return self.players[n+1:] + self.players[:n]
+
   def thinker_fillup_for_player(self, player):
     n_cards = player.get_n_possible_thinker_cards()
     logging.debug('Adding {0} cards to player {1} hand'.format(

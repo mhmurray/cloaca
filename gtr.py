@@ -27,6 +27,9 @@ class Game:
   
   def __init__(self, game_state=None):
     self.game_state = game_state if game_state is not None else GameState()
+    logger = logging.getLogger()
+    logger.addFilter(gtrutils.RoleColorFilter())
+    logger.addFilter(gtrutils.MaterialColorFilter())
 
   def __repr__(self):
     rep=('Game(game_state={game_state!r})')
@@ -238,17 +241,28 @@ class Game:
     1) Ask for thinker or lead
     2) -->ACTION(thinker), -->ACTION(lead_role)
     """
-    if thinker:
-      perform_thinker_action(player)
-      end_turn()
-    else:
+    lead_role = self.ThinkerOrLeadDialog(player)
+    if lead_role:
       role = self.lead_role_action(player)
-      for p in get_other_players():
+      for p in self.game_state.get_following_players_in_order():
         self.follow_role_action(p, role)
 
-      perform_role_being_led(player)
-      for p in get_following_players():
+      self.perform_role_being_led(player,)
+      for p in self.game_state.get_following_players_in_order():
         self.perform_role_being_led(p)
+    else:
+      self.perform_thinker_action(player)
+      self.end_turn(player)
+
+  def ThinkerOrLeadDialog(self, player):
+    """ Asks whether the player wants to think or lead at the start of their
+    turn.
+    """
+    logging.info('Start of {}\'s turn: Thinker or Lead?'.format(player.name))
+
+    choices = ['Thinker', 'Lead']
+    index = self.choices_dialog(choices, 'Select one.')
+    return index==1
 
   def post_game_state(self):
       save_game_state(self)
@@ -273,16 +287,16 @@ class Game:
     else: should_discard_all = False
 
     if should_discard_all:
-      game_state.discard_all_for_player(thinking_player)
+      self.game_state.discard_all_for_player(thinking_player)
     
     if latrine_card:
-      game_state.discard_for_player(latrine_card)
+      self.game_state.discard_for_player(latrine_card)
 
-    thinker_type = self.ThinkerTypeDialog()
+    thinker_type = self.ThinkerTypeDialog(thinking_player)
     if thinker_type == "Jack":
-      game_state.draw_one_jack_for_player(thinking_player)
+      self.game_state.draw_one_jack_for_player(thinking_player)
     if thinker_type == "Cards":
-      game_state.thinker_fillup_for_player(thinking_player)
+      self.game_state.thinker_fillup_for_player(thinking_player)
 
   def lead_role_action(self, leading_player):
     """
@@ -292,12 +306,13 @@ class Game:
     4) Move cards to camp, set this turn's role that was led.
     """
     # This dialog checks that the cards used are legal
-    resp = self.LeadOrRoleDialog(leading_player)
+    resp = self.LeadRoleDialog(self.game_state, leading_player)
     role = resp[0]
     cards = resp[1:]
     self.game_state.role_led = role
     for c in cards:
       leading_player.camp.append(leading_player.get_card_from_hand(c))
+    return role
 
   def follow_role_action(self, following_player, role):
     """
@@ -308,7 +323,7 @@ class Game:
     """
     cards = self.FollowRoleDialog(following_player, role)
     for c in cards:
-      following_player.camp.append(leading_player.get_card_from_hand(c))
+      following_player.camp.append(following_player.get_card_from_hand(c))
 
   def perform_role_being_led(self, player):
     """
@@ -331,14 +346,15 @@ class Game:
     # The clients are simple for Laborer, Merchant, and Legionary.
     # We can calculate how many actions you get before doing any of them.
     # Before all of them do the role that was led or followed
-    #
+    role = self.game_state.role_led
+    logging.info('Player {} is performing {}'.format(player.name, role))
     if role in ['Laborer', 'Merchant', 'Legionary']:
       has_cm = 'Circus Maximus' in player.get_active_buildings()
 
       n_actions = player.get_n_clients(role)
 
       if player.is_following_or_leading():
-        self.perform_role_action(player, role)
+        self.perform_role_action(player, role, False)
         if has_cm : n_actions *= 2
 
       for i in range(n_actions):
@@ -405,7 +421,7 @@ class Game:
       used_oot = False
       if player.is_following_or_leading():
         can_oot = n_clients > 0 or (has_lm and n_merchant > 0)
-        used_oot = self.perform_role_action(player, role, oot)
+        used_oot = self.perform_role_action(player, role, can_oot)
 
       clients_used = 0
       merchants_used = 0
@@ -489,9 +505,18 @@ class Game:
     3) Check for Dock and ask for card from hand
     4) Move card from hand
     """
-    pass
+    has_dock = 'Dock' in player.get_active_buildings()
+    
+    card_from_pool, card_from_hand = self.LaborerDialog(player, has_dock)
 
-  def peform_patron_action(self, player):
+    if card_from_pool:
+      gtrutils.add_card_to_zone(
+        gtrutils.get_card_from_zone(card_from_pool,self.game_state.pool),player.stockpile)
+    if card_from_hand:
+      gtrutils.add_card_to_zone(
+        gtrutils.get_card_from_zone(card_from_hand,player.hand),player.stockpile)
+
+  def perform_patron_action(self, player):
     """
     1) Abort if clientele full (Insula, Aqueduct)
     2) Ask for which card from pool
@@ -499,7 +524,7 @@ class Game:
     """
     pass
 
-  def peform_craftsman_action(self, player, out_of_town_allowed):
+  def perform_craftsman_action(self, player, out_of_town_allowed):
     """
     out_of_town_allowed is indicated by the caller if this craftsman would
     be stacked up with another, so that an out-of-town site may be used.
@@ -514,7 +539,7 @@ class Game:
     """
     pass
 
-  def peform_legionary_action(self, player, affected_players):
+  def perform_legionary_action(self, player, affected_players):
     """
     affected_players must be determined by the caller, accounting for Pallisade, Wall, Bridge
     1) Ask for card to show for demand
@@ -524,7 +549,7 @@ class Game:
     """
     pass
 
-  def peform_architect_action(self, player, out_of_town_allowed):
+  def perform_architect_action(self, player, out_of_town_allowed):
     """
     out_of_town_allowed is indicated by the caller if this architect would
     be stacked up with another, so that an out-of-town site may be used.
@@ -538,7 +563,7 @@ class Game:
     """
     pass
 
-  def peform_merchant_action(self, player):
+  def perform_merchant_action(self, player):
     """
     Do we log materials? We should in case the display messes up,
     but maybe only until end of turn.
@@ -547,7 +572,30 @@ class Game:
     3) If Basilica, ask player to select from hand. No reveal and vault.
     4) If Atrium, ask player to select top of deck. No reveal and vault.
     """
-    pass
+    vault_limit = player.get_influence()
+    if 'Market' in player.get_active_buildings(): card_limit += 2
+
+    card_limit = vault_limit - len(player.vault)
+
+    has_atrium = 'Atrium' in player.get_active_buildings()
+    has_basilica = 'Basilica' in player.get_active_buildings()
+
+    merchant_allowed = (card_limit>0) \
+      and (has_atrium or len(player.stockpile)>0 or (has_basilica and len(player.hand)>0))
+
+    if merchant_allowed:
+      # card_from_deck is a boolean. The others are actual card names.
+      card_from_stockpile, card_from_hand, card_from_deck = \
+        self.MerchantDialog(self.game_state, player, has_atrium, has_basilica, card_limit)
+
+      if card_from_stockpile:
+        gtrutils.add_card_to_zone(
+          gtrutils.get_card_from_zone(card_from_stockpile, player.stockpile), player.vault)
+      if card_from_hand:
+        gtrutils.add_card_to_zone(
+          gtrutils.get_card_from_zone(card_from_hand, player.hand), player.vault)
+      if card_from_deck:
+        gtrutils.add_card_to_zone(self.game_state.draw_cards(1), player.vault)
 
   def kids_in_pool(self, player, players_with_senate):
     """
@@ -615,12 +663,16 @@ class Game:
     self.game_state = game_state
     return game_state
 
+  def print_selections(self, choices_list):
+    for i, choice in enumerate(choices_list):
+      logging.info('  [{0}] {1}'.format(i+1, choice))
+
   def choices_dialog(self, choices_list, 
                      prompt = 'Please make a selection'):
     """ Returns the index in the choices_list selected by the user or
     raises a StartOverException or a CancelDialogExeption. """
 
-    print_selections(choices_list)
+    self.print_selections(choices_list)
     
     while True:
       prompt_str = '--> {0} [1-{1}] ([q]uit, [s]tart over): '
@@ -639,7 +691,7 @@ class Game:
         logging.info('Invalid selection ({0}). Please enter a number between 1 and {1}'.format(response_int, len(choices_list)))
 
 
-  def ThinkerTypeDialog(game_state, player):
+  def ThinkerTypeDialog(self, player):
     """ Returns 'Jack' or 'Cards' for which type of thinker to
     perform.
     """
@@ -666,8 +718,76 @@ class Game:
       except:
         logging.info('your response was {0!s}... try again'.format(response_str))
 
+  def LaborerDialog(self, player, has_dock):
+    """ Prompts for which card to get from the pool and hand for a Laborer
+    action.
+    """
+    card_from_pool, card_from_hand = (None,None)
 
-  def LeadRoleDialog(game_state, player):
+    sorted_pool = sorted(self.game_state.pool)
+    if len(sorted_pool) > 0:
+      logging.info('Performing Laborer, choose a card from the pool:')
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
+      card_choices.insert(0,'Skip this action')
+
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your stockpile')
+      if card_index > 0:
+        card_from_pool = sorted_pool[card_index-1]
+
+    sorted_hand = sorted([card for card in player.hand if card != 'Jack'])
+    if has_dock and len(sorted_hand) > 0:
+      logging.info('Choose a card from your hand:')
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+      card_choices.insert(0,'Skip this action')
+
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your stockpile')
+      if card_index > 0:
+        card_from_hand = sorted_hand[card_index-1]
+
+    return (card_from_pool, card_from_hand)
+
+  def MerchantDialog(game_state, player, has_atrium, has_basilica, card_limit):
+    """ Prompts for which card to get from the pool and hand for a Laborer
+    action.
+
+    There are flags for the player having an Basilica or Atrium. These
+    cause the dialog to prompt for card from the hand or replace the 
+    normal merchant action with a draw from the deck.
+
+    There is a parameter that specifies the card limit for the vault. This
+    is the number of slots left in the vault.
+    """
+    card_from_stockpile, card_from_hand, card_from_deck  = (None,None,False)
+
+    sorted_stockpile = sorted(player.stockpile)
+    if len(sorted_stockpile) > 0 or has_atrium:
+      logging.info('Performing Merchant, choose a card from stockpile (Vault {}/{})'.format(
+        str(len(player.vault)-card_limit),str(len(player.vault))))
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_stockpile]
+      card_choices.insert(0,'Skip this action')
+      card_choices.insert(1,'Take card from top of deck')
+
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
+      if card_index == 1:
+        card_from_deck = True
+        card_limit -= 1 
+      elif card_index > 1:
+        card_from_stockpile = sorted_stockpile[card_index-2]
+        card_limit -= 1
+
+    sorted_hand = sorted([card for card in player.hand if card != 'Jack'])
+    if card_limit>0 and has_basilica and len(sorted_hand)>0:
+      logging.info('Choose a card from your hand:')
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+      card_choices.insert(0,'Skip this action')
+
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
+      if card_index > 0:
+        card_from_hand = sorted_hand[card_index-1]
+
+    return (card_from_stockpile, card_from_hand, card_from_deck)
+
+  def LeadRoleDialog(self, game_state, player):
     """ Players can only lead from their hands to their camp. 
     Returns a list of [<role>, <card1>, <card2>, ...] where <role> is
     the role being led and the remainder of the list
@@ -737,7 +857,7 @@ class Game:
       card = sorted_hand[card_index]
       return [card_manager.get_role_of_card(card), card]
 
-  def FollowRoleDialog(game_state, player, role_led):
+  def FollowRoleDialog(self, player, role_led):
     """ Players can only lead or follow from their hands to their camp. 
     Returns a list of [<card1>, <card2>, ...] where these
     are the card or cards used to follow.
@@ -748,7 +868,7 @@ class Game:
     multiple of a single role).
     """
     # Choose the role card
-    logging.info('Follow {}: choose the card:'.format(role))
+    logging.info('Follow {}: choose the card:'.format(role_led))
     hand = player.hand
     sorted_hand = sorted(hand)
     card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]

@@ -9,15 +9,12 @@ import logging
 pp = pprint.PrettyPrinter(indent=4)
 logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 
-players = []
-for i in range(1,4):
-  player = Player('Player {0:d}'.format(i))
-  players.append(player)
-
-game = gtr.Game(GameState(players))
+game = gtr.Game()
+game.game_state.find_or_add_player('M')
+game.game_state.find_or_add_player('L')
 #print repr(game)
 
-game.init_common_piles(n_players=len(players))
+game.init_common_piles(n_players=2)
 #print repr(game)
 
 game.game_state.init_players()
@@ -27,4 +24,8 @@ game.game_state.init_players()
 
 game.show_public_game_state()
 
+players = game.game_state.players
 
+while True:
+    game.take_turn(players[game.game_state.leader_index])
+    game.game_state.increment_leader_index()

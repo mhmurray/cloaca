@@ -100,11 +100,11 @@ class Player:
     """
     # "buildings" is a list of lists. The first element is the building name
     active_buildings = [x[0] for x in self.get_completed_buildings()]
-    if "Gate" in completed_buildings:
+    if "Gate" in active_buildings:
       # find marble buildings and append to active buildings list
       for b in self.buildings:
         if card_manager.get_material_of_card(b[0]) == "Marble":
-          if b[0] not in active_buildings
+          if b[0] not in active_buildings:
             active_buildings.append(b[0])
 
     return active_buildings

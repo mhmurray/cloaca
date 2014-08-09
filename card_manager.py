@@ -14,8 +14,8 @@ from os import path
 def get_cards_dict_from_json_file():
   """ Return dict of data for ALL cards from the json file.  """
   # json should be in the GTR directory, with this module
-  gtr_dir = path.dirname( __file__)
-  json_file = file('{0}/GTR_cards.json'.format(gtr_dir), 'r')
+  gtr_dir = path.dirname(__file__)
+  json_file = file(path.join(gtr_dir,'GTR_cards.json'), 'r')
   cards_dict = json.load(json_file)
   json_file.close()
   return cards_dict
