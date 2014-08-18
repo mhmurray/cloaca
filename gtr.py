@@ -46,6 +46,16 @@ class Game:
     self.game_state.priority_index = first_player_index
     self.game_state.jack_pile.extend(['Jack'] * Game.initial_jack_count)
     self.init_foundations(n_players)
+
+  def testing_init_piles(self, n_players):
+    logging.info('--> Intializing for tests (Extra cards for everyone!)')
+
+    cards=['Dock','Latrine','Storeroom','Atrium','Villa','Basilica']
+    self.game_state.pool.extend(cards)
+    for player in self.game_state.players:
+      player.hand.extend(cards)
+      player.hand.append('Jack')
+      player.stockpile.extend(cards)
   
   def init_pool(self, n_players):
     """ Returns the index of the player that goes first. Fills the pool
@@ -132,10 +142,10 @@ class Game:
       self.game_state.exchange_area = []
       
     # print N cards in library
-    print 'Library : {0:d} cards'.format(len(self.game_state.library))
+    logging.info('Library : {0:d} cards'.format(len(self.game_state.library)))
 
     # print N jacks
-    print 'Jacks : {0:d} cards'.format(len(self.game_state.jack_pile))
+    logging.info('Jacks : {0:d} cards'.format(len(self.game_state.jack_pile)))
 
     # print Foundations
     logging.info('Foundation materials:')
@@ -211,29 +221,29 @@ class Game:
     buildings built, buildings under construction and stage of completion.
     """
     # print name
-    logging.info('--> Player {0} complete state:'.format(player.name))
+    logging.info('--> Player {} complete state:'.format(player.name))
 
     # print hand
-    print player.describe_hand_private()
+    logging.info(player.describe_hand_private())
     
     # print Vault
     if len(player.vault) > 0:
-      print player.describe_vault_public()
+      logging.info(player.describe_vault_public())
 
     # print clientele
     if len(player.clientele) > 0:
-      print player.describe_clientele()
+      logging.info(player.describe_clientele())
 
     # print Stockpile
     if len(player.stockpile) > 0:
-      print player.describe_stockpile()
+      logging.info(player.describe_stockpile())
 
     # print Buildings
     if len(player.buildings) > 0:
       # be sure there is at least one non-empty site
       for building in player.buildings:
           if building:
-              print player.describe_buildings()
+              logging.info(player.describe_buildings())
               break
 
   def take_turn(self, player):
@@ -252,7 +262,8 @@ class Game:
         self.perform_role_being_led(p)
     else:
       self.perform_thinker_action(player)
-      self.end_turn(player)
+      
+    self.end_turn(player)
 
   def ThinkerOrLeadDialog(self, player):
     """ Asks whether the player wants to think or lead at the start of their
@@ -428,7 +439,7 @@ class Game:
 
       def check_merchants():
         has_lm = 'Ludus Magna' in player.get_active_buildings()
-        has_merchant = (n_merchants-merchants_used > 0)
+        has_merchant = (n_merchant-merchants_used > 0)
         return has_lm and has_merchant
 
       while clients_used < n_clients:
@@ -438,7 +449,7 @@ class Game:
         clients_used += 1
 
       while check_merchants():
-        can_oot = (n_merchants - merchants_used) > 1
+        can_oot = (n_merchant - merchants_used) > 1
         used_oot = self.perform_clientele_action(player, role, can_oot, used_oot)
 
         merchants_used += 1
@@ -457,17 +468,26 @@ class Game:
     If out_of_town_allowed is True, there's another action after this one, so out_of_town_allowed
     is true for the last action we do here.
 
+    We have to get the out_of_town_used input because this function handles the
+    doubling by Circus Maximus, which means only the first of the doublet should
+    be skipped due to out-of-town.
+    
+    We need to know if the last of the (possibly two) actions we do here is allowed
+    to be out-of-town, so we take this input boolean as out_of_town_allowed. Of course,
+    if we're doubling due to Circus Maximus, the first of this double is always
+    allowed to out-of-town.
+
     Returns True if the last action was used to start an out-of-town site.
     """
     used_oot = out_of_town_used
     if 'Circus Maximus' in player.get_active_buildings():
       if used_oot: used_oot = False
       else:
-        used_oot = self.perform_role_action(player, role, out_of_town_allowed)
+        used_oot = self.perform_role_action(player, role, True)
 
     if used_oot: used_oot = False
     else:
-      used_oot = self.perform_clientele_action(player, role, out_of_town_allowed)
+      used_oot = self.perform_role_action(player, role, out_of_town_allowed)
 
     return used_oot
 
@@ -477,7 +497,7 @@ class Game:
 
     It returns the value the role action returns. If this is a Craftsman
     or an Architect, it's whether or not the action was ued to start an
-    out of town site. Otherwise it's None.
+    out of town site. Otherwise it's False.
     """
     if role=='Patron':
       self.perform_patron_action(player)
@@ -486,9 +506,9 @@ class Game:
       self.perform_laborer_action(player)
       return False
     elif role=='Architect':
-      return self.perform_architect_action(player)
+      return self.perform_architect_action(player, out_of_town_allowed)
     elif role=='Craftsman':
-      return self.perform_craftsman_action(player)
+      return self.perform_craftsman_action(player, out_of_town_allowed)
     elif role=='Legionary':
       self.perform_legionary_action(player)
       return False
@@ -516,30 +536,214 @@ class Game:
       gtrutils.add_card_to_zone(
         gtrutils.get_card_from_zone(card_from_hand,player.hand),player.stockpile)
 
+  def PatronFromPoolDialog(self, player):
+    card_from_pool = None
+    sorted_pool = sorted(self.game_state.pool)
+
+    if len(sorted_pool):
+      logging.info('Performing Patron, choose a client from pool (Clientele {}/{})'.format(
+        str(player.get_n_clients()),str(player.get_clientele_limit())))
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
+      card_choices.insert(0,'Skip this action')
+
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your clientele')
+      if card_index > 0:
+        card_from_pool = sorted_pool[card_index-1]
+
+    return card_from_pool
+
+  def PatronFromDeckDialog(self, player):
+    logging.info(
+      'Performing Patron. Do you wish to take a client from the deck? (Clientele {}/{})'.format(
+      str(player.get_n_clients()),str(player.get_clientele_limit())))
+    choices = ['Yes','No']
+    return self.choices_dialog(choices) == 0
+
+  def PatronFromHandDialog(self, player):
+    card_from_hand = None
+    sorted_hand = sorted([card for card in player.hand if card != 'Jack'])
+
+    if len(sorted_hand):
+      logging.info('Performing Patron, choose a client from hand (Clientele {}/{})'.format(
+        str(player.get_n_clients()),str(player.get_clientele_limit())))
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+      card_choices.insert(0,'Skip this action')
+
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your clientele')
+      if card_index > 0:
+        card_from_hand = sorted_hand[card_index-1]
+
+    return card_from_hand
+
   def perform_patron_action(self, player):
     """
     1) Abort if clientele full (Insula, Aqueduct)
     2) Ask for which card from pool
     3) Check for Bar and Aqueduct and 
     """
-    pass
+    # Bar, Aqueduct, Bath matter.
+    # We don't have to check for these between each sub-action because it's not
+    # possible for the state of buildings to change unless you've already built
+    # a Bath. Also, building Bar after your patron from the pool doesn't let
+    # you use the from-the-deck option.
+    has_bar = 'Bar' in player.get_active_buildings()
+    has_aqueduct = 'Aqueduct' in player.get_active_buildings()
+    has_bath = 'Bath' in player.get_active_buildings()
+
+    
+
+    if player.get_clientele_limit() - player.get_n_clients() > 0:
+      card_from_pool = self.PatronFromPoolDialog(player)
+      if card_from_pool:
+        gtrutils.move_card(card_from_pool, self.game_state.pool, player.clientele)
+        if has_bath:
+          self.perform_role_action(player, card_manager.get_role_of_card(card_from_pool), False)
+
+    if has_bar and player.get_clientele_limit() - player.get_n_clients() > 0:
+      card_from_deck = self.PatronFromDeckDialog(player)
+      if card_from_deck:
+        card = self.game_state.draw_cards(1)
+        gtrutils.add_card_to_zone(card, player.clientele)
+        if has_bath:
+          self.perform_role_action(player, card_manager.get_role_of_card(card), False)
+
+    if has_aqueduct and player.get_clientele_limit() - player.get_n_clients() > 0:
+      card_from_hand = self.PatronFromHandDialog(player)
+      if card_from_hand:
+        gtrutils.move_card(card_from_hand, player.hand, player.clientele)
+        if has_bath:
+          self.perform_role_action(player, card_manager.get_role_of_card(card_from_hand), False)
+
+  def check_building_start_legal(self, building, site):
+    """ Checks if starting this building is legal. Accounts for Statue.
+
+    The building parameter is just the name of the building,
+    not the list structure used in Player.buildings.
+    """
+    material = card_manager.get_material_of_card(building)
+    return material == site or building == 'Statue'
+
+  def check_building_add_legal(self, player, building, material):
+    """ Checks if the specified player is allowed to add material
+    to building. This accounts for the building material, the
+    site material, a player's active Road, Scriptorium, and Tower.
+    This does not handle Stairway, which is done in perform_architect_action().
+    
+    This checks if the material is legal, but not if the building is already
+    finished or malformed (eg. no site, or no foundation).
+
+    The building provided is the list structure used
+    to represent buildings in Player.buildings, so the site
+    is available from there.
+    """
+    has_tower = 'Tower' in player.get_active_buildings()
+    has_road = 'Road' in player.get_active_buildings()
+    has_scriptorium = 'Scriptorium' in player.get_active_buildings()
+
+    if building not in player.get_owned_buildings():
+      logging.warn('Illegal build: {} doesn\'t own building {}'.format(player.name, building))
+      return False
+
+    try: site = building[1]
+    except IndexError:
+      logging.warn('building[1] is supposed to be the site, but doesn\'t exist')
+      return False
+    
+    # The sites are 'Wood', 'Concrete', etc.
+    site_material = site
+
+    try: foundation = building[0]
+    except IndexError:
+      logging.warn('building[0] is supposed to be the foundation, but doesn\'t exist')
+      return False
+
+    foundation_material = card_manager.get_material_of_card(foundation)
+
+    if has_tower and material == 'Rubble':
+      return True
+    elif has_scriptorium and material == 'Marble':
+      return True
+    elif has_road and (foundation_material == 'Stone' or site_material == 'Stone'):
+      return True
+    elif material == foundation_material or material == site_material:
+      return True
+    else:
+      return False
+
+  def UseFountainDialog(self, player):
+    return False
+
+  def FountainDialog(self, player, card_from_deck, out_of_town_allowed):
+    return (True, None, None, None)
+  
+  def CraftsmanDialog(self, player, out_of_town_allowed):
+    """ Returns (building, material, site) to be built.
+    """
+    return (None, None, None)
 
   def perform_craftsman_action(self, player, out_of_town_allowed):
     """
-    out_of_town_allowed is indicated by the caller if this craftsman would
-    be stacked up with another, so that an out-of-town site may be used.
-    In that case, this will return an indication and the caller can nix the
-    next craftsman action.
-    1) Ask for building to start or material to add.
-    2) If out_of_town_allowed is false, don't allow out of town, otherwise
-       start the out-of-town site and return the indicator.
-    3) Check legality of material, building + site.
-    4) Place material or building -->ACTION(place_material) -->ACTION(start_building)
-    5) Mark flag for "performed craftsman this turn" for Academy
-    """
-    pass
+    Buildings that matter : Fountain, Tower, Road, Scriptorium.
+    Also special case for Statue.
 
-  def perform_legionary_action(self, player, affected_players):
+    Returns whether or not the out of town site was used.
+    """
+    # Buildings that matter:
+    has_fountain = 'Fountain' in player.get_active_buildings()
+    has_tower = 'Tower' in player.get_active_buildings()
+    has_road = 'Road' in player.get_active_buildings()
+    has_scriptorium = 'Scriptorium' in player.get_active_buildings()
+
+    used_out_of_town = False
+    building, material, site = (None, None, None)
+
+    # Use fountain?
+    if has_fountain and self.UseFountainDialog(player):
+      card_from_deck = self.game_state.draw_cards(1)
+      player.add_cards_to_hand([card_from_deck])
+
+      skip_action, building, material, site =\
+        self.FountainDialog(player, card_from_deck, out_of_town_allowed)
+
+      if skip_action:
+        return False
+
+    else:
+      (building, material, site) = self.CraftsmanDialog(player, out_of_town_allowed)
+
+    starting_new_building = not building in player.get_owned_buildings()
+    if starting_new_building and self.check_building_start_legal(building, site):
+      building_list = []
+      gtrutils.move_card(building, player.hand, building_list)
+      if site in self.game_state.in_town_foundations:
+        gtrutils.move_card(site, self.game_state.in_town_foundations, building_list)
+      elif site in self.game_state.out_of_town_foundations:
+        gtrutils.move_card(site, self.game_state.out_of_town_foundations, building_list)
+        used_out_of_town = True
+      else:
+        logging.warn('Illegal build, site {} does not exist in- or out-of-town'.format(site))
+        return False
+    elif not starting_new_building and self.check_building_add_legal(player, building, material):
+      try:
+        building_list = filter(lambda x: x[0] == building, player.buildings)[0]
+      except IndexError:
+        logging.warn('Trying to add to a non-existent building: {}'.format(building))
+        return False
+      gtrutils.move_card(material, player.hand, building_list)
+      # The following means the building is complete
+      if len(building_list) == 2 + card_manager.get_value_of_material(building_list[1]):
+        logging.info('Player {} completed building {}'.format(player.name, building_list[0]))
+        gtrutils.move_card(building_list[1], building_list, player.influence)
+        self.resolve_building(building)
+    else:
+      logging.warn('Illegal craftsman, building={}, site={}, material={}'.format(
+                   building, site, material))
+      return False
+
+    return used_out_of_town
+    
+
+  def perform_legionary_action(self, player):
     """
     affected_players must be determined by the caller, accounting for Pallisade, Wall, Bridge
     1) Ask for card to show for demand
@@ -547,7 +751,9 @@ class Game:
     3) If player has coliseum, ask for affected players to select client to send to the lions.
     4) If player has bridge, ask affected players for material from stockpile
     """
+    logging.info('=== Rome demands implementation! ===')
     pass
+    
 
   def perform_architect_action(self, player, out_of_town_allowed):
     """
@@ -560,6 +766,8 @@ class Game:
        start the out-of-town site and return the indicator.
     3) Check legality of material, building + site.
     4) Place material or building -->ACTION(place_material) -->ACTION(start_building)
+
+    Returns whether or not the out of town site was used.
     """
     pass
 
@@ -572,7 +780,7 @@ class Game:
     3) If Basilica, ask player to select from hand. No reveal and vault.
     4) If Atrium, ask player to select top of deck. No reveal and vault.
     """
-    vault_limit = player.get_influence()
+    vault_limit = player.get_influence_points()
     if 'Market' in player.get_active_buildings(): card_limit += 2
 
     card_limit = vault_limit - len(player.vault)
@@ -586,7 +794,7 @@ class Game:
     if merchant_allowed:
       # card_from_deck is a boolean. The others are actual card names.
       card_from_stockpile, card_from_hand, card_from_deck = \
-        self.MerchantDialog(self.game_state, player, has_atrium, has_basilica, card_limit)
+        self.MerchantDialog(player, has_atrium, has_basilica, card_limit)
 
       if card_from_stockpile:
         gtrutils.add_card_to_zone(
@@ -597,21 +805,55 @@ class Game:
       if card_from_deck:
         gtrutils.add_card_to_zone(self.game_state.draw_cards(1), player.vault)
 
-  def kids_in_pool(self, player, players_with_senate):
+  def kids_in_pool(self, player):
     """
     Place cards in camp into the pool.
     1) If Sewer, ask to move cards into stockpile.
     2) If dropping a Jack, ask players_with_senate in order.
     """
-    pass
+    logging.info('\n ==== KIDS IN POOL ====\n')
+    print 'Players in turn order ' + str(self.game_state.get_players_in_turn_order())
+    for player in self.game_state.get_players_in_turn_order():
+      player_index = self.game_state.players.index(player)
+      other_players_in_order = self.game_state.get_players_in_turn_order(player_index)
+      other_players_in_order.pop(0)
+
+      players_with_senate =\
+        filter(lambda x : 'Senate' in x.get_active_buildings(), other_players_in_order)
+      
+      has_sewer = 'Sewer' in player.get_active_buildings()
+      if has_sewer:
+        cards = self.UseSewerDialog(player)
+        for card in cards:
+          gtrutils.move_card(card, player.camp, player.stockpile)
+
+      print('Camp = ' + str(player.camp))
+      for card in player.camp:
+        if card is 'Jack':
+          for senate_player in players_with_senate:
+            if self.UseSenateDialog(senate_player, player):
+              gtr_utils.move_card(card, player.camp, senate_player.hand)
+              break
+        else:
+          logging.info('Moving card {} from camp to pool'.format(card))
+          gtrutils.move_card(card, player.camp, self.game_state.pool)
 
   def end_turn(self, player):
     """
     Ask for Academy thinker. Need to figure out whether or not Senate goes first.
     1) Find players_with_senate
-    2) --> kids_in_pool(player, players_with_senate)
+    2) --> kids_in_pool(player)
     """
-    pass
+
+    self.kids_in_pool(player)
+    has_academy = 'Academy' in player.get_active_buildings()
+
+    if has_academy and player.performed_craftsman:
+      self.ThinkerTypeDialog(player)
+    
+    player.performed_craftsman = False
+
+
 
   def add_material_to_building(self, player, material, source, building):
     """
@@ -718,6 +960,31 @@ class Game:
       except:
         logging.info('your response was {0!s}... try again'.format(response_str))
 
+  def UseSewerDialog(self, player):
+    done=False
+    cards_to_move=[]
+    choices=['All', 'None']
+    choices.extend([gtrutils.get_detailed_card_summary(card) 
+                    for card in player.camp if card is not 'Jack'])
+    while not done:
+      logging.info('Do you wish to use your Sewer?')
+
+      card_index = self.choices_dialog(choices, 'Select a card to take into your stockpile')
+      if card_index == 0:
+        cards_to_move.extend(choices[2:])
+      elif card_index > 1:
+        cards_to_move.append(choices.pop(card_index))
+      else:
+        done=True
+    
+    return cards_to_move
+
+  def UseSenateDialog(self, senate_player, jack_player):
+    logging.info('Do you wish to use your Senate?')
+    choices=['Yes','No']
+    index = self.choices_dialog(choices, 'Select one')
+    return index == 0
+
   def LaborerDialog(self, player, has_dock):
     """ Prompts for which card to get from the pool and hand for a Laborer
     action.
@@ -746,7 +1013,7 @@ class Game:
 
     return (card_from_pool, card_from_hand)
 
-  def MerchantDialog(game_state, player, has_atrium, has_basilica, card_limit):
+  def MerchantDialog(self, player, has_atrium, has_basilica, card_limit):
     """ Prompts for which card to get from the pool and hand for a Laborer
     action.
 
@@ -762,7 +1029,7 @@ class Game:
     sorted_stockpile = sorted(player.stockpile)
     if len(sorted_stockpile) > 0 or has_atrium:
       logging.info('Performing Merchant, choose a card from stockpile (Vault {}/{})'.format(
-        str(len(player.vault)-card_limit),str(len(player.vault))))
+        str(len(player.vault)),str(len(player.vault)+card_limit)))
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_stockpile]
       card_choices.insert(0,'Skip this action')
       card_choices.insert(1,'Take card from top of deck')

@@ -90,10 +90,20 @@ class GameState:
       return len(self.players)
 
   def get_following_players_in_order(self):
-      # rotates the list so players are in order from the leader,
-      # and removes the leader
+      """ Returns a list of players in turn order starting with
+      the next player after the leader, and ending with the player
+      before the leader. This is get_all_players_in_turn_order()
+      with the leader removed.
+      """
       n = self.leader_index
       return self.players[n+1:] + self.players[:n]
+
+  def get_players_in_turn_order(self, start_player=None):
+      """ Returns a list of players in turn order 
+      starting with start_player or the leader it's None.
+      """
+      n = start_player or self.leader_index
+      return self.players[n:] + self.players[:n]
 
   def thinker_fillup_for_player(self, player):
     n_cards = player.get_n_possible_thinker_cards()
@@ -143,7 +153,8 @@ class GameState:
 
   def init_players(self):
     logging.info('--> Initializing players')
-    for player in self.players: self.init_player(player)
+    for player in self.players:
+      self.init_player(player)
     
   def add_cards_to_pool(self, cards):
     self.pool.extend(cards)

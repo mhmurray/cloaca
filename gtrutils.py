@@ -35,6 +35,16 @@ def add_card_to_zone(card, zone):
   logging.debug('adding card {0!s} to zone {1!s}'.format(card, zone))
   zone.append(card)
 
+def move_card(card, source_zone, dest_zone):
+  """ Concatenates get_card_from_zone() and add_card_to_zone().
+  """
+  try:
+    card = get_card_from_zone(card, source_zone)
+  except ValueError as e:
+    logging.info('Failed to move card')
+
+  add_card_to_zone(card, dest_zone)
+
 def get_short_zone_summary(card_list, n_letters=3):
   """ Return a single-line string with n-letter card abbreviations and numbers
   of card instances.
@@ -192,3 +202,4 @@ if __name__ == '__main__':
 
   print get_short_zone_summary(test_zone)
 
+# vim: ts=8:sts=2:sw=2:et

@@ -33,6 +33,7 @@ class Player:
     self.buildings = buildings if buildings is not None else []
     self.influence = influence if influence is not None else []
     self.revealed = revealed or []
+    self.performed_craftsman = False
 
   def __repr__(self):
     rep = ('Player(name={name!r}, hand={hand!r}, stockpile={stockpile!r}, '
@@ -73,6 +74,9 @@ class Player:
 
   def get_card_from_camp(self,card):
     return get_card_from_zone(card, self.camp)
+
+  def get_owned_buildings(self):
+    return [buildings[0] for building in self.buildings]
 
   def get_completed_buildings(self):
     """ Returns a list of just the building names for all
@@ -129,6 +133,16 @@ class Player:
         n_clients += role_list.count('Merchant')
 
     return n_clients
+
+  def get_clientele_limit(self):
+    has_insula = 'Insula' in self.get_active_buildings()
+    has_aqueduct = 'Aqueduct' in self.get_active_buildings()
+    limit = self.get_influence_points()
+
+    if has_insula: limit += 2
+    if has_aqueduct: limit *= 2
+    return limit
+    
 
   def get_n_client_cards_of_role(self, role):
     role_list = [card_manager.get_role_of_card(x) for x in self.clientele]

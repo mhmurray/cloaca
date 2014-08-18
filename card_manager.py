@@ -74,6 +74,7 @@ def get_role_of_material(material):
       logging.error('----> Role of {0} not found!'.format(material))
   
 def get_role_of_card(card_name):
+  print 'get_role_of_card({})'.format(str(card_name))
   material = get_material_of_card(card_name)
   role = get_role_of_material(material)
   return role
