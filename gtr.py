@@ -742,16 +742,40 @@ class Game:
 
     return used_out_of_town
     
+  def LegionaryDialog(self, player):
+    logging.info('Card to use for legionary:')
+    hand = player.hand
+    sorted_hand = sorted(hand)
+    card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+    card_choices.append('Petition')
+
+    card_index = self.choices_dialog(card_choices, 
+        'Select a card to use to demand material')
+    card_from_hand = sorted_hand[card_index-1]
+
+    logging.info('Using card %s' % gtrutils.get_detailed_card_summary(card_from_hand))
+    return card_from_hand
+        
 
   def perform_legionary_action(self, player):
     """
-    affected_players must be determined by the caller, accounting for Pallisade, Wall, Bridge
+    Buildings that matter: Bridge, Coliseum, Palisade, Wall
     1) Ask for card to show for demand
     2) Ask for affected players to give card of material, or say "Glory to Rome!"
     3) If player has coliseum, ask for affected players to select client to send to the lions.
     4) If player has bridge, ask affected players for material from stockpile
     """
-    logging.info('=== Rome demands implementation! ===')
+
+    # Buildings that matter:
+    has_bridge = 'Bridge' in player.get_active_buildings()
+    has_coliseum = 'Coliseum' in player.get_active_buildings()
+    has_palisade = 'Palisade' in player.get_active_buildings()
+    has_wall = 'Wall' in player.get_active_buildings()
+
+    card_to_demand_material = self.LegionaryDialog(player)
+    material = card_manager.get_material_of_card(card_to_demand_material)
+    logging.info('Rome demands %s!!' % material)
+
     pass
     
 
@@ -1133,6 +1157,7 @@ class Game:
     Raises a StartOverException if the user enters the Start Over option
     or if the user attempts an illegal action (petition without the needed
     multiple of a single role).
+    FIXME -- show only the appropriate role to use for following
     """
     # Choose the role card
     logging.info('Follow {}: choose the card:'.format(role_led))
