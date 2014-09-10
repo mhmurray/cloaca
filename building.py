@@ -4,8 +4,9 @@ class Building:
     """ A container that represents buildings in GtR. The primary
     data members are the building foundation, site, and materials.
 
-    Once the building is complete, the site is removed. The materials
-    remain, however. A completed building has no memory of its site.
+    Once the building is complete, the site is NOT removed. The materials
+    remain as well. A completed building must retain a memory of its site
+    so that we know the material composition in the future.
     """
 
     def __init__(self, foundation=None, site=None, materials=None):
@@ -16,16 +17,27 @@ class Building:
         self.site = site
         self.materials = materials if materials else []
         self.stairway_materials = []
+        self.is_completed = False
 
     def is_completed(self):
-        """ True if the building is completed.
+        """ True if the building is completed, determined by counting
+        the number of materials and comparing to the site.
         """
-        return self.site is None
+        return self.is_completed
     
     def is_stairwayed(self):
         """ True if a material has been added by the Stairway.
         """
         return len(self.stairway_material) > 0
+
+    def is_composed_of(self, material):
+        """ Returns True if the building is composed of the specified material.
+        That is, if you would be allowed to add that material to this building
+        to complete it. For most buildings this is just the Site or Foundation
+        material, but the Statue can be built on any site and counts as that
+        site's material and Marble.
+        """
+        return material in get_material_composition()
 
     def get_material_composition(self):
         """ Returns a list of materials that make up this building.

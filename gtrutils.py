@@ -93,37 +93,21 @@ def get_detailed_zone_summary(zone):
 
 def get_building_info(building):
     """ Return a string to describe a building """
-
-    # each building is a list where the 0th card defines the building, the other
-    # orders cards are the materials, and there may be a site card
-
-    # the 0th card is the title card
-    if not building:
+    if not building.foundation:
         return ''
-    title_card = building[0]
+    title_card = building.foundation
     function = card_manager.get_function_of_card(title_card)
     value = card_manager.get_value_of_card(title_card)
     title_material = card_manager.get_material_of_card(title_card)
     title_value = card_manager.get_value_of_card(title_card)
     
-    has_site = False
-    has_materials = False
-    materials_string = ''
-    for card in building[1:]:
-      try:
-        material = card_manager.get_material_of_card(card)
-        materials_string += material[0]
-        has_materials = True
-      except: 
-        site_material = card
-        has_site = True
-        
     info = '  * {0} | {1}-{2} | '.format(title_card, title_material[:3], value)
-    if has_site:
-        info += '{0} site '.format(site_material[:3])
-    if has_site and has_materials:
-        info += '+ '
-    info += '{0} | {1}'.format(materials_string, function)
+    if building.site:
+        info += '{0} site + '.format(building.site)
+    if building.materials:
+        info += ''.join([card_manager.get_material_of_card(m)[0] for m in building.materials])
+    else: info += '___'
+    info += ' | ' + function
     return info
         
 def colorize_role(any_string):

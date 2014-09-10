@@ -12,6 +12,7 @@ from gtrutils import get_detailed_card_summary
 from gtrutils import get_building_info
 from gtrutils import get_detailed_zone_summary
 import card_manager
+from building import Building
 
 import logging
 import collections
@@ -75,43 +76,83 @@ class Player:
   def get_card_from_camp(self,card):
     return get_card_from_zone(card, self.camp)
 
-  def get_owned_buildings(self):
-    return [buildings[0] for building in self.buildings]
+  def owns_building(self, building):
+    """ Whether this player owns a building, complete or otherwise.
+    The parameter building is a string.
+    """
+    return building in self.get_owned_building_names()
 
-  def get_completed_buildings(self):
-    """ Returns a list of just the building names for all
+  def get_owned_buildings(self):
+    """ Returns a list of all Building objects this player owns,
+    complete or incomplete.
+    """
+    return self.buildings
+
+  def get_owned_building_names(self):
+    """ Returns a list of the names of all buildings this
+    player owns, complete or incomplete.
+    """
+    return [b.foundation for b in self.buildings]
+
+  def get_completed_building_names(self):
+    """ Returns a list of the building names (string) for all (owned)
     completed buildings.
     """
-    # Each "building" is a list of lists, with b[0] being the 
-    # actual buidling, and the site and materials making up the rest
-    # So check if the site (ie. "Brick", "Marble", etc.) is in the list,
-    # indicating an incomplete building.
-    completed_buildings = []
-    materials = card_manager.get_all_materials()
-    for b in self.buildings:
-      completed = len(filter(lambda x : x in materials, b))
-      if completed:
-        completed_buildings.append(b[0])
+    return [b.foundation for b in self.buildings]
 
-    return completed_buildings
+  def get_completed_buildings(self):
+    """ Returns a list of all owned completed Building objects.
+    """
+    return filter(Building.is_completed, self.buildings)
+
+  def get_incomplete_building_names(self):
+    """ Returns a list of all incomplete building names.
+    """
+    return [b.foundation for b in self.buildings]
+
+  def get_incomplete_buildings(self):
+    """ Returns a list of all incomplete Building objects.
+    """
+    return [b for b in self.buildings if not b.is_completed()]
+
+  def get_building(self, building_name):
+    """ Gets the Building object from the name of the building.
+    """
+    return [b for b in self.buildings if b.foundation == building_name][0]
 
   def get_active_buildings(self):
     """ Returns a list of just the building names for all buildings
-    that are active. This includes eg. a Temple with no marble added while
+    that are active. This includes an incomplete marble building while
     we have a completed Gate.
 
-    This doesn't check other player for Stairway modifications
+    This doesn't check other players for Stairway modifications.
     """
-    # "buildings" is a list of lists. The first element is the building name
-    active_buildings = [x[0] for x in self.get_completed_buildings()]
-    if "Gate" in active_buildings:
+    active_buildings = self.get_completed_buildings()
+    if 'Gate' in self.get_completed_building_names():
       # find marble buildings and append to active buildings list
-      for b in self.buildings:
-        if card_manager.get_material_of_card(b[0]) == "Marble":
-          if b[0] not in active_buildings:
-            active_buildings.append(b[0])
+      incomplete_marble_buildings =\
+        filter(lambda x : x.is_composed_of('Marble'), self.get_incomplete_buildings())
+      active_buildings.extend(incomplete_marble_buildings)
 
     return active_buildings
+
+  def get_active_building_names(self):
+    """ Returns a list of just the building names for all buildings
+    that are active. This includes an incomplete marble building while
+    we have a completed Gate.
+
+    This doesn't check other players for Stairway modifications.
+    """
+    return [b.foundation for b in self.get_active_buildings()]
+
+  def get_stairwayed_buildings(self):
+    """ Returns a list of Building objects that have a material added
+    via the Stairway.
+    """
+    return [b for b in self.get_owned_buildings() if b.is_stairwayed]
+
+  def get_stairwayed_building_names(self):
+    return [b.foundation for b in self.get_stairwayed_buildings()]
 
   def get_n_clients(self, role=None):
     """ Return the number of clients of the specified role. This counts
@@ -133,16 +174,6 @@ class Player:
         n_clients += role_list.count('Merchant')
 
     return n_clients
-
-  def get_clientele_limit(self):
-    has_insula = 'Insula' in self.get_active_buildings()
-    has_aqueduct = 'Aqueduct' in self.get_active_buildings()
-    limit = self.get_influence_points()
-
-    if has_insula: limit += 2
-    if has_aqueduct: limit *= 2
-    return limit
-    
 
   def get_n_client_cards_of_role(self, role):
     role_list = [card_manager.get_role_of_card(x) for x in self.clientele]

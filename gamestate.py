@@ -7,8 +7,10 @@ draw a card from an empty pile.
 
 from gtrutils import get_card_from_zone
 from player import Player
+from building import Building
 import random
 import logging
+
 
 class GameState:
   """ Contains the current game state. The methods of this class
@@ -155,6 +157,17 @@ class GameState:
     logging.info('--> Initializing players')
     for player in self.players:
       self.init_player(player)
+    
+  def testing_init_player(self, player):
+    player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
+    self.thinker_fillup_for_player(player)
+    player.buildings.append(Building('Latrine','Rubble'))
+    player.buildings.append(Building('Atrium','Brick'))
+
+  def testing_init_players(self):
+    logging.info('--> Initializing players')
+    for player in self.players:
+      self.testing_init_player(player)
     
   def add_cards_to_pool(self, cards):
     self.pool.extend(cards)

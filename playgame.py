@@ -17,7 +17,7 @@ game.game_state.find_or_add_player('L')
 game.init_common_piles(n_players=2)
 #print repr(game)
 
-game.game_state.init_players()
+game.game_state.testing_init_players()
 game.testing_init_piles(2)
 #pp.pprint(vars(game))
 
