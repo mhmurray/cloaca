@@ -103,10 +103,26 @@ class TestArchitect(unittest.TestCase):
 
         b = self.p1.get_building('Atrium')
 
-        self.assertEqual(b, Building('Atrium', 'Brick', ['Foundry']), msg='b = ' + repr(b))
+        self.assertEqual(b, Building('Atrium', 'Brick', ['Foundry']), msg='b = '+repr(b))
 
     def test_add_material_and_complete(self):
-        """ Add material, completing building """
+        """ Add material, completing building
+
+        Sorted list of M's buildings: Atrium, Road, Villa
+        Sorted list of M's stockpile: Foundry, Road, Scriptorium
+
+        ArchitectDialog will ask for
+          - Start or building to add to, respond 2 for add to Road.
+          - Choose a material, respond 1 for Road.
+        """
+        self.replace_choices_dialog([2,1])
+        self.game.perform_architect_action(self.p1, False)
+
+        self.assertTrue('Road' in self.p1.get_incomplete_building_names())
+
+        b = self.p1.get_building('Road')
+
+        self.assertEqual(b, Building('Road', 'Rubble', ['Road'], completed=True), msg='b = '+repr(b))
 
     def test_stairway(self):
         """ Stairwaying an opponent's building. """

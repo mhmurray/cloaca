@@ -10,7 +10,7 @@ class Building:
     """
 
     def __init__(self, foundation=None, site=None, materials=None,
-                 stairway_materials=None, is_completed=False):
+                 stairway_materials=None, completed=False):
         """ The parameter materials is a list of cards that are used 
         as building materials.
         """
@@ -18,12 +18,12 @@ class Building:
         self.site = site
         self.materials = materials if materials else []
         self.stairway_materials = stairway_materials if stairway_materials else []
-        self.is_completed = is_completed
+        self.is_completed = completed
 
     def __str__(self):
         """ The building name is the name of the foundation card.
         """
-        return b.foundation
+        return self.foundation
 
     def __repr__(self):
         s = 'Building({0!r},{1!r},{2!r},{3!r},{4!r})'.format(

@@ -256,6 +256,12 @@ class Game:
     if has_aqueduct: limit *= 2
     return limit
 
+  def player_has_building(self, player, building):
+    """ Checks if the player has the specific building object, not
+    just a building of the same name.
+    """
+    return building in player.get_owned_buildings()
+
   def player_has_active_building(self, player, building):
     return building in self.get_active_building_names(player)
 
@@ -666,7 +672,7 @@ class Game:
     material = card_manager.get_material_of_card(building)
     return material == site or building == 'Statue'
 
-  def check_building_add_legal(self, player, building_name, material):
+  def check_building_add_legal(self, player, building_name, material_card):
     """ Checks if the specified player is allowed to add material
     to building. This accounts for the building material, the
     site material, a player's active Road, Scriptorium, and Tower.
@@ -679,7 +685,9 @@ class Game:
     to represent buildings in Player.buildings, so the site
     is available from there.
     """
-    if material is None or building_name is None: return False
+    if material_card is None or building_name is None:
+      logging.warn('Illegal add: material=' + str(material_card) + '  building='+ building_name)
+      return False
     has_tower = self.player_has_active_building(player, 'Tower')
     has_road = self.player_has_active_building(player, 'Road')
     has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
@@ -693,6 +701,7 @@ class Game:
     # The sites are 'Wood', 'Concrete', etc.
     site_material = building.site
     foundation = building.foundation
+    material = card_manager.get_material_of_card(material_card)
 
     foundation_material = card_manager.get_material_of_card(foundation)
 
@@ -705,13 +714,73 @@ class Game:
     elif material == foundation_material or material == site_material:
       return True
     else:
+      logging.warn('Illegal add, material ({0}) doesn\'t '.format(material) +
+                   'match building material ({0}) '.format(foundation_material) +
+                   'or site material ({0})'.format(site_material))
       return False
 
   def UseFountainDialog(self, player):
-    return False
+    choices = ['Use Fountain, drawing from deck', 'Don\'t use Fountain, play from hand']
+    choice_index = choices_dialog(choices, 'Do you wish to use your Fountain?')
+    return choice_index == 0
 
   def FountainDialog(self, player, card_from_deck, out_of_town_allowed):
-    return (True, None, None, None)
+    """ The Fountain allows you to draw a card from the deck, then
+    choose whether to use the card with a craftsman action. The player
+    is allowed to just keep (draw) the card.
+    
+    This function returns a tuple (skip, building, material, site),
+    with the following elements:
+      1) Whether the player skips the action or not (drawing the card)
+      2) The building to be started or added to
+      3) The material to be added to an incomplete building
+      4) The site to start a building on.
+
+    The material will always be the Fountain card, and the building might be.
+    """
+    # TODO: Could check if it's even possible to use the card
+    skip, building, material, site = (False, None, None, None)
+
+    material_of_card = card_manager.get_material_of_card(card_from_deck)
+    
+    card_choices = \
+      [str(b) for b in player.get_incomplete_buildings()
+      if self.check_building_add_legal(player, str(b), card_from_deck)]
+
+    if not player.owns_building(card_from_deck):
+      card_choices.insert(0, 'Start {} buidling'.format(card_from_deck))
+
+    if len(card_choices) == 0:
+      logging.warn('Can\'t use {} with a craftsman action'.format(card_from_deck))
+      return (True, None, None, None)
+
+    logging.info('Performing Craftsman with {}, choose a building option:'
+                 .format(card_from_deck))
+
+    choices = ['Use {} to start or add to a building'.format(card_from_deck),
+               'Don\'t play card, draw and skip action instead.']
+    choice_index = self.choices_dialog(choices)
+
+    if choice_index == 1:
+      logging.info('Skipping Craftsman action and drawing card')
+      return (True, None, None, None)
+
+    card_index = self.choices_dialog(card_choices, 'Select a building option')
+    if card_index == 0: # Starting a new building
+      building = card_from_deck
+
+      if building == 'Statue':
+        sites = card_manager.get_all_materials()
+        site_index = choices_dialog(sites)
+        site = sites[site_index]
+      else:
+        site = card_manager.get_material_of_card(building)
+
+    else: # Adding to a building from hand
+      building = card_choices[card_index-1]
+      material = card_from_deck
+
+    return False, building, material, site
   
   def perform_craftsman_action(self, player, out_of_town_allowed):
     """
@@ -772,20 +841,21 @@ class Game:
         'Illegal build. {} is already completed'.format(building))
 
     elif not starting_new_building and add_okay:
+      b = player.get_building(building)
       gtrutils.move_card(material, player.hand, b.materials)
       completed = False
       if has_scriptorium and card_manager.get_material_of_card(material) == 'Marble':
         logging.info('Player {} completed building {} using Scriptorium'.format(
           player.name, building,foundation))
-        completed == True
+        completed = True
       elif len(b.materials) == card_manager.get_value_of_material(b.site):
         logging.info('Player {} completed building {}'.format(player.name, building.foundation))
-        completed == True
+        completed = True
 
       if completed:
         b.is_completed = True
         gtrutils.add_card_to_zone(b.site, player.influence)
-        self.resolve_building(building)
+        self.resolve_building(player, building)
 
     else:
       logging.warn('Illegal craftsman, building={}, site={}, material={}'.format(
@@ -835,6 +905,9 @@ class Game:
 
   def perform_architect_action(self, player, out_of_town_allowed):
     """
+    Performs ArchitectDialog, then StairwayDialog if the player
+    has an active stairway.
+
     out_of_town_allowed is indicated by the caller if this architect would
     be stacked up with another, so that an out-of-town site may be used.
     In that case, this will return an indication and the caller can nix the
@@ -846,8 +919,93 @@ class Game:
     4) Place material or building -->ACTION(place_material) -->ACTION(start_building)
 
     Returns whether or not the out of town site was used.
+
+    Buildings that matter : Archway, Tower, Road, Scriptorium, Villa, Stairway
+    Also special case for Statue.
+
+    Returns whether or not the out of town site was used.
     """
-    pass
+    # Buildings that matter:
+    has_archway = self.player_has_active_building(player, 'Archway')
+    has_tower = self.player_has_active_building(player, 'Tower')
+    has_road = self.player_has_active_building(player, 'Road')
+    has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
+    has_stairway = self.player_has_active_building(player, 'Stairway')
+
+    used_out_of_town = False
+    building, material, site = (None, None, None)
+
+    (building, material, site, from_pool) = self.ArchitectDialog(player, out_of_town_allowed)
+
+    starting_new_building = site is not None
+    already_owned = player.owns_building(building)
+    start_okay = False if not site else \
+      self.check_building_start_legal(building, site)
+    add_okay = False if not material else \
+      self.check_building_add_legal(player, building, material)
+    if starting_new_building and already_owned:
+      logging.warn(
+        'Illegal build. {} is already owned by {} and cannot be started'
+        .format(building, player.name))
+
+    elif starting_new_building and start_okay and not already_owned:
+      b = Building()
+      b.foundation = gtrutils.get_card_from_zone(building, player.hand)
+      if site in self.game_state.in_town_foundations:
+        b.site = gtrutils.get_card_from_zone(site, self.game_state.in_town_foundations)
+      elif site in self.game_state.out_of_town_foundations:
+        b.site = gtrutils.get_card_from_zone(site, self.game_state.out_of_town_foundations)
+        used_out_of_town = True
+      else:
+        logging.warn('Illegal build, site {} does not exist in- or out-of-town'.format(site))
+        return False
+      player.buildings.append(b)
+
+    elif not starting_new_building and player.get_building(building).is_completed:
+      logging.warn(
+        'Illegal build. {} is already completed'.format(building))
+
+    elif not starting_new_building and add_okay:
+      b = player.get_building(building)
+      material_zone = self.game_state.pool if from_pool else player.stockpile
+      gtrutils.move_card(material, material_zone, b.materials)
+      completed = False
+      if has_scriptorium and card_manager.get_material_of_card(material) == 'Marble':
+        logging.info('Player {} completed building {} using Scriptorium'.format(
+          player.name, building,foundation))
+        completed = True
+      elif building == 'Villa':
+        logging.info(
+          'Player {} completed Villa with one material using Architect'.format(player.name))
+        completed = True
+      elif len(b.materials) == card_manager.get_value_of_material(b.site):
+        logging.info('Player {} completed building {}'.format(player.name, str(b)))
+        completed = True
+
+      if completed:
+        b.is_completed = True
+        gtrutils.add_card_to_zone(b.site, player.influence)
+        self.resolve_building(player, building)
+
+    else:
+      logging.warn('Illegal Architect, building={}, site={}, material={}'.format(
+                   building, site, material))
+      logging.warn('  add_okay='+str(add_okay)+'  start_okay='+str(start_okay))
+      return False
+
+    if has_stairway:
+      building, material, from_pool = self.StairwayDialog(player)
+      if building is not None and material is not None:
+        other_player = [p for p in self.game_state.players if p.has_building(building)][0]
+        material_zone = self.game_state.pool if from_pool else player.stockpile
+        logging.info(
+          'Player {} used Stairway to add a material to player {}\'s {}, ' +
+          'activating its function for all players'.format(
+          player.name, other_player.name, str(building)))
+        gtrutils.move_card(material, material_zone, building.stairway_materials)
+
+    return used_out_of_town
+
 
   def perform_merchant_action(self, player):
     """
@@ -1090,6 +1248,68 @@ class Game:
         card_from_hand = sorted_hand[card_index-1]
 
     return (card_from_pool, card_from_hand)
+
+
+  def StairwayDialog(self, player):
+    """
+    Asks the player if they wish to use the Stairway and returns the 
+    building to add to, the material to add, and whether to take from the pool.
+    """
+    possible_buildings = [(p, b) for p in self.game_state for b in p.get_completed_buildings()]
+    logging.info('Use Stairway?')
+    choices = [p.name + '\'s ' + str(b) for (p,b) in possible_buildings]
+    building, material, from_pool = None, None, False
+    return building, material, from_pool
+
+  def ArchitectDialog(self, player, out_of_town_allowed):
+    """ Returns (building, material, site, from_pool) to be built.
+    """
+    building, material, site, from_pool = None, None, None, False
+
+    logging.info('Performing Architect, choose a building option:')
+    card_choices = sorted(player.get_incomplete_building_names())
+    card_choices.insert(0, 'Start a new buidling')
+
+    card_index = self.choices_dialog(card_choices, 'Select a building option')
+    if card_index == 0: # Starting a new building
+      sorted_hand = sorted(player.hand)
+      logging.info('Choose a building to start from your hand:')
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+
+      card_index = self.choices_dialog(card_choices, 'Select a building to start')
+      building = sorted_hand[card_index]
+
+      if building == 'Statue':
+        sites = card_manager.get_all_materials()
+        site_index = choices_dialog(sites)
+        site = sites[site_index]
+      else:
+        site = card_manager.get_material_of_card(building)
+
+    else: # Adding to a building from hand
+      building = card_choices[card_index]
+      
+      has_archway = self.player_has_active_building(player, 'Archway')
+      
+      sorted_stockpile = sorted(player.stockpile)
+      logging.info('Choose a material to add from your hand:')
+      card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_stockpile]
+
+      if has_archway:
+        sorted_pool = sorted(self.game_state.pool)
+        pool_choices = ['[POOL]' + gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
+        card_choices.extend(pool_choices)
+
+      card_index = self.choices_dialog(card_choices, 'Select a material to add')
+
+      if card_index > len(sorted_stockpile):
+        from_pool = True
+        material = sorted_pool[card_index == len(sorted_stockpile)]
+      else:
+        material = sorted_stockpile[card_index]
+
+    return building, material, site, from_pool
+
 
   def CraftsmanDialog(self, player, out_of_town_allowed):
     """ Returns (building, material, site) to be built.

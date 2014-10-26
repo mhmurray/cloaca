@@ -26,7 +26,7 @@ class GameState:
                exchange_area=None):
     self.players = []
     if players:
-        for player in players: self.add_player(player)
+        for player in players: self.find_or_add_player(player)
     self.leader_index = None
     self.is_decision_phase = True # 2 phases: decision, action
     self.do_respond_to_legionary = False
