@@ -9,26 +9,41 @@ class Building:
     so that we know the material composition in the future.
     """
 
-    def __init__(self, foundation=None, site=None, materials=None):
+    def __init__(self, foundation=None, site=None, materials=None,
+                 stairway_materials=None, is_completed=False):
         """ The parameter materials is a list of cards that are used 
         as building materials.
         """
         self.foundation = foundation
         self.site = site
         self.materials = materials if materials else []
-        self.stairway_materials = []
-        self.is_completed = False
+        self.stairway_materials = stairway_materials if stairway_materials else []
+        self.is_completed = is_completed
 
-    def is_completed(self):
-        """ True if the building is completed, determined by counting
-        the number of materials and comparing to the site.
+    def __str__(self):
+        """ The building name is the name of the foundation card.
         """
-        return self.is_completed
+        return b.foundation
+
+    def __repr__(self):
+        s = 'Building({0!r},{1!r},{2!r},{3!r},{4!r})'.format(
+                self.foundation,
+                self.site,
+                self.materials,
+                self.stairway_materials,
+                self.is_completed
+                )
+        return s
     
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
     def is_stairwayed(self):
         """ True if a material has been added by the Stairway.
         """
         return len(self.stairway_material) > 0
+
+    def is_completed(self): return self.is_completed
 
     def is_composed_of(self, material):
         """ Returns True if the building is composed of the specified material.
