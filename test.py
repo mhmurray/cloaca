@@ -16,6 +16,8 @@ implement a lot of logic around the actions that we want to test,
 so we can't just replace those.
 """
 
+unittest.longMessage = True
+
 class TestArchitect(unittest.TestCase):
     """ Test architect actions """
 
@@ -122,7 +124,7 @@ class TestArchitect(unittest.TestCase):
 
         b = self.p1.get_building('Road')
 
-        self.assertEqual(b, Building('Road', 'Rubble', ['Road'], completed=True), msg='b = '+repr(b))
+        self.assertEqual(b, Building('Road', 'Rubble', ['Road'], completed=True))
 
     def test_stairway(self):
         """ Stairwaying an opponent's building. """
