@@ -18,7 +18,7 @@ class Building:
         self.site = site
         self.materials = materials if materials else []
         self.stairway_materials = stairway_materials if stairway_materials else []
-        self.is_completed = completed
+        self.completed = completed
 
     def __str__(self):
         """ The building name is the name of the foundation card.
@@ -31,7 +31,7 @@ class Building:
                 self.site,
                 self.materials,
                 self.stairway_materials,
-                self.is_completed
+                self.completed
                 )
         return s
     
@@ -43,7 +43,7 @@ class Building:
         """
         return len(self.stairway_material) > 0
 
-    def is_completed(self): return self.is_completed
+    def is_completed(self): return self.completed
 
     def is_composed_of(self, material):
         """ Returns True if the building is composed of the specified material.

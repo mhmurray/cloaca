@@ -108,7 +108,7 @@ class Player:
   def get_incomplete_building_names(self):
     """ Returns a list of all incomplete building names.
     """
-    return [b.foundation for b in self.buildings]
+    return [b.foundation for b in self.buildings if not b.is_completed()]
 
   def get_incomplete_buildings(self):
     """ Returns a list of all incomplete Building objects.

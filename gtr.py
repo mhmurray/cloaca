@@ -836,7 +836,7 @@ class Game:
         return False
       player.buildings.append(b)
 
-    elif not starting_new_building and player.get_building(building).is_completed:
+    elif not starting_new_building and player.get_building(building).is_completed():
       logging.warn(
         'Illegal build. {} is already completed'.format(building))
 
@@ -853,7 +853,7 @@ class Game:
         completed = True
 
       if completed:
-        b.is_completed = True
+        b.completed = True
         gtrutils.add_card_to_zone(b.site, player.influence)
         self.resolve_building(player, building)
 
@@ -961,7 +961,7 @@ class Game:
         return False
       player.buildings.append(b)
 
-    elif not starting_new_building and player.get_building(building).is_completed:
+    elif not starting_new_building and player.get_building(building).is_completed():
       logging.warn(
         'Illegal build. {} is already completed'.format(building))
 
@@ -983,7 +983,7 @@ class Game:
         completed = True
 
       if completed:
-        b.is_completed = True
+        b.completed = True
         gtrutils.add_card_to_zone(b.site, player.influence)
         self.resolve_building(player, building)
 
@@ -1302,9 +1302,9 @@ class Game:
 
       card_index = self.choices_dialog(card_choices, 'Select a material to add')
 
-      if card_index > len(sorted_stockpile):
+      if card_index >= len(sorted_stockpile):
         from_pool = True
-        material = sorted_pool[card_index == len(sorted_stockpile)]
+        material = sorted_pool[card_index - len(sorted_stockpile)]
       else:
         material = sorted_stockpile[card_index]
 
