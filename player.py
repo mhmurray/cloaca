@@ -48,16 +48,6 @@ class Player:
   def get_max_hand_size(self):
     return Player.max_hand_size
 
-  def get_n_possible_thinker_cards(self):
-    """ get number of cards that can be drawn when thiking """
-    n_possible_cards = self.get_max_hand_size() - len(self.hand)
-    if n_possible_cards < 1:
-      n_possible_cards = 1
-    if n_possible_cards == 0:
-        n_possible_cards = 1
-    return n_possible_cards
-
-
   def get_card_from_hand(self, card):
     return get_card_from_zone(card, self.hand)
 
@@ -149,12 +139,12 @@ class Player:
     """ Returns a list of Building objects that have a material added
     via the Stairway.
     """
-    return [b for b in self.get_owned_buildings() if b.is_stairwayed]
+    return [b for b in self.get_owned_buildings() if b.is_stairwayed()]
 
   def get_stairwayed_building_names(self):
     return [b.foundation for b in self.get_stairwayed_buildings()]
 
-  def get_n_clients(self, role=None):
+  def get_n_clients(self, role=None, active_buildings=[]):
     """ Return the number of clients of the specified role. This counts
     the effect of Storeroom and Ludus Magna, but not Circus Maximus.
 
@@ -163,14 +153,14 @@ class Player:
     """
     if role is None:
       n_clients = len(self.clientele)
-    elif role == 'Laborer' and 'Storeroom' in self.get_active_buildings():
+    elif role == 'Laborer' and 'Storeroom' in active_buildings:
       n_clients = len(self.clientele)
     else:
       role_list = map(card_manager.get_role_of_card, self.clientele)
       n_clients = role_list.count(role)
 
       # Ludus Magna adds to any non-Merchant count.
-      if role != 'Merchant' and 'Ludus Magna' in self.get_active_buildings():
+      if role != 'Merchant' and 'Ludus Magna' in active_buildings:
         n_clients += role_list.count('Merchant')
 
     return n_clients

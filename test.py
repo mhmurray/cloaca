@@ -9,8 +9,8 @@ import unittest
 from building import Building
 
 
-""" Testing framework for GtR. To test the ineractive parts, we need to 
-commandeer the dialog methods somehow. This is done by replacing
+""" Testing framework for GtR. To test the interactive parts, we need to 
+commandeer the dialog methods. This is done by replacing
 the gtr.Game.card_choices() dialog. The individual __Dialog() methods
 implement a lot of logic around the actions that we want to test,
 so we can't just replace those.
@@ -136,6 +136,7 @@ class TestArchitect(unittest.TestCase):
 
         self.assertEqual(b, Building('Road', 'Rubble', ['Road'], completed=True))
 
+    @unittest.skip('Stairway not implemented')
     def test_stairway(self):
         """ Stairwaying an opponent's building.
 
@@ -147,17 +148,16 @@ class TestArchitect(unittest.TestCase):
           - Start or building to add to, respond 2 for add to Shrine.
           - Choose a material, respond 1 for Road.
         """
-        self.replace_choices_dialog([2,1])
+        # This test is broken
+        self.replace_choices_dialog([1,1])
         self.p1.buildings.append(Building('Stairway','Marble',completed=True))
 
         self.assertTrue('Stairway' in self.game.get_active_building_names(self.p1))
         
         self.game.perform_architect_action(self.p1, False)
 
-
-        b = self.p1.get_building('Road')
-
-        self.assertEqual(b, Building('Road', 'Rubble', ['Road'], completed=True))
+        self.assertTrue(self.game.player_has_active_building(self.p1, 'Atrium'))
+        self.assertTrue(self.game.player_has_active_building(self.p2, 'Atrium'))
 
     def test_archway_add_material(self):
         """ A material can be added to a building from the pool.

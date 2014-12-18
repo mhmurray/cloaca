@@ -41,7 +41,7 @@ class Building:
     def is_stairwayed(self):
         """ True if a material has been added by the Stairway.
         """
-        return len(self.stairway_material) > 0
+        return len(self.stairway_materials) > 0
 
     def is_completed(self): return self.completed
 

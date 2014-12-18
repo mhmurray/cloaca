@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 """ Glory to Rome sim.
-
 """
 
 from player import Player
@@ -247,6 +246,61 @@ class Game:
               logging.info(player.describe_buildings())
               break
 
+  def get_player_score(self, player):
+    return self.get_buildings_score(player) + self.get_vault_score(player)
+
+  def get_buildings_score(self, player):
+    """ Add up the score from this players buildings.
+    This includes the influence gained by sites, including payment
+    from a Prison, and points from Statue and Wall.
+    """
+    influence_pts = player.get_influence_points()
+    statue_pts = 0
+    if self.player_has_active_building(player, 'Statue'):
+      statue_pts = 3
+
+    wall_pts = 0
+    if self.player_has_active_building(player, 'Wall'):
+      wall_pts = len(player.stockpile) // 2
+
+    return influence_pts + statue_pts + wall_pts
+
+  def get_vault_score(self, player):
+    """ Examines all players' vaults to determine the vault
+    score for each player, including the merchant bonuses.
+    """
+    bonuses = {}
+    for player in self.game_state.players:
+      bonuses[player.name] = []
+    
+    for material in card_manager.get_materials():
+      # Set name to None if there's a tie, but maintain maximum
+      name, maximum = None, 0
+      for player in self.game_state.players:
+        material_cards = filter(
+            lambda x : card_manager.get_material_of_card(x) == material, player.vault)
+        n = len(material_cards)
+        if n > maximum:
+          name = player.name
+          maximum = n
+        elif n == maximum:
+          index = None
+          maximum = n
+      if name:
+        bonuses[name].append(material)
+
+    bonus_pts = 3*len(bonuses[player.name])
+
+    card_pts = 0
+    for card in player.vault:
+      card_pts += card_manager.get_value_of_card(card)
+
+    return card_pts + bonus_pts
+
+    
+
+
+
   def get_clientele_limit(self, player):
     has_insula = self.player_has_active_building(player, 'Insula')
     has_aqueduct = self.player_has_active_building(player, 'Aqueduct')
@@ -305,7 +359,7 @@ class Game:
       for p in self.game_state.get_following_players_in_order():
         self.follow_role_action(p, role)
 
-      self.perform_role_being_led(player,)
+      self.perform_role_being_led(player)
       for p in self.game_state.get_following_players_in_order():
         self.perform_role_being_led(p)
     else:
@@ -323,39 +377,75 @@ class Game:
     index = self.choices_dialog(choices, 'Select one.')
     return index==1
 
+  def UseLatrineDialog(self, player):
+    """ Asks which card, if any, the player wishes to use with the 
+    Latrine before thinking.
+    """
+    logging.info('Choose a card to discard with the Latrine.')
+
+    sorted_hand = sorted(player.hand)
+    card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+    card_choices.insert(0, 'Skip discard')
+    index = self.choices_dialog(card_choices, 'Select a card to discard')
+
+    if index == 0:
+      return None
+    else:
+      return sorted_hand[index-1]
+
+  def UseVomitoriumDialog(self, player):
+    """ Asks which card, if any, the player wishes to use with the 
+    Latrine before thinking.
+    """
+    logging.info('Discard hand with Vomitorium?')
+
+    choices = ['Discard all', 'Skip Vomitorium']
+    index = self.choices_dialog(choices)
+
+    return index == 0
+
   def post_game_state(self):
       save_game_state(self)
 
-  def perform_thinker_action(self, thinking_player):
+  def get_max_hand_size(self, player):
+    max_hand_size = 5
+    if self.player_has_active_building(player, 'Shrine'):
+      max_hand_size += 2
+    if self.player_has_active_building(player, 'Temple'):
+      max_hand_size += 4
+
+    return max_hand_size
+
+  def perform_thinker_action(self, player):
     """
-    1) If thinking_player has a Latrine, ask for discard.
-    2) If thinking_player has a Vomitorium, ask for discard.
+    1) If player has a Latrine, ask for discard.
+    2) If player has a Vomitorium, ask for discard.
     3) Determine # cards that would be drawn. Check hand size,
        Temple, and Shrine. Also check if jacks are empty,
        and if drawing cards would end the game.
-    3) Ask thinking_player for thinker type (jack or # cards)
+    3) Ask player for thinker type (jack or # cards)
     4) Draw cards for player.
     """
-    # still doesn't check for stairway-activated buildings
-    if self.player_has_active_building(thinking_player, 'Latrine'):
-      latrine_card = client.UseLatrineDialog(thinking_player)
-    else: latrine_card = None
-
-    if self.player_has_active_building(thinking_player, 'Vomitorium'):
-      should_discard = client.UseVomitoriumDialog(thinking_player)
+    if self.player_has_active_building(player, 'Vomitorium'):
+      should_discard_all = self.UseVomitoriumDialog(player)
     else: should_discard_all = False
 
-    if should_discard_all:
-      self.game_state.discard_all_for_player(thinking_player)
-    
-    if latrine_card:
-      self.game_state.discard_for_player(latrine_card)
+    if not should_discard_all and self.player_has_active_building(player, 'Latrine'):
+      building = player.get_building('Latrine')
+      latrine_card = self.UseLatrineDialog(player)
+    else: latrine_card = None
 
-    thinker_type = self.ThinkerTypeDialog(thinking_player)
+    if latrine_card:
+      self.game_state.discard_for_player(player, latrine_card)
+
+    if should_discard_all:
+      self.game_state.discard_all_for_player(player)
+    
+    thinker_type = self.ThinkerTypeDialog(player)
     if thinker_type == "Jack":
-      self.game_state.draw_one_jack_for_player(thinking_player)
+      self.game_state.draw_one_jack_for_player(player)
     if thinker_type == "Cards":
-      self.game_state.thinker_fillup_for_player(thinking_player)
+      self.game_state.thinker_for_cards(player, self.get_max_hand_size(player))
 
   def lead_role_action(self, leading_player):
     """
@@ -380,9 +470,13 @@ class Game:
     3) Ask for clarification if necessary
     4) Move cards to camp
     """
-    cards = self.FollowRoleDialog(following_player, role)
-    for c in cards:
-      following_player.camp.append(following_player.get_card_from_hand(c))
+    # response could be None for thinker
+    response = self.FollowRoleDialog(following_player, role)
+    if response is None:
+      self.perform_thinker_action(following_player)
+    else:
+      for c in response:
+        following_player.camp.append(following_player.get_card_from_hand(c))
 
   def perform_role_being_led(self, player):
     """
@@ -410,7 +504,7 @@ class Game:
     if role in ['Laborer', 'Merchant', 'Legionary']:
       has_cm = self.player_has_active_building(player, 'Circus Maximus')
 
-      n_actions = player.get_n_clients(role)
+      n_actions = player.get_n_clients(role, self.get_active_building_names(player))
 
       if player.is_following_or_leading():
         self.perform_role_action(player, role, False)
@@ -469,6 +563,9 @@ class Game:
     # If there's a CM, these checks only apply to the second action for
     # each client, since the first is always allowed to out-of-town.
     #
+    # For the tower, we can always out-of-town, and used_oot should be
+    # reset to zero after every call to perform_clientele_action()
+    #
     # The same logic applies for architects, so we can combine the two.
     
     if role in ['Craftsman', 'Architect']:
@@ -476,11 +573,13 @@ class Game:
       n_merchant = player.get_n_client_cards_of_role('Merchant')
 
       has_lm = self.player_has_active_building(player, 'Ludus Magna')
+      has_tower = self.player_has_active_building(player, 'Tower')
       
       used_oot = False
       if player.is_following_or_leading():
-        can_oot = n_clients > 0 or (has_lm and n_merchant > 0)
+        can_oot = n_clients > 0 or (has_lm and n_merchant > 0) or has_tower
         used_oot = self.perform_role_action(player, role, can_oot)
+        if has_tower: used_oot = False
 
       clients_used = 0
       merchants_used = 0
@@ -491,18 +590,20 @@ class Game:
         return has_lm and has_merchant
 
       while clients_used < n_clients:
-        can_oot = (n_clients - clients_used) > 1 or check_merchants()
+        has_tower = self.player_has_active_building(player, 'Tower')
+        can_oot = (n_clients - clients_used) > 1 or check_merchants() or has_tower
         used_oot = self.perform_clientele_action(player, role, can_oot, used_oot)
+        if has_tower: used_oot = False
 
         clients_used += 1
 
       while check_merchants():
+        has_tower = self.player_has_active_building(player, 'Tower')
         can_oot = (n_merchant - merchants_used) > 1
         used_oot = self.perform_clientele_action(player, role, can_oot, used_oot)
+        if has_tower: used_oot = False
 
         merchants_used += 1
-
-    #ugh! done. Probably should test this one.
 
 
   def perform_clientele_action(self, player, role, out_of_town_allowed=False, out_of_town_used=False):
@@ -528,14 +629,17 @@ class Game:
     Returns True if the last action was used to start an out-of-town site.
     """
     used_oot = out_of_town_used
+    has_tower = self.player_has_active_building(player, 'Tower')
     if self.player_has_active_building(player, 'Circus Maximus'):
       if used_oot: used_oot = False
       else:
         used_oot = self.perform_role_action(player, role, True)
+        if has_tower: used_oot = False
 
     if used_oot: used_oot = False
     else:
       used_oot = self.perform_role_action(player, role, out_of_town_allowed)
+      if has_tower: used_oot = False
 
     return used_oot
 
@@ -637,8 +741,6 @@ class Game:
     has_bar = self.player_has_active_building(player, 'Bar')
     has_aqueduct = self.player_has_active_building(player, 'Aqueduct')
     has_bath = self.player_has_active_building(player, 'Bath')
-
-    
 
     if self.get_clientele_limit(player) - player.get_n_clients() > 0:
       card_from_pool = self.PatronFromPoolDialog(player)
@@ -828,9 +930,13 @@ class Game:
       b.foundation = gtrutils.get_card_from_zone(building, player.hand)
       if site in self.game_state.in_town_foundations:
         b.site = gtrutils.get_card_from_zone(site, self.game_state.in_town_foundations)
-      elif site in self.game_state.out_of_town_foundations:
+      elif out_of_town_allowed and site in self.game_state.out_of_town_foundations:
         b.site = gtrutils.get_card_from_zone(site, self.game_state.out_of_town_foundations)
         used_out_of_town = True
+      elif not out_of_town_allowed and site in self.game_state.out_of_town_foundations:
+        logging.warn(
+            'Illegal build, not enough actions to build on out of town {} site'.format(site))
+        return False
       else:
         logging.warn('Illegal build, site {} does not exist in- or out-of-town'.format(site))
         return False
@@ -846,10 +952,10 @@ class Game:
       completed = False
       if has_scriptorium and card_manager.get_material_of_card(material) == 'Marble':
         logging.info('Player {} completed building {} using Scriptorium'.format(
-          player.name, building,foundation))
+          player.name, str(building)))
         completed = True
       elif len(b.materials) == card_manager.get_value_of_material(b.site):
-        logging.info('Player {} completed building {}'.format(player.name, building.foundation))
+        logging.info('Player {} completed building {}'.format(player.name, str(building)))
         completed = True
 
       if completed:
@@ -891,10 +997,10 @@ class Game:
     logging.info('\n=== Glory to Rome! ===')
 
     # Buildings that matter:
-    has_bridge = 'Bridge' in player.get_active_buildings()
-    has_coliseum = 'Coliseum' in player.get_active_buildings()
-    has_palisade = 'Palisade' in player.get_active_buildings()
-    has_wall = 'Wall' in player.get_active_buildings()
+    has_bridge = self.player_has_active_building('Bridge')
+    has_coliseum = self.player_has_active_building('Coliseum')
+    has_palisade = self.player_has_active_building('Palisade')
+    has_wall = self.player_has_active_building('Wall')
 
     card_to_demand_material = self.LegionaryDialog(player)
     material = card_manager.get_material_of_card(card_to_demand_material)
@@ -1039,7 +1145,7 @@ class Game:
         gtrutils.add_card_to_zone(
           gtrutils.get_card_from_zone(card_from_hand, player.hand), player.vault)
       if card_from_deck:
-        gtrutils.add_card_to_zone(self.game_state.draw_cards(1), player.vault)
+        gtrutils.add_card_to_zone(self.game_state.draw_cards(1)[0], player.vault)
 
   def kids_in_pool(self, player):
     """
@@ -1089,7 +1195,19 @@ class Game:
     
     player.performed_craftsman = False
 
-
+  def end_game(self):
+    """ The game is over. This determines a winner.
+    """
+    logging.info('      =================  ')
+    logging.info('   ====== GAME OVER =====')
+    logging.info('      =================  ')
+    logging.info('  The only winner is Rome.')
+    logging.info('  Glory to Rome!')
+    logging.info('\n')
+    for p in self.game_state.players:
+      logging.info('Score for player {} : {}'.format(p.name, self.get_player_score(p)))
+    logging.info('\n')
+    raise Exception('Game over.')
 
   def add_material_to_building(self, player, material, source, building):
     """
@@ -1103,7 +1221,32 @@ class Game:
   def resolve_building(self, player, building):
     """ Placeholder for all building resolutions
     """
-    pass
+    if str(building) == 'Catacomb':
+      self.end_game()
+    elif str(building) == 'Foundry':
+      n = player.get_influence_points()
+      for i in range(n):
+          logging.info(
+              'Foundry: Performing Laborer {}/{} for player {}'.format(i+1,n,player.name))
+          self.perform_laborer_action(player)
+    elif str(building) == 'Garden':
+      n = player.get_influence_points()
+      for i in range(n):
+          logging.info(
+              'Garden: Performing Patron {}/{} for player {}'.format(i+1,n,player.name))
+          self.perform_patron_action(player)
+    elif str(building) == 'School':
+      n = player.get_influence_points()
+      for i in range(n):
+          logging.info(
+              'School: Performing Thinker {}/{} for player {}'.format(i+1,n,player.name))
+          self.perform_thinker_action(player)
+    elif str(building) == 'Amphitheatre':
+      n = player.get_influence_points()
+      for i in range(n):
+          logging.info(
+              'Amphitheatre: Performing Craftsman {}/{} for player {}'.format(i+1,n,player.name))
+          self.perform_craftsman_action(player)
 
   def save_game_state(self, log_file_prefix='log_state'):
     """
@@ -1175,7 +1318,8 @@ class Game:
     """
     logging.info('Thinker:')
     logging.info('[1] Jack')
-    n_possible_cards = player.get_n_possible_thinker_cards()
+    n_possible_cards = self.get_max_hand_size(player) - len(player.hand)
+    if n_possible_cards < 1: n_possible_cards = 1
     logging.info('[2] Fill up from library ({0} cards)'.format(n_possible_cards))
     while True:
       response_str = raw_input('--> Your choice ([q]uit, [s]tart over): ')
@@ -1255,9 +1399,11 @@ class Game:
     Asks the player if they wish to use the Stairway and returns the 
     building to add to, the material to add, and whether to take from the pool.
     """
-    possible_buildings = [(p, b) for p in self.game_state for b in p.get_completed_buildings()]
+    possible_buildings = [(p, b) for p in self.game_state.players for b in p.get_completed_buildings()]
     logging.info('Use Stairway?')
-    choices = [p.name + '\'s ' + str(b) for (p,b) in possible_buildings]
+    building_names = [p.name + '\'s ' + str(b) for (p,b) in possible_buildings]
+    choices = sorted(building_names)
+    choices.insert(0, 'Don\'t use Stairway')
     building, material, from_pool = None, None, False
     return building, material, from_pool
 
@@ -1476,10 +1622,14 @@ class Game:
     sorted_hand = sorted(hand)
     card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
     card_choices.append('Petition')
+    card_choices.insert(0, 'Thinker')
 
     card_index = self.choices_dialog(card_choices, 'Select a card to follow with')
 
-    if card_choices[card_index] == 'Jack':
+    if card_index == 0:
+      return None
+
+    elif card_choices[card_index] == 'Jack':
       return ['Jack']
 
     elif card_index == card_choices.index('Petition'):
@@ -1515,7 +1665,13 @@ class Game:
       return cards_to_petition
 
     else:
-      card = sorted_hand[card_index]
+      card = sorted_hand[card_index-1]
+      if card_manager.get_role_of_card(card) != role_led:
+        logging.warn('Illegal follow, card {} does not match the role that was led ({})'.format(
+          card, role_led))
+        logging.warn('Drawing Jack instead')
+        return None
+
       return [card]
 
 # vim: ts=8:sts=2:sw=2:et

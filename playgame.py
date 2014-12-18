@@ -15,6 +15,7 @@ game.game_state.find_or_add_player('L')
 #print repr(game)
 
 game.init_common_piles(n_players=2)
+game.game_state.in_town_foundations = []
 #print repr(game)
 
 game.game_state.testing_init_players()

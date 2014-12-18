@@ -107,12 +107,17 @@ class GameState:
       n = start_player or self.leader_index
       return self.players[n:] + self.players[:n]
 
-  def thinker_fillup_for_player(self, player):
-    n_cards = player.get_n_possible_thinker_cards()
-    logging.debug('Adding {0} cards to player {1} hand'.format(
-      n_cards,
-      player.name
-    ))
+  def thinker_fillup_for_player(self, player, max_hand_size):
+    n_cards = max_hand_size - len(player.hand)
+    logging.debug(
+        'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
+    player.add_cards_to_hand(self.draw_cards(n_cards))
+
+  def thinker_for_cards(self, player, max_hand_size):
+    n_cards = max_hand_size - len(player.hand)
+    if n_cards < 1: n_cards = 1
+    logging.debug(
+        'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
     player.add_cards_to_hand(self.draw_cards(n_cards))
 
   def draw_one_card_for_player(self, player):
@@ -128,7 +133,8 @@ class GameState:
     self.pool.append(player.get_card_from_hand(card))
 
   def discard_all_for_player(self, player):
-    for card in player.hand:
+    cards_to_discard = list(player.hand)
+    for card in cards_to_discard:
       self.pool.append(player.get_card_from_hand(card))
 
   def find_or_add_player(self, player_name):
@@ -151,7 +157,7 @@ class GameState:
   
   def init_player(self, player):
     player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
-    self.thinker_fillup_for_player(player)
+    self.thinker_fillup_for_player(player, 5)
 
   def init_players(self):
     logging.info('--> Initializing players')
@@ -160,9 +166,10 @@ class GameState:
     
   def testing_init_player(self, player):
     player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
-    self.thinker_fillup_for_player(player)
-    player.buildings.append(Building('Latrine','Rubble'))
+    self.thinker_fillup_for_player(player, 5)
+    player.buildings.append(Building('Tower','Concrete', ['Senate'],[],False))
     player.buildings.append(Building('Atrium','Brick'))
+    player.buildings.append(Building('Catacomb','Stone',['Villa','Villa']))
 
   def testing_init_players(self):
     logging.info('--> Initializing players')
