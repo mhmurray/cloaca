@@ -52,7 +52,7 @@ class Building:
         material, but the Statue can be built on any site and counts as that
         site's material and Marble.
         """
-        return material in get_material_composition()
+        return material in self.get_material_composition()
 
     def get_material_composition(self):
         """ Returns a list of materials that make up this building.

@@ -115,7 +115,17 @@ def get_all_materials():
   ]
   return foundations
 
-
+def cmp_jacks_first(c1, c2):
+  """ Comparator that alphabetizes cards, but puts Jacks before all
+  Orders cards.
+  """
+  if c1 == c2:
+    return 0
+  if c1 == 'Jack':
+    return -1
+  if c2 == 'Jack':
+    return 1
+  return cmp(c1,c2)
 
 if __name__ == '__main__':
 
@@ -137,3 +147,4 @@ if __name__ == '__main__':
 
 
 
+# vim: ts=8:sts=2:sw=2:et

@@ -11,6 +11,7 @@ from building import Building
 import random
 import logging
 
+lg = logging.getLogger('gtr')
 
 class GameState:
   """ Contains the current game state. The methods of this class
@@ -65,7 +66,7 @@ class GameState:
       self.priority_index = self.priority_index + 1
       if self.priority_index >= self.get_n_players():
         self.priority_index = 0
-      logging.debug(
+      lg.debug(
         'priority index changed from {0} to {1}; turn {2}'.format(
           prev_index,
           self.priority_index,
@@ -78,11 +79,11 @@ class GameState:
       if self.leader_index >= self.get_n_players():
         self.leader_index = 0
         self.turn_index = self.turn_index + 1
-      logging.debug('leader index changed from {0} to {1}'.format(prev_index,
+      lg.debug('leader index changed from {0} to {1}'.format(prev_index,
       self.leader_index))
 
   def print_turn_info(self):
-      logging.info('--> Turn {0} | leader: {1} | priority: {2}'.format(
+      lg.info('--> Turn {0} | leader: {1} | priority: {2}'.format(
         self.turn_index, 
         self.players[self.leader_index].name,
         self.players[self.priority_index].name,
@@ -109,14 +110,14 @@ class GameState:
 
   def thinker_fillup_for_player(self, player, max_hand_size):
     n_cards = max_hand_size - len(player.hand)
-    logging.debug(
+    lg.debug(
         'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
     player.add_cards_to_hand(self.draw_cards(n_cards))
 
   def thinker_for_cards(self, player, max_hand_size):
     n_cards = max_hand_size - len(player.hand)
     if n_cards < 1: n_cards = 1
-    logging.debug(
+    lg.debug(
         'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
     player.add_cards_to_hand(self.draw_cards(n_cards))
 
@@ -143,14 +144,14 @@ class GameState:
     players. """
     players_match = filter(lambda x : x.name==player_name, self.players)
     if len(players_match) > 1:
-      logging.critical(
+      lg.critical(
         'Fatal error! Two instances of player {0}.'.format(players_match[0].name))
       raise Exception('Cannot create two players with the same name.')
     elif len(players_match) == 1:
-      logging.info('Found existing player {0}.'.format(players_match[0].name))
+      lg.info('Found existing player {0}.'.format(players_match[0].name))
       player_index = self.players.index(players_match[0])
     else:
-      logging.info('Adding player {0}.'.format(player_name))
+      lg.info('Adding player {0}.'.format(player_name))
       self.players.append(Player(player_name))
       player_index = len(self.players) - 1
     return player_index
@@ -160,19 +161,20 @@ class GameState:
     self.thinker_fillup_for_player(player, 5)
 
   def init_players(self):
-    logging.info('--> Initializing players')
+    lg.info('--> Initializing players')
     for player in self.players:
       self.init_player(player)
     
   def testing_init_player(self, player):
     player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
     self.thinker_fillup_for_player(player, 5)
-    player.buildings.append(Building('Tower','Concrete', ['Senate'],[],False))
-    player.buildings.append(Building('Atrium','Brick'))
+    player.buildings.append(Building('Palace','Marble', ['Forum'],[],True))
+    player.buildings.append(Building('Latrine','Rubble', [],[],False))
     player.buildings.append(Building('Catacomb','Stone',['Villa','Villa']))
+    player.stockpile.extend(['Forum','Insula','Catacomb','Foundry','Circus','Storeroom'])
 
   def testing_init_players(self):
-    logging.info('--> Initializing players')
+    lg.info('--> Initializing players')
     for player in self.players:
       self.testing_init_player(player)
     

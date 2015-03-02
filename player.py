@@ -17,6 +17,8 @@ from building import Building
 import logging
 import collections
 
+lg = logging.getLogger('gtr')
+
 class Player:
   """ Contains the piles and items controlled by a player. """
   max_hand_size = 5
@@ -31,6 +33,7 @@ class Player:
     self.clientele = clientele if clientele is not None else []
     self.vault = vault if vault is not None else []
     self.camp = camp if camp is not None else []
+    self.n_camp_actions = 0
     self.buildings = buildings if buildings is not None else []
     self.influence = influence if influence is not None else []
     self.revealed = revealed or []
@@ -44,6 +47,9 @@ class Player:
       name=self.name, hand=self.hand, stockpile=self.stockpile,
       clientele=self.clientele, vault=self.vault, camp=self.camp,
       buildings=self.buildings, influence=self.influence)
+
+  def __str__(self):
+    return self.name
 
   def get_max_hand_size(self):
     return Player.max_hand_size
@@ -255,7 +261,7 @@ class Player:
     for card in self.influence:
       value = card_manager.get_value_of_material(card)
       if value is None:
-        logging.error('Unexpected card {0} in influence'.format(card))
+        lg.error('Unexpected card {0} in influence'.format(card))
       else:
         influence += value
     return influence
