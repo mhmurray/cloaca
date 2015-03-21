@@ -14,6 +14,8 @@ import collections
 import logging
 import pickle
 import itertools
+import time
+import glob
 
 lg = logging.getLogger('gtr')
 # To set up logging, look at playgame.py
@@ -354,6 +356,7 @@ class Game:
 
   def take_turn(self, player):
     """
+    !!! This no longer used after implementing take_turn_stacked !!!
     1) Ask for thinker or lead
     2) -->ACTION(thinker), -->ACTION(lead_role)
     """
@@ -370,6 +373,66 @@ class Game:
       self.perform_thinker_action(player)
       
     self.end_turn(player)
+
+  def thinker_or_lead(self, player):
+    lead_role = self.ThinkerOrLeadDialog(player)
+    if lead_role:
+      # my_list[::-1] reverses the list
+      for p in self.game_state.get_players_in_turn_order()[::-1]:
+        self.game_state.stack.push_frame("perform_role_being_led", p)
+      for p in self.game_state.get_following_players_in_order()[::-1]:
+        self.game_state.stack.push_frame("follow_role_action", p)
+      self.game_state.stack.push_frame("lead_role_action", player)
+
+    else:
+      self.game_state.stack.push_frame("perform_thinker_action", player)
+
+  def process_stack_frame(self):
+    if self.game_state.stack.stack:
+      frame = self.game_state.stack.stack.pop()
+      func = getattr(self,frame.function_name)
+      func.__call__(*frame.entry_args)
+
+  def run(self, load_state = False):
+    """ Loop that keeps the game running.
+    
+    If load_state is True, we load the old state and start running.
+    The stack should never be empty, but we might load in the middle
+    of a turn, which means we haven't printed the game state. Print
+    it again, maybe redundantly.
+    """
+    if load_state:
+      self.get_previous_game_state('tmp/log_state')
+      self.show_public_game_state()
+      self.print_complete_player_state(self.game_state.players[self.game_state.leader_index])
+    else:
+      leader = self.game_state.players[self.game_state.leader_index]
+      self.game_state.stack.push_frame('take_turn_stacked', leader)
+
+    while(self.game_state.stack.stack):
+      self.save_game_state('tmp/log_state')
+      self.process_stack_frame()
+
+  def advance_turn(self):
+    """ Moves the leader index, prints game state, saves, and pushes the next turn.
+    """
+    self.game_state.turn_number += 1
+    self.game_state.increment_leader_index()
+    leader_index = self.game_state.leader_index
+    self.show_public_game_state()
+    self.print_complete_player_state(self.game_state.players[leader_index])
+    leader = self.game_state.players[leader_index]
+    self.game_state.stack.push_frame('take_turn_stacked', leader)
+
+  def take_turn_stacked(self, player):
+    """
+    Push END_TURN frame.
+    Push THINKER_OR_LEAD frame.
+    Yield.
+    """
+    self.game_state.stack.push_frame("advance_turn")
+    self.game_state.stack.push_frame("end_turn", player)
+    self.game_state.stack.push_frame("thinker_or_lead", player)
 
   def ThinkerOrLeadDialog(self, player):
     """ Asks whether the player wants to think or lead at the start of their
@@ -454,7 +517,7 @@ class Game:
       self.game_state.draw_one_jack_for_player(player)
     if thinker_type == "Cards":
       self.game_state.thinker_for_cards(player, self.get_max_hand_size(player))
-      if len(game_state.library) == 0:
+      if len(self.game_state.library) == 0:
         lg.info('The last Orders card has been drawn, Game Over.')
         end_game()
 
@@ -477,19 +540,20 @@ class Game:
     leading_player.n_camp_actions = n_actions_total
     return role
 
-  def follow_role_action(self, following_player, role):
+  def follow_role_action(self, following_player, role=None):
     """
     1) Ask for cards used to follow
     2) Check for ambiguity in ways to follow (Crane, Palace, petition)
     3) Ask for clarification if necessary
     4) Move cards to camp
     """
+    role = self.game_state.role_led
     # response could be None for thinker or [n_actions, card1, card2, ...]
     # for a role followed using petition, palace, etc.
     response = self.FollowRoleDialog(following_player, role)
     if response is None:
       print 'Follow role response is ' + str(response)
-      self.perform_thinker_action(following_player)
+      self.game_state.stack.push_frame("perform_thinker_action", following_player)
     else:
       following_player.n_camp_actions = response[0]
       for c in response[1:]:
@@ -1283,7 +1347,7 @@ class Game:
     self.game_state.time_stamp = time_stamp
     file_name = '{0}_{1}.log'.format(log_file_prefix, time_stamp)
     log_file = file(file_name, 'w')
-    pickle.dump(game_state, log_file)
+    pickle.dump(self.game_state, log_file)
     log_file.close()
 
   def get_previous_game_state(self, log_file_prefix='log_state'):
@@ -1308,6 +1372,7 @@ class Game:
     game_state = pickle.load(log_file)
     log_file.close()
     self.game_state = game_state
+    lg.info('Loaded game state.')
     return game_state
 
   def print_selections(self, choices_list, selectable):
@@ -1348,10 +1413,17 @@ class Game:
     n_valid_selections = len(selectable_choices)
     
     while True:
-      prompt_str = '--> {0} [1-{1}] ([q]uit, [s]tart over): '
+      prompt_str = '--> {0} [1-{1}] ([q]uit, [s]tart over, [w]izard): '
       response_str = raw_input(prompt_str.format(prompt, n_valid_selections))
       if response_str in ['s', 'start over']: raise StartOverException
       elif response_str in ['q', 'quit']: raise CancelDialogException
+      elif response_str in ['w', 'wizard']:
+        print ' !!! Current stack state: !!! '
+        def anon(x): print str(x)
+        map(anon, self.game_state.stack.stack[::-1])
+        print ' !!!                      !!! '
+
+
       try:
         response_int = int(response_str)
       except:

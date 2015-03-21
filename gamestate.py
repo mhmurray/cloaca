@@ -11,6 +11,8 @@ from building import Building
 import random
 import logging
 
+import stack
+
 lg = logging.getLogger('gtr')
 
 class GameState:
@@ -24,11 +26,12 @@ class GameState:
   def __init__(self, players=None, jack_pile=None, library=None, pool=None, 
                in_town_foundations=None, out_of_town_foundations=None,
                card_definitions_dict=None, time_stamp=None,
-               exchange_area=None):
+               exchange_area=None, my_stack=None):
     self.players = []
     if players:
         for player in players: self.find_or_add_player(player)
     self.leader_index = None
+    self.turn_number = 0
     self.is_decision_phase = True # 2 phases: decision, action
     self.do_respond_to_legionary = False
     self.is_role_led = False
@@ -43,6 +46,7 @@ class GameState:
     self.out_of_town_foundations = out_of_town_foundations or []
     self.is_started = False
     self.time_stamp = time_stamp
+    self.stack = my_stack if my_stack else stack.Stack()
 
   def __repr__(self):
     rep = ('GameState(players={players!r}, leader={leader!r}, '
