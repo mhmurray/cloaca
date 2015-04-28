@@ -9,6 +9,7 @@ from gamestate import GameState
 import gtrutils
 import card_manager 
 from building import Building
+import client2 as client
 
 import collections
 import logging
@@ -26,13 +27,14 @@ class StartOverException(Exception):
 class CancelDialogException(Exception):
   pass
 
-class Game:
+class Game(object):
   initial_pool_count = 5
   initial_jack_count = 6
   max_players = 5
   
   def __init__(self, game_state=None):
     self.game_state = game_state if game_state is not None else GameState()
+    self.client_dict = {} # Dictionary of <name> : <Client()>
     logger = logging.getLogger('gtr')
     logger.addFilter(gtrutils.RoleColorFilter())
     logger.addFilter(gtrutils.MaterialColorFilter())
@@ -40,6 +42,40 @@ class Game:
   def __repr__(self):
     rep=('Game(game_state={game_state!r})')
     return rep.format(game_state = self.game_state)
+
+  def test_all_get_complete_building(self, building_name):
+    from building import Building
+    b = Building(
+            building_name, 
+            card_manager.get_material_of_card(building_name),
+            [building_name]*card_manager.get_value_of_card(building_name),
+            None, True)
+    from copy import copy
+    for p in self.game_state.players:
+      p.buildings.append(copy(b))
+
+  def test_all_get_incomplete_building(self, building_name):
+    from building import Building
+    b = Building(
+            building_name, 
+            card_manager.get_material_of_card(building_name),
+            [building_name]*(card_manager.get_value_of_card(building_name)-1),
+            None, False)
+    from copy import copy
+    for p in self.game_state.players:
+      p.buildings.append(copy(b))
+
+  def get_client(self, player_name):
+    """ Returns the client object and updates the GameState to be current.
+    """
+    c = self.client_dict[player_name]
+    c.game.game_state = self.game_state # Update client game state
+    return c
+
+  def add_player(self, name):
+    self.game_state.find_or_add_player(name)
+    if name not in self.client_dict:
+      self.client_dict[name] = client.Client(name)
 
   def init_common_piles(self, n_players):
     lg.info('--> Initializing the game')
@@ -354,28 +390,8 @@ class Game:
 
     return active_buildings + stairwayed_buildings
 
-  def take_turn(self, player):
-    """
-    !!! This no longer used after implementing take_turn_stacked !!!
-    1) Ask for thinker or lead
-    2) -->ACTION(thinker), -->ACTION(lead_role)
-    """
-    lead_role = self.ThinkerOrLeadDialog(player)
-    if lead_role:
-      role = self.lead_role_action(player)
-      for p in self.game_state.get_following_players_in_order():
-        self.follow_role_action(p, role)
-
-      self.perform_role_being_led(player)
-      for p in self.game_state.get_following_players_in_order():
-        self.perform_role_being_led(p)
-    else:
-      self.perform_thinker_action(player)
-      
-    self.end_turn(player)
-
   def thinker_or_lead(self, player):
-    lead_role = self.ThinkerOrLeadDialog(player)
+    lead_role = self.client_dict[player.name].ThinkerOrLeadDialog()
     if lead_role:
       # my_list[::-1] reverses the list
       for p in self.game_state.get_players_in_turn_order()[::-1]:
@@ -389,29 +405,56 @@ class Game:
 
   def process_stack_frame(self):
     if self.game_state.stack.stack:
-      frame = self.game_state.stack.stack.pop()
+      try:
+        frame = self.game_state.stack.stack.pop()
+      except IndexError:
+        lg.info('Tried to pop from empty stack!')
+        raise
+
       func = getattr(self,frame.function_name)
       func.__call__(*frame.entry_args)
 
-  def run(self, load_state = False):
+  def run(self):
     """ Loop that keeps the game running.
     
-    If load_state is True, we load the old state and start running.
-    The stack should never be empty, but we might load in the middle
-    of a turn, which means we haven't printed the game state. Print
-    it again, maybe redundantly.
+    If the game is not started, push take_turn_stacked and run Game.pump()
+    in an infinite loop.
     """
-    if load_state:
-      self.get_previous_game_state('tmp/log_state')
-      self.show_public_game_state()
-      self.print_complete_player_state(self.game_state.players[self.game_state.leader_index])
-    else:
+    if not self.game_state.is_started:
       leader = self.game_state.players[self.game_state.leader_index]
       self.game_state.stack.push_frame('take_turn_stacked', leader)
 
-    while(self.game_state.stack.stack):
-      self.save_game_state('tmp/log_state')
-      self.process_stack_frame()
+    while(True):
+      self.pump()
+
+  def load_game(self, log_file=None):
+    """ Loads the game in log_file if specified.
+
+    The default is to look in ./tmp for files like 'log_state_<timestamp>.log'
+    """
+    if log_file is None:
+      log_file_prefix = 'tmp/log_state'
+      log_files = glob.glob('{0}*.log'.format(log_file_prefix))
+      log_files.sort()
+
+    if not log_files:
+      raise Exception('No saved games found in ' + log_file_prefix + '*')
+
+    log_file_name = log_files[-1] # last element
+    time_stamp = log_file_name.split('_')[-1].split('.')[0:1]
+    time_stamp = '.'.join(time_stamp)
+    asc_time = time.asctime(time.localtime(float(time_stamp)))
+    lg.debug('Retrieving game state from {0}'.format(asc_time))
+
+    self.get_previous_game_state(log_file_name)
+
+    # After loading, print state since console will be empty
+    self.show_public_game_state()
+    self.print_complete_player_state(self.game_state.players[self.game_state.leader_index])
+
+  def pump(self):
+    self.process_stack_frame()
+    self.save_game_state('tmp/log_state')
 
   def advance_turn(self):
     """ Moves the leader index, prints game state, saves, and pushes the next turn.
@@ -426,15 +469,15 @@ class Game:
 
   def take_turn_stacked(self, player):
     """
+    Push ADVANCE_TURN frame.
     Push END_TURN frame.
     Push THINKER_OR_LEAD frame.
-    Yield.
     """
     self.game_state.stack.push_frame("advance_turn")
     self.game_state.stack.push_frame("end_turn", player)
     self.game_state.stack.push_frame("thinker_or_lead", player)
 
-  def ThinkerOrLeadDialog(self, player):
+  def _ThinkerOrLeadDialog(self, player):
     """ Asks whether the player wants to think or lead at the start of their
     turn.
 
@@ -446,7 +489,7 @@ class Game:
     index = self.choices_dialog(choices, 'Select one.')
     return index==1
 
-  def UseLatrineDialog(self, player):
+  def _UseLatrineDialog(self, player):
     """ Asks which card, if any, the player wishes to use with the 
     Latrine before thinking.
     """
@@ -462,7 +505,7 @@ class Game:
     else:
       return sorted_hand[index-1]
 
-  def UseVomitoriumDialog(self, player):
+  def _UseVomitoriumDialog(self, player):
     """ Asks if the player wants to discard their hand with the Vomitorium.
 
     Returns True if player uses the Vomitorium, False otherwise.
@@ -497,13 +540,14 @@ class Game:
     3) Ask player for thinker type (jack or # cards)
     4) Draw cards for player.
     """
+    client = self.get_client(player.name)
     if self.player_has_active_building(player, 'Vomitorium'):
-      should_discard_all = self.UseVomitoriumDialog(player)
+      should_discard_all = client.UseVomitoriumDialog()
     else: should_discard_all = False
 
     if not should_discard_all and self.player_has_active_building(player, 'Latrine'):
       building = player.get_building('Latrine')
-      latrine_card = self.UseLatrineDialog(player)
+      latrine_card = client.UseLatrineDialog()
     else: latrine_card = None
 
     if latrine_card:
@@ -512,7 +556,8 @@ class Game:
     if should_discard_all:
       self.game_state.discard_all_for_player(player)
     
-    thinker_type = self.ThinkerTypeDialog(player)
+    client = self.get_client(player.name)
+    thinker_type = client.ThinkerTypeDialog()
     if thinker_type == "Jack":
       self.game_state.draw_one_jack_for_player(player)
     if thinker_type == "Cards":
@@ -529,7 +574,8 @@ class Game:
     4) Move cards to camp, set this turn's role that was led.
     """
     # This dialog checks that the cards used are legal
-    resp = self.LeadRoleDialog(self.game_state, leading_player)
+    client = self.get_client(leading_player.name)
+    resp = client.LeadRoleDialog()
     role = resp[0]
     n_actions_total = resp[1]
     cards = resp[2:]
@@ -548,9 +594,10 @@ class Game:
     4) Move cards to camp
     """
     role = self.game_state.role_led
+    client = self.get_client(following_player.name)
     # response could be None for thinker or [n_actions, card1, card2, ...]
     # for a role followed using petition, palace, etc.
-    response = self.FollowRoleDialog(following_player, role)
+    response = client.FollowRoleDialog()
     if response is None:
       print 'Follow role response is ' + str(response)
       self.game_state.stack.push_frame("perform_thinker_action", following_player)
@@ -765,7 +812,11 @@ class Game:
     """
     has_dock = self.player_has_active_building(player, 'Dock')
     
-    card_from_pool, card_from_hand = self.LaborerDialog(player, has_dock)
+    c = self.get_client(player.name)
+    card_from_pool, card_from_hand = c.LaborerDialog()
+
+    if card_from_hand and not has_dock:
+      raise Exception('Illegal laborer from hand without Dock.')
 
     if card_from_pool:
       gtrutils.add_card_to_zone(
@@ -774,7 +825,7 @@ class Game:
       gtrutils.add_card_to_zone(
         gtrutils.get_card_from_zone(card_from_hand,player.hand),player.stockpile)
 
-  def PatronFromPoolDialog(self, player):
+  def _PatronFromPoolDialog(self, player):
     card_from_pool = None
     sorted_pool = sorted(self.game_state.pool)
 
@@ -790,14 +841,14 @@ class Game:
 
     return card_from_pool
 
-  def PatronFromDeckDialog(self, player):
+  def _PatronFromDeckDialog(self, player):
     lg.info(
       'Performing Patron. Do you wish to take a client from the deck? (Clientele {}/{})'.format(
       str(player.get_n_clients()),str(self.get_clientele_limit(player))))
     choices = ['Yes','No']
     return self.choices_dialog(choices) == 0
 
-  def PatronFromHandDialog(self, player):
+  def _PatronFromHandDialog(self, player):
     card_from_hand = None
     sorted_hand = sorted([card for card in player.hand if card != 'Jack'])
 
@@ -828,23 +879,29 @@ class Game:
     has_aqueduct = self.player_has_active_building(player, 'Aqueduct')
     has_bath = self.player_has_active_building(player, 'Bath')
 
+    client = self.get_client(player.name)
+
     if self.get_clientele_limit(player) - player.get_n_clients() > 0:
-      card_from_pool = self.PatronFromPoolDialog(player)
+      card_from_pool = client.PatronFromPoolDialog()
       if card_from_pool:
         gtrutils.move_card(card_from_pool, self.game_state.pool, player.clientele)
         if has_bath:
           self.perform_role_action(player, card_manager.get_role_of_card(card_from_pool), False)
 
+    client = self.get_client(player.name) # Do this to update client game state.
+
     if has_bar and self.get_clientele_limit(player) - player.get_n_clients() > 0:
-      card_from_deck = self.PatronFromDeckDialog(player)
+      card_from_deck = client.PatronFromDeckDialog()
       if card_from_deck:
-        card = self.game_state.draw_cards(1)
+        card = self.game_state.draw_cards(1)[0]
         gtrutils.add_card_to_zone(card, player.clientele)
         if has_bath:
           self.perform_role_action(player, card_manager.get_role_of_card(card), False)
 
+    client = self.get_client(player.name) # Do this to update client game state.
+
     if has_aqueduct and self.get_clientele_limit(player) - player.get_n_clients() > 0:
-      card_from_hand = self.PatronFromHandDialog(player)
+      card_from_hand = client.PatronFromHandDialog()
       if card_from_hand:
         gtrutils.move_card(card_from_hand, player.hand, player.clientele)
         if has_bath:
@@ -907,12 +964,12 @@ class Game:
                    'or site material ({0})'.format(site_material))
       return False
 
-  def UseFountainDialog(self, player):
+  def _UseFountainDialog(self, player):
     choices = ['Use Fountain, drawing from deck', 'Don\'t use Fountain, play from hand']
     choice_index = choices_dialog(choices, 'Do you wish to use your Fountain?')
     return choice_index == 0
 
-  def FountainDialog(self, player, card_from_deck, out_of_town_allowed):
+  def _FountainDialog(self, player, card_from_deck, out_of_town_allowed):
     """ The Fountain allows you to draw a card from the deck, then
     choose whether to use the card with a craftsman action. The player
     is allowed to just keep (draw) the card.
@@ -986,19 +1043,24 @@ class Game:
     used_out_of_town = False
     building, material, site = (None, None, None)
 
+    client = self.get_client(player.name)
+
     # Use fountain?
-    if has_fountain and self.UseFountainDialog(player):
-      card_from_deck = self.game_state.draw_cards(1)
+    if has_fountain and client.UseFountainDialog():
+      card_from_deck = self.game_state.draw_cards(1)[0]
       player.add_cards_to_hand([card_from_deck])
 
+      client = self.get_client(player.name)
+
       skip_action, building, material, site =\
-        self.FountainDialog(player, card_from_deck, out_of_town_allowed)
+        client.FountainDialog(card_from_deck, out_of_town_allowed)
 
       if skip_action:
         return False
 
     else:
-      (building, material, site) = self.CraftsmanDialog(player, out_of_town_allowed)
+      client = self.get_client(player.name)
+      (building, material, site) = client.CraftsmanDialog(out_of_town_allowed)
 
     starting_new_building = site is not None
     already_owned = player.owns_building(building)
@@ -1056,7 +1118,7 @@ class Game:
 
     return used_out_of_town
     
-  def LegionaryDialog(self, player):
+  def _LegionaryDialog(self, player):
     lg.info('Card to use for legionary:')
     hand = player.hand
     sorted_hand = sorted(hand)
@@ -1087,7 +1149,9 @@ class Game:
     has_palisade = self.player_has_active_building(player, 'Palisade')
     has_wall = self.player_has_active_building(player, 'Wall')
 
-    card_to_demand_material = self.LegionaryDialog(player)
+    client = self.get_client(player.name)
+
+    card_to_demand_material = client.LegionaryDialog()
     material = card_manager.get_material_of_card(card_to_demand_material)
     lg.info('Rome demands %s!!' % material)
 
@@ -1126,7 +1190,8 @@ class Game:
     used_out_of_town = False
     building, material, site = (None, None, None)
 
-    (building, material, site, from_pool) = self.ArchitectDialog(player, out_of_town_allowed)
+    client = self.get_client(player.name)
+    (building, material, site, from_pool) = client.ArchitectDialog(out_of_town_allowed)
 
     if building is None and site is None and material is None:
       lg.info('Skipped architect action.')
@@ -1189,7 +1254,8 @@ class Game:
         return False
 
     if has_stairway:
-      building, material, from_pool = self.StairwayDialog(player)
+      client = self.get_client(player.name)
+      building, material, from_pool = client.StairwayDialog()
       if building is not None and material is not None:
         other_player = [p for p in self.game_state.players
                         if building in p.buildings][0]
@@ -1224,9 +1290,9 @@ class Game:
       and (has_atrium or len(player.stockpile)>0 or (has_basilica and len(player.hand)>0))
 
     if merchant_allowed:
+      client = self.get_client(player.name)
       # card_from_deck is a boolean. The others are actual card names.
-      card_from_stockpile, card_from_hand, card_from_deck = \
-        self.MerchantDialog(player, has_atrium, has_basilica, card_limit)
+      card_from_stockpile, card_from_hand, card_from_deck = client.MerchantDialog()
 
       if card_from_stockpile:
         gtrutils.add_card_to_zone(
@@ -1255,7 +1321,8 @@ class Game:
       
       has_sewer = self.player_has_active_building(player, 'Sewer') 
       if has_sewer:
-        cards = self.UseSewerDialog(player)
+        client = self.get_client(player.name)
+        cards = client.UseSewerDialog()
         for card in cards:
           gtrutils.move_card(card, player.camp, player.stockpile)
 
@@ -1263,7 +1330,8 @@ class Game:
       for card in player.camp:
         if card is 'Jack':
           for senate_player in players_with_senate:
-            if self.UseSenateDialog(senate_player, player):
+            client = self.get_client(senate_player.name)
+            if client.UseSenateDialog():
               gtr_utils.move_card(card, player.camp, senate_player.hand)
               break
         else:
@@ -1280,7 +1348,8 @@ class Game:
     has_academy = self.player_has_active_building(player, 'Academy') 
 
     if has_academy and player.performed_craftsman:
-      self.ThinkerTypeDialog(player)
+      client = self.get_client(player.name)
+      client.ThinkerTypeDialog()
     
     player.performed_craftsman = False
     player.n_camp_actions = 0
@@ -1350,24 +1419,10 @@ class Game:
     pickle.dump(self.game_state, log_file)
     log_file.close()
 
-  def get_previous_game_state(self, log_file_prefix='log_state'):
+  def get_previous_game_state(self, log_file_name):
     """
     Return saved game state from file
     """
-    log_files = glob.glob('{0}*.log'.format(log_file_prefix))
-    log_files.sort()
-    #for log_file in log_files: # print all log file names, for debugging
-    #  lg.debug(log_file)
-
-    if not log_files:
-      return None
-
-    log_file_name = log_files[-1] # last element
-    time_stamp = log_file_name.split('_')[-1].split('.')[0:1]
-    time_stamp = '.'.join(time_stamp)
-    asc_time = time.asctime(time.localtime(float(time_stamp)))
-    #lg.debug('Retrieving game state from {0}'.format(asc_time))
-
     log_file = file(log_file_name, 'r')
     game_state = pickle.load(log_file)
     log_file.close()
@@ -1438,7 +1493,7 @@ class Game:
                 '1 and {1}'.format(response_int, n_valid_selections))
 
 
-  def ThinkerTypeDialog(self, player):
+  def _ThinkerTypeDialog(self, player):
     """ Returns 'Jack' or 'Cards' for which type of thinker to
     perform.
     """
@@ -1466,7 +1521,7 @@ class Game:
       except:
         lg.info('your response was {0!s}... try again'.format(response_str))
 
-  def UseSewerDialog(self, player):
+  def _UseSewerDialog(self, player):
     done=False
     cards_to_move=[]
     choices=['All', 'None']
@@ -1485,13 +1540,13 @@ class Game:
     
     return cards_to_move
 
-  def UseSenateDialog(self, senate_player, jack_player):
+  def _UseSenateDialog(self):
     lg.info('Do you wish to use your Senate?')
     choices=['Yes','No']
     index = self.choices_dialog(choices, 'Select one')
     return index == 0
 
-  def LaborerDialog(self, player, has_dock):
+  def _LaborerDialog(self, player, has_dock):
     """ Prompts for which card to get from the pool and hand for a Laborer
     action.
     """
@@ -1520,7 +1575,7 @@ class Game:
     return (card_from_pool, card_from_hand)
 
 
-  def StairwayDialog(self, player):
+  def _StairwayDialog(self, player):
     """
     Asks the player if they wish to use the Stairway and returns the 
     building to add to, the material to add, and whether to take from the pool.
@@ -1561,7 +1616,14 @@ class Game:
 
     return building, material, from_pool
 
-  def ArchitectDialog(self, player, out_of_town_allowed):
+# ArchwayAction:
+#   - StartBuilding: Site, Building
+#   - AddToBuildingFromStockpile: Building, Material
+#   - AddToBuildingFromPool: Building, Material
+#   - StairwayFromStockpile: Building, Material
+#   - StairwayFromPool: Building, Material
+
+  def _ArchitectDialog(self, player, out_of_town_allowed):
     """ Returns (building, material, site, from_pool) to be built.
 
     If the action is to be skipped, returns None, None, None
@@ -1614,7 +1676,7 @@ class Game:
     return building, material, site, from_pool
 
 
-  def CraftsmanDialog(self, player, out_of_town_allowed):
+  def _CraftsmanDialog(self, player, out_of_town_allowed):
     """ Returns (building, material, site) to be built.
     """
     building, material, site = None, None, None
@@ -1651,7 +1713,7 @@ class Game:
 
     return building, material, site
 
-  def MerchantDialog(self, player, has_atrium, has_basilica, card_limit):
+  def _MerchantDialog(self, player, has_atrium, has_basilica, card_limit):
     """ Prompts for which card to get from the pool and hand for a Laborer
     action.
 
@@ -1692,7 +1754,7 @@ class Game:
 
     return (card_from_stockpile, card_from_hand, card_from_deck)
 
-  def SelectRoleDialog(self, player, role=None, unselectable=None,
+  def _SelectRoleDialog(self, player, role=None, unselectable=None,
                        other_options=None):
     """ Selects a card or cards to be used as a role for leading or following
     from the player's hand.
@@ -1757,7 +1819,8 @@ class Game:
     card_index = self.choices_dialog(card_choices, 'Select a card', selectable)
 
     if card_index == card_choices.index('Petition'):
-      cards_selected = self.PetitionDialog(player, petition_count, unselectable)
+      client = self.get_client(player.name)
+      cards_selected = client.PetitionDialog(unselectable)
     elif card_index > len(sorted_cards):
       cards_selected = [card_choices[card_index]] # This is one of the 'other options'
     else:
@@ -1765,7 +1828,7 @@ class Game:
 
     return cards_selected
 
-  def LeadRoleDialog(self, game_state, player):
+  def _LeadRoleDialog(self, game_state, player):
     """ Players can only lead from their hands to their camp. 
     Returns a list of [<role>, <n_actions>, <card1>, <card2>, ...] where <role> is
     the role being led and the remainder of the list
@@ -1810,7 +1873,7 @@ class Game:
 
     return [role_led, n_actions] + cards_selected
 
-  def PetitionDialog(self, player, petition_count, unselectable = None):
+  def _PetitionDialog(self, player, petition_count, unselectable = None):
     """
     Returns a list of cards used to petition.
 
@@ -1870,7 +1933,7 @@ class Game:
 
     return cards_to_petition
 
-  def FollowRoleDialog(self, player, role_led):
+  def _FollowRoleDialog(self, player, role_led):
     """ Players can only lead or follow from their hands to their camp. 
     Returns a list of [<n_actions>, <card1>, <card2>, ...] where these
     are the card or cards used to follow.

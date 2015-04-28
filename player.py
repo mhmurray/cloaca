@@ -229,7 +229,9 @@ class Player:
     """ Returns a string describing a player's clientele.
     """
     roles = []
+    print 'Describe clientele:'
     for card in self.clientele:
+      print str(card)
       roles.append(card_manager.get_role_of_card(card))
     cards_string = 'Clientele : ' + get_short_zone_summary(roles)
     return cards_string
