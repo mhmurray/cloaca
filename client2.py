@@ -38,6 +38,66 @@ class Client(object):
       if p.name == self.name:
         return p
 
+  def print_selections(self, choices_list, selectable):
+    """ Prints [%d] <selection> for each element in choices_list
+    if the corresponding entry in selectable is True.
+    """
+    i_choice = 1
+    for choice, select in itertools.izip_longest(choices_list, selectable,
+                                                 fillvalue=True):
+      if select:
+        lg.info('  [{0:2d}] {1}'.format(i_choice, choice))
+        i_choice+=1
+      else:
+        lg.info('       {0}'.format(choice))
+
+  def choices_dialog(self, choices_list, 
+                     prompt='Please make a selection',
+                     selectable=None):
+    """ Returns the index in the choices_list selected by the user or
+    raises a StartOverException or a CancelDialogExeption.
+    
+    The <selectable> parameter is a list of booleans of the same
+    length as choices_list, indicating whether the item is a valid
+    selection. If None or unspecified, all items are selectable.
+    If the list is shorter than choices_list, additional True elements
+    are added to match length.
+    """
+    if selectable is None:
+      selectable = [True] * len(choices_list)
+    
+    # Match length
+    selectable += [True]*(len(choices_list) - len(selectable))
+
+    self.print_selections(choices_list, selectable)
+
+    selectable_choices = list(itertools.compress(choices_list, selectable))
+    n_valid_selections = len(selectable_choices)
+    
+    while True:
+      prompt_str = '--> {0} [1-{1}] ([q]uit, [s]tart over, [w]izard): '
+      response_str = raw_input(prompt_str.format(prompt, n_valid_selections))
+      if response_str in ['s', 'start over']: raise StartOverException
+      elif response_str in ['q', 'quit']: raise CancelDialogException
+      elif response_str in ['w', 'wizard']:
+        print ' !!! Current stack state: !!! '
+        def anon(x): print str(x)
+        map(anon, self.game.game_state.stack.stack[::-1])
+        print ' !!!                      !!! '
+
+
+      try:
+        response_int = int(response_str)
+      except:
+        lg.info('your response was {0!s}... try again'.format(response_str))
+        continue
+      if response_int <= n_valid_selections and response_int > 0:
+        # return the index in the choices_list, 0 indexed
+        index = choices_list.index(selectable_choices[response_int-1])
+        return index
+      else:
+        lg.info('Invalid selection ({0}). Please enter a number between '
+                '1 and {1}'.format(response_int, n_valid_selections))
 
   def ThinkerOrLeadDialog(self):
     """ Asks whether the player wants to think or lead at the start of their
@@ -48,7 +108,7 @@ class Client(object):
     lg.info('Start of {}\'s turn: Thinker or Lead?'.format(self.name))
 
     choices = ['Thinker', 'Lead']
-    index = self.game.choices_dialog(choices, 'Select one.')
+    index = self.choices_dialog(choices, 'Select one.')
     return index==1
 
   def UseLatrineDialog(self):
@@ -60,7 +120,7 @@ class Client(object):
     sorted_hand = sorted(self.get_player().hand)
     card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
     card_choices.insert(0, 'Skip discard')
-    index = self.game.choices_dialog(card_choices, 'Select a card to discard')
+    index = self.choices_dialog(card_choices, 'Select a card to discard')
 
     if index == 0:
       return None
@@ -75,7 +135,7 @@ class Client(object):
     lg.info('Discard hand with Vomitorium?')
 
     choices = ['Discard all', 'Skip Vomitorium']
-    index = self.game.choices_dialog(choices)
+    index = self.choices_dialog(choices)
 
     return index == 0
 
@@ -91,7 +151,7 @@ class Client(object):
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
       card_choices.insert(0,'Skip this action')
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a card to take into your clientele')
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your clientele')
       if card_index > 0:
         card_from_pool = sorted_pool[card_index-1]
 
@@ -103,7 +163,7 @@ class Client(object):
       'Performing Patron. Do you wish to take a client from the deck? (Clientele {}/{})'.format(
       str(p.get_n_clients()), str(self.game.get_clientele_limit(p))))
     choices = ['Yes','No']
-    return self.game.choices_dialog(choices) == 0
+    return self.choices_dialog(choices) == 0
 
   def PatronFromHandDialog(self):
     p = self.get_player()
@@ -117,7 +177,7 @@ class Client(object):
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
       card_choices.insert(0,'Skip this action')
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a card to take into your clientele')
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your clientele')
       if card_index > 0:
         card_from_hand = sorted_hand[card_index-1]
 
@@ -125,7 +185,7 @@ class Client(object):
 
   def UseFountainDialog(self):
     choices = ['Use Fountain, drawing from deck', 'Don\'t use Fountain, play from hand']
-    choice_index = self.game.choices_dialog(choices, 'Do you wish to use your Fountain?')
+    choice_index = self.choices_dialog(choices, 'Do you wish to use your Fountain?')
     return choice_index == 0
 
   def FountainDialog(self, card_from_deck, out_of_town_allowed):
@@ -164,19 +224,19 @@ class Client(object):
 
     choices = ['Use {} to start or add to a building'.format(card_from_deck),
                'Don\'t play card, draw and skip action instead.']
-    choice_index = self.game.choices_dialog(choices)
+    choice_index = self.choices_dialog(choices)
 
     if choice_index == 1:
       lg.info('Skipping Craftsman action and drawing card')
       return (True, None, None, None)
 
-    card_index = self.game.choices_dialog(card_choices, 'Select a building option')
+    card_index = self.choices_dialog(card_choices, 'Select a building option')
     if card_index == 0: # Starting a new building
       building = card_from_deck
 
       if building == 'Statue':
         sites = card_manager.get_all_materials()
-        site_index = self.game.choices_dialog(sites)
+        site_index = self.choices_dialog(sites)
         site = sites[site_index]
       else:
         site = card_manager.get_material_of_card(building)
@@ -194,7 +254,7 @@ class Client(object):
     sorted_hand = sorted(hand)
     card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
 
-    card_index = self.game.choices_dialog(card_choices, 
+    card_index = self.choices_dialog(card_choices, 
         'Select a card to use to demand material')
     card_from_hand = sorted_hand[card_index]
 
@@ -239,7 +299,7 @@ class Client(object):
     while not done:
       lg.info('Do you wish to use your Sewer?')
 
-      card_index = self.game.choices_dialog(choices, 'Select a card to take into your stockpile')
+      card_index = self.choices_dialog(choices, 'Select a card to take into your stockpile')
       if card_index == 0:
         cards_to_move.extend(choices[2:])
       elif card_index > 1:
@@ -252,7 +312,7 @@ class Client(object):
   def UseSenateDialog(self):
     lg.info('Do you wish to use your Senate?')
     choices=['Yes','No']
-    index = self.game.choices_dialog(choices, 'Select one')
+    index = self.choices_dialog(choices, 'Select one')
     return index == 0
 
   def LaborerDialog(self):
@@ -270,7 +330,7 @@ class Client(object):
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
       card_choices.insert(0,'Skip this action')
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a card to take into your stockpile')
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your stockpile')
       if card_index > 0:
         card_from_pool = sorted_pool[card_index-1]
 
@@ -301,7 +361,7 @@ class Client(object):
     building_names = [pl.name + '\'s ' + str(b) for (pl,b) in possible_buildings]
     choices = sorted(building_names)
     choices.insert(0, 'Don\'t use Stairway')
-    choice_index = self.game.choices_dialog(choices, 'Select option for Stairway')
+    choice_index = self.choices_dialog(choices, 'Select option for Stairway')
     
     building, material, from_pool = None, None, False
     if choice_index != 0:
@@ -318,7 +378,7 @@ class Client(object):
         pool_choices = ['[POOL]' + gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
         card_choices.extend(pool_choices)
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a material to add')
+      card_index = self.choices_dialog(card_choices, 'Select a material to add')
 
       if card_index >= len(sorted_stockpile):
         from_pool = True
@@ -341,18 +401,18 @@ class Client(object):
     card_choices.insert(0, 'Start a new buidling')
     card_choices.insert(0, 'Skip action')
 
-    card_index = self.game.choices_dialog(card_choices, 'Select a building option')
+    card_index = self.choices_dialog(card_choices, 'Select a building option')
     if card_index == 1: # Starting a new building
       sorted_hand = sorted(p.hand)
       lg.info('Choose a building to start from your hand:')
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a building to start')
+      card_index = self.choices_dialog(card_choices, 'Select a building to start')
       building = sorted_hand[card_index]
 
       if building == 'Statue':
         sites = card_manager.get_all_materials()
-        site_index = self.game.choices_dialog(sites)
+        site_index = self.choices_dialog(sites)
         site = sites[site_index]
       else:
         site = card_manager.get_material_of_card(building)
@@ -371,7 +431,7 @@ class Client(object):
         pool_choices = ['[POOL]' + gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
         card_choices.extend(pool_choices)
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a material to add')
+      card_index = self.choices_dialog(card_choices, 'Select a material to add')
 
       if card_index >= len(sorted_stockpile):
         from_pool = True
@@ -391,18 +451,18 @@ class Client(object):
     card_choices = p.get_incomplete_building_names()
     card_choices.insert(0, 'Start a new buidling')
 
-    card_index = self.game.choices_dialog(card_choices, 'Select a building option')
+    card_index = self.choices_dialog(card_choices, 'Select a building option')
     if card_index == 0: # Starting a new building
       sorted_hand = sorted(p.hand)
       lg.info('Choose a building to start from your hand:')
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a building to start')
+      card_index = self.choices_dialog(card_choices, 'Select a building to start')
       building = sorted_hand[card_index]
 
       if building == 'Statue':
         sites = card_manager.get_all_materials()
-        site_index = self.game.choices_dialog(sites)
+        site_index = self.choices_dialog(sites)
         site = sites[site_index]
       else:
         site = card_manager.get_material_of_card(building)
@@ -414,7 +474,7 @@ class Client(object):
       lg.info('Choose a material to add from your hand:')
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a material to add')
+      card_index = self.choices_dialog(card_choices, 'Select a material to add')
       material = sorted_hand[card_index]
 
     return building, material, site
@@ -450,7 +510,7 @@ class Client(object):
       card_choices.insert(0,'Skip this action')
       card_choices.insert(1,'Take card from top of deck')
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a card to take into your vault')
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
       if card_index == 1:
         card_from_deck = True
         card_limit -= 1 
@@ -464,7 +524,7 @@ class Client(object):
       card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
       card_choices.insert(0,'Skip this action')
 
-      card_index = self.game.choices_dialog(card_choices, 'Select a card to take into your vault')
+      card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
       if card_index > 0:
         card_from_hand = sorted_hand[card_index-1]
 
@@ -533,7 +593,7 @@ class Client(object):
     if other_options:
       card_choices.extend(other_options)
 
-    card_index = self.game.choices_dialog(card_choices, 'Select a card', selectable)
+    card_index = self.choices_dialog(card_choices, 'Select a card', selectable)
 
     if card_index == card_choices.index('Petition'):
       cards_selected = self.PetitionDialog(unselectable)
@@ -567,7 +627,7 @@ class Client(object):
     cards_selected = self.SelectRoleDialog()
 
     if(len(cards_selected) > 1 or cards_selected[0] == 'Jack'):
-      role_index = self.game.choices_dialog(
+      role_index = self.choices_dialog(
         card_manager.get_all_roles(), 'Select a role for Jack (or Petition)')
       role_led = card_manager.get_all_roles()[role_index]
     else:
@@ -644,7 +704,7 @@ class Client(object):
     # Get first petition card, then filter out the roles that don't match
     for i in range(0, petition_count):
       selectable = get_allowed_cards(petition_cards, the_petition_role, cards_to_petition, unselectable)
-      card_index = self.game.choices_dialog(petition_cards, 
+      card_index = self.choices_dialog(petition_cards, 
         "Select {0:d} cards to use for petition".format(petition_count - len(cards_to_petition)),
         selectable)
       cards_to_petition.append(petition_cards[card_index])
