@@ -351,9 +351,6 @@ class Game(object):
 
     return card_pts + bonus_pts
 
-    
-
-
 
   def get_clientele_limit(self, player):
     has_insula = self.player_has_active_building(player, 'Insula')
@@ -424,20 +421,6 @@ class Game(object):
     self.expected_action = message.THINKERORLEAD
     return
 
-
-  def _thinker_or_lead(self, player):
-    client = self.get_client(player.name)
-    lead_role = client.ThinkerOrLeadDialog()
-    if lead_role:
-      # my_list[::-1] reverses the list
-      for p in self.game_state.get_players_in_turn_order()[::-1]:
-        self.game_state.stack.push_frame("perform_role_being_led", p)
-      for p in self.game_state.get_following_players_in_order()[::-1]:
-        self.game_state.stack.push_frame("follow_role_action", p)
-      self.game_state.stack.push_frame("lead_role_action", player)
-
-    else:
-      self.game_state.stack.push_frame("perform_thinker_action", player)
 
   def process_stack_frame(self):
     if self.game_state.stack.stack:
@@ -611,51 +594,6 @@ class Game(object):
     self.pump()
 
 
-  def _perform_thinker_action(self, player, skip_allowed=False):
-    """
-    1) If player has a Vomitorium, ask for discard.
-    2) If player has a Latrine, and didn't use Vomitorium,
-       ask for discard.
-    3) Determine # cards that would be drawn. Check hand size,
-       Temple, and Shrine. Also check if jacks are empty,
-       and if drawing cards would end the game.
-    3) Ask player for thinker type (jack or # cards)
-    4) Draw cards for player.
-    """
-    client = self.get_client(player.name)
-    if self.player_has_active_building(player, 'Vomitorium'):
-      should_discard_all = client.UseVomitoriumDialog()
-    else: should_discard_all = False
-
-    if not should_discard_all and self.player_has_active_building(player, 'Latrine'):
-      building = player.get_building('Latrine')
-      latrine_card = client.UseLatrineDialog()
-    else: latrine_card = None
-
-    if latrine_card:
-      self.game_state.discard_for_player(player, latrine_card)
-
-    if should_discard_all:
-      self.game_state.discard_all_for_player(player)
-    
-    client = self.get_client(player.name)
-    for_jack, skip = client.ThinkerTypeDialog()
-    # True for Jack, False for Orders cards
-    if skip:
-      if skip_allowed:
-        return
-      else:
-        lg.warn('Skipping Thinker not allowed, drawing Jack.')
-        self.game_state.draw_one_jack_for_player(player)
-    else:
-      if for_jack == True:
-        self.game_state.draw_one_jack_for_player(player)
-      else:
-        self.game_state.thinker_for_cards(player, self.get_max_hand_size(player))
-        if len(self.game_state.library) == 0:
-          lg.info('The last Orders card has been drawn, Game Over.')
-          end_game()
-
   def lead_role_action(self):
     """ Entry point for the lead role stack frame.
     """
@@ -676,27 +614,6 @@ class Game(object):
     self.pump()
 
 
-  def _lead_role_action(self, leading_player):
-    """
-    1) Ask for cards used to lead
-    2) Check legal leads using these cards (Palace, petition)
-    3) Ask for role clarification if necessary
-    4) Move cards to camp, set this turn's role that was led.
-    """
-    # This dialog checks that the cards used are legal
-    client = self.get_client(leading_player.name)
-    resp = client.LeadRoleDialog()
-    role = resp[0]
-    n_actions_total = resp[1]
-    cards = resp[2:]
-    self.game_state.role_led = role
-    for c in cards:
-      gtrutils.move_card(c, leading_player.hand, leading_player.camp)
-      #leading_player.camp.append(leading_player.get_card_from_hand(c))
-    leading_player.n_camp_actions = n_actions_total
-    return role
-
-  
   def follow_role_action(self, player):
     self.game_state.active_player = player
     self.expected_action = message.FOLLOWROLE
@@ -717,26 +634,6 @@ class Game(object):
         gtrutils.move_card(c, p.hand, p.camp)
 
     self.pump()
-
-
-  def _follow_role_action(self, following_player, role=None):
-    """
-    1) Ask for cards used to follow
-    2) Check for ambiguity in ways to follow (Crane, Palace, petition)
-    3) Ask for clarification if necessary
-    4) Move cards to camp
-    """
-    client = self.get_client(following_player.name)
-    response = client.FollowRoleDialog()
-    # response could be None for thinker or [n_actions, card1, card2, ...]
-    # for a role followed using petition, palace, etc.
-    if response is None:
-      print 'Follow role response is ' + str(response)
-      self.game_state.stack.push_frame("perform_thinker_action", following_player)
-    else:
-      following_player.n_camp_actions = response[0]
-      for c in response[1:]:
-        following_player.camp.append(following_player.get_card_from_hand(c))
 
 
   def perform_role_being_led(self, player):
@@ -793,177 +690,6 @@ class Game(object):
     self.pump()
 
 
-  def _perform_role_being_led(self, player):
-    """
-    This is the main part of a player's turn. It figures how many actions
-    the player gets from leading or following with a card (or cards).
-    It then figures out how many clients get to perform their actions and
-    activates them in turn. If the number of clients changes, it must be
-    tracked here (eg. the first client finishes a Ludus Magna).
-    1) Determine if the player gets to perform multiple actions (Palace)
-    2) If the role is architect or craftsman, if the player is going
-       to get multiples (Palace, clietele) or the have a Tower, set
-       out_of_town_allowed=true
-    3) While the player has actions {-->ACTION(perform_<role>_action)}
-    4) Check how many clientele the player has (Stockpile, Ludus Magna).
-    5) While the player has clientele actions { -->ACTION(perform_clientele_action) }
-       Have to forward out_of_town_allowed.
-    """
-    # The clients are simple for Laborer, Merchant, and Legionary.
-    # We can calculate how many actions you get before doing any of them.
-    # Before all of them do the role that was led or followed
-    role = self.game_state.role_led
-    lg.info('Player {} is performing {}'.format(player.name, role))
-    if role in ['Laborer', 'Merchant', 'Legionary']:
-      has_cm = self.player_has_active_building(player, 'Circus Maximus')
-
-      n_actions = player.get_n_clients(role, self.get_active_building_names(player))
-
-      if player.is_following_or_leading():
-        for i in range(player.n_camp_actions):
-          self.perform_role_action(player, role)
-        if has_cm : n_actions *= 2
-
-      for i in range(n_actions):
-        self.perform_clientele_action(player, role)
-
-
-    # For Patron, anything is possible, since the Bath lets the player
-    # perform arbitrary actions between Patron actions
-    # For Craftsman and Architect, similarly, arbitrary things can happen
-    # between actions as buildings are completed. Additionally, we need
-    # to keep track of whether we have 2 Cra/Arch actions that can be used
-    # to start a building out-of-town.
-    # 
-    # Things that can change the calculation of how many actions a player gets:
-    #   1) Building a Circus Maximus - doubles unused clients
-    #   2) Building a Ludus Magna - activates Merchant clients for other roles
-    #
-    # However note that clients that are new this turn *don't* get to perform
-    # the action, regardless of how they were acquired.
-    #
-    # To handle this, we lock in the number of Patron and Merchant clients
-    # at the beginning. Then we do all the real Patron-card client activations.
-    # At that point we can check if there's a Ludus Magna, in which case we
-    # do all the Merchant-card Patron actions.
-    if role == 'Patron':
-      n_patron = player.get_n_client_cards_of_role('Patron')
-      n_merchant = player.get_n_client_cards_of_role('Merchant')
-
-      if player.is_following_or_leading():
-        # We can do extra palace actions successively, since
-        # the number of them can't be changed.
-        for i in range(player.n_camp_actions):
-          self.perform_patron_action(player)
-      
-      patrons_used=0
-      merchants_used=0
-
-      while patrons_used < n_patron:
-        self.perform_clientele_action(player, 'Patron')
-        patrons_used += 1
-
-      # Now if the player has build a Ludus Magna somehow, use the Merchants
-      if self.player_has_active_building(player, 'Ludus Magna'):
-        while merchants_used < n_merchant:
-          self.perform_clientele_action(player, 'Patron')
-          merchants_used += 1
-
-
-    # Craftsman is similar to Patron, except that we need to check whether
-    # we're allowed to out-of-town each action as we do it.
-    # For the led role, we just check if there are any clients.
-    # For the clients, we check if there are Craftsman yet to be used
-    # then for the last guy, if there's a LM and a Merchant client.
-    # If there's a CM, these checks only apply to the second action for
-    # each client, since the first is always allowed to out-of-town.
-    #
-    # For the tower, we can always out-of-town, and used_oot should be
-    # reset to zero after every call to perform_clientele_action()
-    #
-    # The same logic applies for architects, so we can combine the two.
-    
-    if role in ['Craftsman', 'Architect']:
-      n_clients = player.get_n_client_cards_of_role(role)
-      n_merchant = player.get_n_client_cards_of_role('Merchant')
-
-      has_lm = self.player_has_active_building(player, 'Ludus Magna')
-      has_tower = self.player_has_active_building(player, 'Tower')
-      
-      self.game_state.used_oot = False
-      if player.is_following_or_leading():
-        for i in range(player.n_camp_actions):
-          if self.game_state.used_oot:
-            self.game_state.used_oot = False
-          else:
-            self.game_state.oot_allowed = \
-                      n_clients>0 or (i<player.n_camp_actions-1) or \
-                      (has_lm and n_merchant > 0) or has_tower
-            self.perform_role_action(player, role) # Sets GameState.used_oot
-            if has_tower: self.game_state.used_oot = False
-
-      clients_used = 0
-      merchants_used = 0
-
-      def check_merchants():
-        has_lm = self.player_has_active_building(player, 'Ludus Magna')
-        has_merchant = (n_merchant-merchants_used > 0)
-        return has_lm and has_merchant
-
-      while clients_used < n_clients:
-        has_tower = self.player_has_active_building(player, 'Tower')
-        self.game_state.oot_allowed = (n_clients - clients_used) > 1 or check_merchants() or has_tower
-        self.perform_clientele_action(player, role)
-        if has_tower: self.game_state.used_oot = False
-
-        clients_used += 1
-
-      while check_merchants():
-        has_tower = self.player_has_active_building(player, 'Tower')
-        self.game_state.oot_allowed = (n_merchant - merchants_used) > 1
-        self.perform_clientele_action(player, role)
-        if has_tower: self.game_state.used_oot = False
-
-        merchants_used += 1
-
-
-  def _perform_clientele_action(self, player, role):
-    """
-    This function will activate one client. It makes two actions 
-    if the player has a Circus Maximus. This function doesn't keep track
-    of which clients have been used.
-    1) -->ACTION(perform_<role>_action), forwarding out_of_town_allowed to architect/craftsman
-    2) If the player has a Circus Maximus, do it again
-
-    If out_of_town_allowed is True, there's another action after this one, so out_of_town_allowed
-    is true for the last action we do here.
-
-    We have to get the out_of_town_used input because this function handles the
-    doubling by Circus Maximus, which means only the first of the doublet should
-    be skipped due to out-of-town.
-    
-    We need to know if the last of the (possibly two) actions we do here is allowed
-    to be out-of-town, so we take this input boolean as out_of_town_allowed. Of course,
-    if we're doubling due to Circus Maximus, the first of this double is always
-    allowed to out-of-town.
-
-    Returns nothing.
-    """
-    has_tower = self.player_has_active_building(player, 'Tower')
-    if self.player_has_active_building(player, 'Circus Maximus'):
-      if self.game_state.used_oot:
-        self.game_state.used_oot = False
-      else:
-        self.game_state.oot_allowed = True
-        self.perform_role_action(player, role) # sets GameState.used_oot
-        if has_tower: used_oot = False # unsets if we have a Tower
-
-    if self.game_state.used_oot:
-      self.game_state.used_oot = False
-    else:
-      self.perform_role_action(player, role) # sets GameState.used_oot
-      if has_tower: used_oot = False # unsets if we have a Tower
-
   def perform_role_action(self, player, role):
     """ Multiplexer function for arbitrary roles. 
 
@@ -1014,28 +740,6 @@ class Game(object):
 
     self.pump()
 
-
-  def _perform_laborer_action(self, player):
-    """
-    1) Ask for which card from the pool
-    2) Move card from pool
-    3) Check for Dock and ask for card from hand
-    4) Move card from hand
-    """
-    has_dock = self.player_has_active_building(player, 'Dock')
-    
-    c = self.get_client(player.name)
-    card_from_pool, card_from_hand = c.LaborerDialog()
-
-    if card_from_hand and not has_dock:
-      raise Exception('Illegal laborer from hand without Dock.')
-
-    if card_from_pool:
-      gtrutils.add_card_to_zone(
-        gtrutils.get_card_from_zone(card_from_pool,self.game_state.pool),player.stockpile)
-    if card_from_hand:
-      gtrutils.add_card_to_zone(
-        gtrutils.get_card_from_zone(card_from_hand,player.hand),player.stockpile)
 
   def perform_patron_action(self, player):
     has_bar = self.player_has_active_building(player, 'Bar')
@@ -1134,49 +838,6 @@ class Game(object):
     self.pump()
 
  
-  def _perform_patron_action(self, player):
-    """
-    1) Abort if clientele full (Insula, Aqueduct)
-    2) Ask for which card from pool
-    3) Check for Bar and Aqueduct and 
-    """
-    # Bar, Aqueduct, Bath matter.
-    # We don't have to check for these between each sub-action because it's not
-    # possible for the state of buildings to change unless you've already built
-    # a Bath. Also, building Bar after your patron from the pool doesn't let
-    # you use the from-the-deck option.
-    has_bar = self.player_has_active_building(player, 'Bar')
-    has_aqueduct = self.player_has_active_building(player, 'Aqueduct')
-    has_bath = self.player_has_active_building(player, 'Bath')
-
-    client = self.get_client(player.name)
-
-    if self.get_clientele_limit(player) - player.get_n_clients() > 0:
-      card_from_pool = client.PatronFromPoolDialog()
-      if card_from_pool:
-        gtrutils.move_card(card_from_pool, self.game_state.pool, player.clientele)
-        if has_bath:
-          self.perform_role_action(player, card_manager.get_role_of_card(card_from_pool), False)
-
-    client = self.get_client(player.name) # Do this to update client game state.
-
-    if has_bar and self.get_clientele_limit(player) - player.get_n_clients() > 0:
-      card_from_deck = client.PatronFromDeckDialog()
-      if card_from_deck:
-        card = self.game_state.draw_cards(1)[0]
-        gtrutils.add_card_to_zone(card, player.clientele)
-        if has_bath:
-          self.perform_role_action(player, card_manager.get_role_of_card(card), False)
-
-    client = self.get_client(player.name) # Do this to update client game state.
-
-    if has_aqueduct and self.get_clientele_limit(player) - player.get_n_clients() > 0:
-      card_from_hand = client.PatronFromHandDialog()
-      if card_from_hand:
-        gtrutils.move_card(card_from_hand, player.hand, player.clientele)
-        if has_bath:
-          self.perform_role_action(player, card_manager.get_role_of_card(card_from_hand), False)
-
   def check_building_start_legal(self, player, building, site):
     """ Checks if starting this building is legal. Accounts for Statue.
 
@@ -1396,99 +1057,6 @@ class Game(object):
     self.pump()
 
 
-  def _perform_craftsman_action(self, player):
-    """
-    Buildings that matter : Fountain, Tower, Road, Scriptorium.
-    Also special case for Statue.
-
-    Returns whether or not the out of town site was used.
-    """
-    # Buildings that matter:
-    has_fountain = self.player_has_active_building(player, 'Fountain')
-    has_tower = self.player_has_active_building(player, 'Tower')
-    has_road = self.player_has_active_building(player, 'Road')
-    has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
-
-    self.game_state.used_oot = False
-    foundation, material, site = (None, None, None)
-
-    client = self.get_client(player.name)
-
-    # Use fountain?
-    if has_fountain and client.UseFountainDialog():
-      player.fountain_card = self.game_state.draw_cards(1)[0]
-
-      client = self.get_client(player.name)
-
-      skip_action, foundation, material, site = client.FountainDialog()
-
-      # Put the fountain card in hand, so that the craftsman code below
-      # can treat the "use fountain" case the same as "don't use fountain".
-      player.add_cards_to_hand([player.fountain_card])
-      player.fountain_card = None
-
-      if skip_action:
-        # The card is already in the player's hand
-        return
-
-    else:
-      client = self.get_client(player.name)
-      (foundation, material, site) = client.CraftsmanDialog()
-
-    starting_new_building = site is not None
-    already_owned = player.owns_building(foundation)
-    start_okay = False if not site else \
-      self.check_building_start_legal(player, foundation, site)
-    add_okay = False if not material else \
-      self.check_building_add_legal(player, foundation, material)
-    if starting_new_building and already_owned:
-      lg.warn(
-        'Illegal build. {} is already owned by {} and cannot be started'
-        .format(foundation, player.name))
-
-    elif starting_new_building and start_okay and not already_owned:
-      b = Building()
-      b.foundation = gtrutils.get_card_from_zone(foundation, player.hand)
-      if site in self.game_state.in_town_foundations:
-        b.site = gtrutils.get_card_from_zone(site, self.game_state.in_town_foundations)
-      elif self.game_state.oot_allowed and site in self.game_state.out_of_town_foundations:
-        b.site = gtrutils.get_card_from_zone(site, self.game_state.out_of_town_foundations)
-        self.game_state.used_oot = True
-      elif not self.game_state.oot_allowed and site in self.game_state.out_of_town_foundations:
-        lg.warn(
-            'Illegal build, not enough actions to build on out of town {} site'.format(site))
-        return
-      else:
-        lg.warn('Illegal build, site {} does not exist in- or out-of-town'.format(site))
-        return
-      player.buildings.append(b)
-
-    elif not starting_new_building and player.get_building(foundation).is_completed():
-      lg.warn(
-        'Illegal build. {} is already completed'.format(foundation))
-
-    elif not starting_new_building and add_okay:
-      b = player.get_building(foundation)
-      gtrutils.move_card(material, player.hand, b.materials)
-      completed = False
-      if has_scriptorium and card_manager.get_material_of_card(material) == 'Marble':
-        lg.info('Player {} completed building {} using Scriptorium'.format(
-          player.name, str(b)))
-        completed = True
-      elif len(b.materials) == card_manager.get_value_of_material(b.site):
-        lg.info('Player {} completed building {}'.format(player.name, str(b)))
-        completed = True
-
-      if completed:
-        b.completed = True
-        gtrutils.add_card_to_zone(b.site, player.influence)
-        self.resolve_building(player, foundation)
-
-    else:
-      lg.warn('Illegal craftsman, building={}, site={}, material={}'.format(
-                   foundation, site, material))
-      return
-
   def perform_legionary_action(self, player):
     """ Legionary actions are processed all at once. For example, if
     you have 2 Legionary clients and are leading Legionary, you reveal
@@ -1648,115 +1216,6 @@ class Game(object):
             break
 
 
-  def _perform_architect_action(self, player):
-    """
-    Performs ArchitectDialog, then StairwayDialog if the player
-    has an active stairway.
-
-    out_of_town_allowed is indicated by the caller if this architect would
-    be stacked up with another, so that an out-of-town site may be used.
-    In that case, this will return an indication and the caller can nix the
-    next architect action.
-    1) Ask for building to start or material to add. (Archway, Stairway)
-    2) If out_of_town_allowed is false, don't allow out of town, otherwise
-       start the out-of-town site and return the indicator.
-    3) Check legality of material, building + site.
-    4) Place material or building -->ACTION(place_material) -->ACTION(start_building)
-
-    Returns whether or not the out of town site was used.
-
-    Buildings that matter : Archway, Tower, Road, Scriptorium, Villa, Stairway
-    Also special case for Statue.
-
-    Returns whether or not the out of town site was used.
-    """
-    # Buildings that matter:
-    has_archway = self.player_has_active_building(player, 'Archway')
-    has_tower = self.player_has_active_building(player, 'Tower')
-    has_road = self.player_has_active_building(player, 'Road')
-    has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
-    has_stairway = self.player_has_active_building(player, 'Stairway')
-
-    building, material, site = (None, None, None)
-
-    client = self.get_client(player.name)
-    (building, material, site, from_pool) = client.ArchitectDialog()
-
-    self.game_state.used_oot = False
-
-    if building is None and site is None and material is None:
-      lg.info('Skipped architect action.')
-    else:
-      starting_new_building = site is not None
-      already_owned = player.owns_building(building)
-      start_okay = False if not site else \
-        self.check_building_start_legal(player, building, site)
-      add_okay = False if not material else \
-        self.check_building_add_legal(player, building, material)
-
-      if starting_new_building and already_owned:
-        lg.warn(
-          'Illegal build. {} is already owned by {} and cannot be started'
-          .format(building, player.name))
-
-      elif starting_new_building and start_okay and not already_owned:
-        b = Building()
-        b.foundation = gtrutils.get_card_from_zone(building, player.hand)
-        if site in self.game_state.in_town_foundations:
-          b.site = gtrutils.get_card_from_zone(site, self.game_state.in_town_foundations)
-        elif site in self.game_state.out_of_town_foundations:
-          b.site = gtrutils.get_card_from_zone(site, self.game_state.out_of_town_foundations)
-          self.game_state.used_oot = True
-        else:
-          lg.warn('Illegal build, site {} does not exist in- or out-of-town'.format(site))
-          return
-        player.buildings.append(b)
-
-      elif not starting_new_building and player.get_building(building).is_completed():
-        lg.warn(
-          'Illegal build. {} is already completed'.format(building))
-
-      elif not starting_new_building and add_okay:
-        b = player.get_building(building)
-        material_zone = self.game_state.pool if from_pool else player.stockpile
-        gtrutils.move_card(material, material_zone, b.materials)
-        completed = False
-        if has_scriptorium and card_manager.get_material_of_card(material) == 'Marble':
-          lg.info('Player {} completed building {} using Scriptorium'.format(
-            player.name, building,foundation))
-          completed = True
-        elif building == 'Villa':
-          lg.info(
-            'Player {} completed Villa with one material using Architect'.format(player.name))
-          completed = True
-        elif len(b.materials) == card_manager.get_value_of_material(b.site):
-          lg.info('Player {} completed building {}'.format(player.name, str(b)))
-          completed = True
-
-        if completed:
-          b.completed = True
-          gtrutils.add_card_to_zone(b.site, player.influence)
-          self.resolve_building(player, building)
-
-      else:
-        lg.warn('Illegal Architect, building={}, site={}, material={}'.format(
-                     building, site, material))
-        lg.warn('  add_okay='+str(add_okay)+'  start_okay='+str(start_okay))
-
-    if has_stairway:
-      client = self.get_client(player.name)
-      player_name, building_name, material, from_pool = client.StairwayDialog()
-      if player_name is not None and building_name is not None and material is not None:
-        other_player = self.game_state.find_player(player_name)
-        b = other_player.get_building(building_name)
-        material_zone = self.game_state.pool if from_pool else player.stockpile
-        lg.info(
-          'Player {0} used Stairway to add a material to player {1}\'s {2}, '
-          .format( player.name, other_player.name, str(b)) +
-          'activating its function for all players')
-        gtrutils.move_card(material, material_zone, building.stairway_materials)
-
-
   def perform_merchant_action(self, player):
     self.game_state.active_player = player
     self.expected_action = message.MERCHANT
@@ -1779,41 +1238,6 @@ class Game(object):
     self.pump()
 
 
-  def _perform_merchant_action(self, player):
-    """
-    Do we log materials? We should in case the display messes up,
-    but maybe only until end of turn.
-    1) Abort if vault full. Also between each step here. (Market)
-    2) Ask player to select material from Stockpile. Reveal and place in vault.
-    3) If Basilica, ask player to select from hand. No reveal and vault.
-    4) If Atrium, ask player to select top of deck. No reveal and vault.
-    """
-    vault_limit = player.get_influence_points()
-    if self.player_has_active_building(player, 'Market'): card_limit += 2
-
-    card_limit = vault_limit - len(player.vault)
-
-    has_atrium = self.player_has_active_building(player, 'Atrium')
-    has_basilica = self.player_has_active_building(player, 'Basilica')
-
-    merchant_allowed = (card_limit>0) \
-      and (has_atrium or len(player.stockpile)>0 or (has_basilica and len(player.hand)>0))
-
-    if merchant_allowed:
-      client = self.get_client(player.name)
-      # card_from_deck is a boolean. The others are actual card names.
-      card_from_stockpile, card_from_hand, card_from_deck = client.MerchantDialog()
-
-      if card_from_stockpile:
-        gtrutils.add_card_to_zone(
-          gtrutils.get_card_from_zone(card_from_stockpile, player.stockpile), player.vault)
-      if card_from_hand:
-        gtrutils.add_card_to_zone(
-          gtrutils.get_card_from_zone(card_from_hand, player.hand), player.vault)
-      if card_from_deck:
-        gtrutils.add_card_to_zone(self.game_state.draw_cards(1)[0], player.vault)
-
-  
   def kids_in_pool(self):
     """ Place cards in camp into the pool.
     1) If Sewer, ask to move cards into stockpile.
@@ -1890,41 +1314,6 @@ class Game(object):
       self.do_kids_in_pool(self.game_state.players[kip_next])
 
   
-  def _kids_in_pool(self, player):
-    """
-    Place cards in camp into the pool.
-    1) If Sewer, ask to move cards into stockpile.
-    2) If dropping a Jack, ask players_with_senate in order.
-    """
-    lg.info('\n ==== KIDS IN POOL ====\n')
-    print 'Players in turn order ' + str(self.game_state.get_players_in_turn_order())
-    for player in self.game_state.get_players_in_turn_order():
-      other_players_in_order = self.game_state.get_players_in_turn_order(player)
-      other_players_in_order.pop(0)
-
-      players_with_senate = [p for p in other_players_in_order 
-                             if self.player_has_active_building(p, 'Senate')]
-      
-      has_sewer = self.player_has_active_building(player, 'Sewer') 
-      if has_sewer:
-        client = self.get_client(player.name)
-        cards = client.UseSewerDialog()
-        for card in cards:
-          gtrutils.move_card(card, player.camp, player.stockpile)
-
-      print('Camp = ' + str(player.camp))
-      for card in player.camp:
-        if card is 'Jack':
-          for senate_player in players_with_senate:
-            client = self.get_client(senate_player.name)
-            if client.UseSenateDialog():
-              gtrutils.move_card(card, player.camp, senate_player.hand)
-              break
-        else:
-          lg.info('Moving card {} from camp to pool'.format(card))
-          gtrutils.move_card(card, player.camp, self.game_state.pool)
-
-
   def end_turn(self):
     # players in reverse order
     players = self.game_state.get_players_in_turn_order()[::-1]
@@ -1947,23 +1336,6 @@ class Game(object):
 
     self.pump()
 
-
-  def _end_turn(self, player):
-    """
-    Ask for Academy thinker. Need to figure out whether or not Senate goes first.
-    1) Find players_with_senate
-    2) --> kids_in_pool(player)
-    """
-    self.kids_in_pool(player)
-    has_academy = self.player_has_active_building(player, 'Academy') 
-
-    if has_academy and player.performed_craftsman:
-      self.perform_optional_thinker_action(player)
-    
-    player.performed_craftsman = False
-    player.n_camp_actions = 0
-
-    self.pump()
 
   def end_game(self):
     """ The game is over. This determines a winner.
