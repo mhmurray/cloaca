@@ -83,7 +83,7 @@ class TestHandleThinker(unittest.TestCase):
         self.assertEqual(len(self.p1.hand), 6)
         self.assertTrue('Jack' in self.p1.hand)
 
-    def test_thinker_for_four_cards(self):
+    def test_thinker_for_four_cards_with_one_orders(self):
         """ Thinker for cards with 1 card in hand should draw 4.
         Test with initial card being a Jack or Latrine
         """
@@ -94,6 +94,10 @@ class TestHandleThinker(unittest.TestCase):
 
         self.assertEqual(len(self.p1.hand), 5)
 
+    def test_thinker_for_four_cards_with_one_jack(self):
+        """ Thinker for cards with 1 card in hand should draw 4.
+        Test with initial card being a Jack or Latrine
+        """
         self.p1.hand = ['Jack']
 
         a = message.GameAction(message.THINKERTYPE, False)

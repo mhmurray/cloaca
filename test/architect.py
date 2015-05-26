@@ -15,7 +15,7 @@ import unittest
 import logging
 import sys
 
-if 1:
+if 0:
     lg = logging.getLogger('gtr')
     formatter = logging.Formatter('%(message)s')
     ch = logging.StreamHandler(sys.stdout)
