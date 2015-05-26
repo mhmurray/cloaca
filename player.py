@@ -33,6 +33,7 @@ class Player:
     self.clientele = clientele if clientele is not None else []
     self.vault = vault if vault is not None else []
     self.camp = camp if camp is not None else []
+    self.fountain_card = None
     self.n_camp_actions = 0
     self.buildings = buildings if buildings is not None else []
     self.influence = influence if influence is not None else []

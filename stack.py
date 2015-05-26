@@ -5,12 +5,18 @@ class Stack(object):
     def push_frame(self, function_name, *args):
         self.stack.append(Frame(function_name, *args))
 
+    def __str__(self):
+        return str(self.stack)
+
+
 class Frame(object):
-    def __init__(self, function_name, *entry_args):
+    def __init__(self, function_name, *args):
         self.function_name = function_name
-        self.entry_args = entry_args
+        self.args = args
         self.executed = False
 
     def __str__(self):
-        return 'Frame({0})'.format(self.name)
+        return 'Frame({0})'.format(self.function_name)
 
+    def __repr__(self):
+        return 'Frame({0}, {1})'.format(self.function_name, self.args)

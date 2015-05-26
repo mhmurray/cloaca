@@ -79,4 +79,4 @@ class Building:
         """ Adds the material to the building materials. Does not
         check legality.
         """
-        materials.append(card)
+        self.materials.append(card)

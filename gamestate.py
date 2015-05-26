@@ -36,6 +36,7 @@ class GameState:
     self.do_respond_to_legionary = False
     self.is_role_led = False
     self.role_led = None
+    self.active_player = None
     self.priority_index = None
     self.turn_index = 0
     self.jack_pile = jack_pile or []
@@ -44,9 +45,16 @@ class GameState:
     self.exchange_area = exchange_area or []
     self.in_town_foundations = in_town_foundations or []
     self.out_of_town_foundations = out_of_town_foundations or []
+    self.oot_allowed = False
+    self.used_oot = False
     self.is_started = False
     self.time_stamp = time_stamp
     self.stack = my_stack if my_stack else stack.Stack()
+    self.legionary_count = 0
+    self.legionary_index = 0
+    self.legionary_resp_indices = []
+    self.kip_index = 0
+    self.senate_resp_indices = []
 
   def __repr__(self):
     rep = ('GameState(players={players!r}, leader={leader!r}, '
@@ -96,6 +104,9 @@ class GameState:
   def get_n_players(self):
       return len(self.players)
 
+  def get_current_player(self):
+      return self.players[self.leader_index]
+
   def get_following_players_in_order(self):
       """ Returns a list of players in turn order starting with
       the next player after the leader, and ending with the player
@@ -109,8 +120,16 @@ class GameState:
       """ Returns a list of players in turn order 
       starting with start_player or the leader it's None.
       """
-      n = start_player or self.leader_index
+      n = self.players.index(start_player) if start_player else self.turn_index
       return self.players[n:] + self.players[:n]
+
+  def get_player_indices_in_turn_order(self, start_player=None):
+      """ Returns a list of player indices in turn order 
+      starting with start_player or the leader it's None.
+      """
+      n = self.players.index(start_player) if start_player else self.turn_index
+      r = range(len(self.players))
+      return r[n:] + r[:n]
 
   def thinker_fillup_for_player(self, player, max_hand_size):
     n_cards = max_hand_size - len(player.hand)
@@ -159,6 +178,11 @@ class GameState:
       self.players.append(Player(player_name))
       player_index = len(self.players) - 1
     return player_index
+
+  def find_player(self, name):
+    """ Gets the Player object corresponding to the specified player name.
+    """
+    return filter(lambda x: x.name==name, self.players)[0]
   
   def init_player(self, player):
     player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
@@ -172,9 +196,6 @@ class GameState:
   def testing_init_player(self, player):
     player.add_cards_to_hand([self.draw_jack()]) # takes a list of cards
     self.thinker_fillup_for_player(player, 5)
-    player.buildings.append(Building('Palace','Marble', ['Forum'],[],True))
-    player.buildings.append(Building('Latrine','Rubble', [],[],False))
-    player.buildings.append(Building('Catacomb','Stone',['Villa','Villa']))
     player.stockpile.extend(['Forum','Insula','Catacomb','Foundry','Circus','Storeroom'])
 
   def testing_init_players(self):

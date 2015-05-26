@@ -13,6 +13,12 @@ import glob
 
 lg = logging.getLogger('gtr')
 
+class StartOverException(Exception):
+  pass
+
+class CancelDialogException(Exception):
+  pass
+
 class Client(object):
   """ Rather than interact with the player via the command line and stdout,
   this client is broken out with an interface for each of the game decisions
@@ -188,7 +194,7 @@ class Client(object):
     choice_index = self.choices_dialog(choices, 'Do you wish to use your Fountain?')
     return choice_index == 0
 
-  def FountainDialog(self, card_from_deck, out_of_town_allowed):
+  def FountainDialog(self):
     """ The Fountain allows you to draw a card from the deck, then
     choose whether to use the card with a craftsman action. The player
     is allowed to just keep (draw) the card.
@@ -200,29 +206,30 @@ class Client(object):
       3) The material to be added to an incomplete building
       4) The site to start a building on.
 
-    The material will always be the Fountain card, and the building might be.
+    The material will always be the Fountain card or None, and the building might be
+    the Fountain card.
     """
     p = self.get_player()
 
     skip, building, material, site = (False, None, None, None)
 
-    material_of_card = card_manager.get_material_of_card(card_from_deck)
+    material_of_card = card_manager.get_material_of_card(p.fountain_card)
     
     card_choices = \
       [str(b) for b in p.get_incomplete_buildings()
-      if self.game.check_building_add_legal(p, str(b), card_from_deck)]
+      if self.game.check_building_add_legal(p, str(b), p.fountain_card)]
 
-    if not p.owns_building(card_from_deck):
-      card_choices.insert(0, 'Start {} buidling'.format(card_from_deck))
+    if not p.owns_building(p.fountain_card):
+      card_choices.insert(0, 'Start {} buidling'.format(p.fountain_card))
 
     if len(card_choices) == 0:
-      lg.warn('Can\'t use {} with a craftsman action'.format(card_from_deck))
+      lg.warn('Can\'t use {} with a craftsman action'.format(p.fountain_card))
       return (True, None, None, None)
 
     lg.info('Performing Craftsman with {}, choose a building option:'
-                 .format(card_from_deck))
+                 .format(p.fountain_card))
 
-    choices = ['Use {} to start or add to a building'.format(card_from_deck),
+    choices = ['Use {} to start or add to a building'.format(p.fountain_card),
                'Don\'t play card, draw and skip action instead.']
     choice_index = self.choices_dialog(choices)
 
@@ -232,7 +239,7 @@ class Client(object):
 
     card_index = self.choices_dialog(card_choices, 'Select a building option')
     if card_index == 0: # Starting a new building
-      building = card_from_deck
+      building = p.fountain_card
 
       if building == 'Statue':
         sites = card_manager.get_all_materials()
@@ -243,7 +250,7 @@ class Client(object):
 
     else: # Adding to a building from hand
       building = card_choices[card_index-1]
-      material = card_from_deck
+      material = p.fountain_card
 
     return False, building, material, site
 
@@ -262,32 +269,17 @@ class Client(object):
     return card_from_hand
         
   def ThinkerTypeDialog(self):
-    """ Returns 'Jack' or 'Cards' for which type of thinker to
-    perform.
+    """ Returns True if think for Jack, False for think for cards, None to skip.
     """
+    lg.info('Thinker for Jack or cards?')
     p = self.get_player()
-    lg.info('Thinker:')
-    lg.info('[1] Jack')
-    n_possible_cards = self.game.get_max_hand_size(p) - len(p.hand)
-    if n_possible_cards < 1: n_possible_cards = 1
-    lg.info('[2] Fill up from library ({0} cards)'.format(n_possible_cards))
-    while True:
-      response_str = raw_input('--> Your choice ([q]uit, [s]tart over): ')
-      if response_str in ['s', 'start over']: continue
-      elif response_str in ['q', 'quit']: return ('','','')
-      try:
-        response_int = int(response_str)
-        if response_int == 1:
-          return 'Jack'
-        elif response_int == 2:
-          return 'Cards'
-        else:
-          lg.info('your response was {0!s}... try again'.format(response_str))
-          continue
-        lg.info(p.describe_hand_private())
-        break
-      except:
-        lg.info('your response was {0!s}... try again'.format(response_str))
+    n_possible_cards = max(self.game.get_max_hand_size(p) - len(p.hand), 1)
+    choices = ['Jack',
+               'Fill up from library ({0} cards)'.format(n_possible_cards),
+               'Skip thinker']
+    index = self.choices_dialog(choices)
+
+    return (True, False, None)[index]
 
   def UseSewerDialog(self):
     p = self.get_player()
@@ -348,8 +340,14 @@ class Client(object):
 
   def StairwayDialog(self):
     """
-    Asks the player if they wish to use the Stairway and returns the 
-    building to add to, the material to add, and whether to take from the pool.
+    Asks the player if they wish to use the Stairway and returns
+    
+    (player, building, material, from_pool)
+
+    player: the player that owns the building
+    building: the name (string) of the building
+    material: name of the material card to use
+    from_pool: bool to use the Archway to take from the pool
     """
     p = self.get_player()
     possible_buildings = [(pl, b) for pl in self.game.game_state.players
@@ -363,9 +361,11 @@ class Client(object):
     choices.insert(0, 'Don\'t use Stairway')
     choice_index = self.choices_dialog(choices, 'Select option for Stairway')
     
-    building, material, from_pool = None, None, False
+    player_name, building_name, material, from_pool = None, None, None, False
     if choice_index != 0:
-      other_player, building = possible_buildings[choice_index-1]
+      player, building = possible_buildings[choice_index-1]
+      player_name = player.name
+      building_name = building.foundation
       
       has_archway = self.game.player_has_active_building(p, 'Archway')
       
@@ -386,9 +386,9 @@ class Client(object):
       else:
         material = sorted_stockpile[card_index]
 
-    return building, material, from_pool
+    return player_name, building_name, material, from_pool
 
-  def ArchitectDialog(self, out_of_town_allowed):
+  def ArchitectDialog(self):
     """ Returns (building, material, site, from_pool) to be built.
 
     If the action is to be skipped, returns None, None, None
@@ -441,7 +441,7 @@ class Client(object):
 
     return building, material, site, from_pool
 
-  def CraftsmanDialog(self, out_of_town_allowed):
+  def CraftsmanDialog(self):
     """ Returns (building, material, site) to be built.
     """
     p = self.get_player()
@@ -468,7 +468,7 @@ class Client(object):
         site = card_manager.get_material_of_card(building)
 
     else: # Adding to a building from hand
-      building = self.game.card_choices[card_index]
+      building = card_choices[card_index]
       
       sorted_hand = sorted(p.hand)
       lg.info('Choose a material to add from your hand:')
@@ -669,7 +669,7 @@ class Client(object):
 
     if len(possible_petitions) < 1:
       lg.info('Petitioning requires {0} cards of the same role'.format(petition_count))
-      raise game.StartOverException
+      raise StartOverException
 
     def get_allowed_cards(cards, petition_role, cards_used=[], unselectable = None):
       selectable = []
