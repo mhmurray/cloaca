@@ -5,6 +5,7 @@ of the game. The only rules enforced are physical - such as failing to
 draw a card from an empty pile. 
 """
 
+import gtrutils
 from gtrutils import get_card_from_zone
 from player import Player
 from building import Building
@@ -37,6 +38,7 @@ class GameState:
     self.is_role_led = False
     self.role_led = None
     self.active_player = None
+    self.slave_player = None
     self.priority_index = None
     self.turn_index = 0
     self.jack_pile = jack_pile or []
@@ -55,6 +57,7 @@ class GameState:
     self.legionary_resp_indices = []
     self.kip_index = 0
     self.senate_resp_indices = []
+    self.expected_action = None
 
   def __repr__(self):
     rep = ('GameState(players={players!r}, leader={leader!r}, '
@@ -72,6 +75,21 @@ class GameState:
         in_town_foundations=self.in_town_foundations,
         out_of_town_foundations=self.out_of_town_foundations,
     )
+
+  def privatize(self):
+    """ Changes card names to 'Card' in order to represent a game
+    where we don't have complete information. This is the case
+    when this object is used in the client to track the
+    server game state, for instance.
+    """
+    self.library = ['Card']*len(self.library)
+    
+    for p in self.players:
+
+      if p is not self.slave_player:
+        p.vault = ['Card']*len(p.vault)
+        p.hand = [c if c == 'Jack' else 'Card' for c in p.hand ]
+        p.fountain_card = 'Card' if p.fountain_Card else None
 
   def increment_priority_index(self):
       prev_index = self.priority_index
@@ -107,6 +125,9 @@ class GameState:
   def get_current_player(self):
       return self.players[self.leader_index]
 
+  def get_active_player_index(self):
+      return self.players.index(self.active_player)
+
   def get_following_players_in_order(self):
       """ Returns a list of players in turn order starting with
       the next player after the leader, and ending with the player
@@ -120,14 +141,14 @@ class GameState:
       """ Returns a list of players in turn order 
       starting with start_player or the leader it's None.
       """
-      n = self.players.index(start_player) if start_player else self.turn_index
+      n = self.players.index(start_player) if start_player else self.leader_index
       return self.players[n:] + self.players[:n]
 
   def get_player_indices_in_turn_order(self, start_player=None):
       """ Returns a list of player indices in turn order 
       starting with start_player or the leader it's None.
       """
-      n = self.players.index(start_player) if start_player else self.turn_index
+      n = self.players.index(start_player) if start_player else self.leader_index
       r = range(len(self.players))
       return r[n:] + r[:n]
 
@@ -160,6 +181,22 @@ class GameState:
     cards_to_discard = list(player.hand)
     for card in cards_to_discard:
       self.pool.append(player.get_card_from_hand(card))
+
+  def find_player_index(self, player_name):
+    """ Finds the index of a named player, otherwise creates a new
+    Player object with the given name, appending it to the list of 
+    players. """
+    players_match = filter(lambda x : x.name==player_name, self.players)
+    if len(players_match) > 1:
+      lg.critical(
+        'Fatal error! Two instances of player {0}.'.format(players_match[0].name))
+      raise Exception('Cannot have two players with the same name.')
+    elif len(players_match) == 1:
+      lg.info('Found existing player {0}.'.format(players_match[0].name))
+      player_index = self.players.index(players_match[0])
+      return player_index
+    else:
+      return None
 
   def find_or_add_player(self, player_name):
     """ Finds the index of a named player, otherwise creates a new
@@ -239,6 +276,139 @@ class GameState:
     while self.priority_index >= len(self.players):
       self.priority_index -= len(self.players)
 
+  def show_public_game_state(self):
+    """ Prints the game state, showing only public information.
+
+    This is the following: cards in the pool, # of cards in the library,
+    # of jacks left, # of each foundation left, who's the leader, public
+    player information.
+    """
+
+    gtrutils.print_header('Public game state', '+')
+
+    # print leader and priority
+    self.print_turn_info()
+
+    # print pool. 
+    pool_string = 'Pool: \n'
+    pool_string += gtrutils.get_detailed_zone_summary(self.pool)
+    lg.info(pool_string)
+    
+    # print exchange area. 
+    try: 
+      if self.exchange_area:
+        exchange_string = 'Exchange area: \n'
+        exchange_string += gtrutils.get_detailed_zone_summary(
+          self.exchange_area)
+        lg.info(exchange_string)
+    except AttributeError: # backwards-compatibility for old games
+      self.exchange_area = []
+      
+    # print N cards in library
+    lg.info('Library : {0:d} cards'.format(len(self.library)))
+
+    # print N jacks
+    lg.info('Jacks : {0:d} cards'.format(len(self.jack_pile)))
+
+    # print Foundations
+    lg.info('Foundation materials:')
+    foundation_string = '  In town: ' + gtrutils.get_short_zone_summary(
+      self.in_town_foundations, 3)
+    lg.info(foundation_string)
+    foundation_string = '  Out of town: ' + gtrutils.get_short_zone_summary(
+      self.out_of_town_foundations, 3)
+    lg.info(foundation_string)
+
+    print ''
+    for player in self.players:
+      self.print_public_player_state(player)
+      #self.print_complete_player_state(player)
+      print ''
+
+
+  def print_public_player_state(self, player):
+    """ Prints a player's public information.
+
+    This is the following: Card in camp (if existing), clientele, influence,
+    number of cards in vault, stockpile, number of cards/jacks in hand, 
+    buildings built, buildings under construction and stage of completion.
+    """
+    # name
+    lg.info('--> Player {0} public state:'.format(player.name))
+
+    # hand
+    lg.info(player.describe_hand_public())
+    
+    # Vault
+    if len(player.vault) > 0:
+      lg.info(player.describe_vault_public())
+
+    # influence
+    if player.influence:
+      lg.info(player.describe_influence())
+
+    # clientele
+    if len(player.clientele) > 0:
+      lg.info(player.describe_clientele())
+
+    # Stockpile
+    if len(player.stockpile) > 0:
+      lg.info(player.describe_stockpile())
+
+    # Buildings
+    if len(player.buildings) > 0:
+      # be sure there is at least one non-empty site
+      for building in player.buildings:
+          if building:
+              lg.info(player.describe_buildings())
+              break
+
+
+    # Camp
+    if len(player.camp) > 0:
+      lg.info(player.describe_camp())
+
+    # Revealed cards
+    try:
+      if len(player.revealed) > 0:
+        lg.info(player.describe_revealed())
+    except AttributeError:
+      player.revealed = []
+
+
+  def print_complete_player_state(self, player):
+    """ Prints a player's information, public or not.
+
+    This is the following: Card in camp (if existing), clientele, influence,
+    cards in vault, stockpile, cards in hand,
+    buildings built, buildings under construction and stage of completion.
+    """
+    # print name
+    lg.info('--> Player {} complete state:'.format(player.name))
+
+    # print hand
+    lg.info(player.describe_hand_private())
+    
+    # print Vault
+    if len(player.vault) > 0:
+      lg.info(player.describe_vault_public())
+
+    # print clientele
+    if len(player.clientele) > 0:
+      lg.info(player.describe_clientele())
+
+    # print Stockpile
+    if len(player.stockpile) > 0:
+      lg.info(player.describe_stockpile())
+
+    # print Buildings
+    if len(player.buildings) > 0:
+      # be sure there is at least one non-empty site
+      for building in player.buildings:
+          if building:
+              lg.info(player.describe_buildings())
+              break
+
 
 if __name__ == '__main__':
 
@@ -246,3 +416,5 @@ if __name__ == '__main__':
   test = GameState()
   print test
 
+
+# vim: ts=8:sts=2:sw=2:et

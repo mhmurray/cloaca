@@ -27,7 +27,7 @@ class TestLegionary(unittest.TestCase):
     def test_expects_legionary(self):
         """ The Game should expect a LEGIONARY action.
         """
-        self.assertEqual(self.game.expected_action, message.LEGIONARY)
+        self.assertEqual(self.game.expected_action(), message.LEGIONARY)
 
 
     def test_legionary(self):
@@ -44,7 +44,7 @@ class TestLegionary(unittest.TestCase):
 
         self.assertIn('Atrium', self.p1.revealed) 
 
-        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.expected_action(), message.GIVECARDS)
 
 
     def test_give_cards(self):
@@ -63,7 +63,7 @@ class TestLegionary(unittest.TestCase):
         self.assertNotIn('Foundry', self.p2.hand)
 
         # It should be p2's turn now
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
 
 
 

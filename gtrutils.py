@@ -26,7 +26,7 @@ def get_card_from_zone(card, zone):
   try:
     return zone.pop(zone.index(card))
   except ValueError as e:
-    logging.error('Error! card {0!s} not found'.format(card))
+    logging.error('Error! card {0!s} not found in zone {1!s}'.format(card, zone))
     raise
 
 def add_card_to_zone(card, zone):

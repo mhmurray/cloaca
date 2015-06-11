@@ -34,7 +34,7 @@ class TestHandleThinker(unittest.TestCase):
     def test_waiting_for_thinker(self):
         """ Tests that the game is expecting a THINKERTYPE.
         """
-        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.expected_action(), message.THINKERTYPE)
 
         a = message.GameAction(message.SKIPTHINKER, False)
 

@@ -27,7 +27,7 @@ class TestPatron(unittest.TestCase):
     def test_expects_patron(self):
         """ The Game should expect a PATRONFROMPOOL action.
         """
-        self.assertEqual(self.game.expected_action, message.PATRONFROMPOOL)
+        self.assertEqual(self.game.expected_action(), message.PATRONFROMPOOL)
 
 
     def test_patron_one_from_pool(self):

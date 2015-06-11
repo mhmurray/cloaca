@@ -39,7 +39,7 @@ class TestArchitect(unittest.TestCase):
     def test_expects_architect(self):
         """ The Game should expect a ARCHITECT action.
         """
-        self.assertEqual(self.game.expected_action, message.ARCHITECT)
+        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
 
 
     def test_skip_action(self):
@@ -49,7 +49,7 @@ class TestArchitect(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.game.game_state.leader_index, 1)
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
 
 
     def test_start_in_town(self):
@@ -210,7 +210,7 @@ class TestArchitectClient(unittest.TestCase):
 
         self.assertEqual(self.game.game_state.leader_index, 0)
         self.assertEqual(self.game.game_state.active_player, self.p2)
-        self.assertEqual(self.game.expected_action, message.ARCHITECT)
+        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
 
 
     def test_add_two_materials(self):
@@ -286,7 +286,7 @@ class TestArchitectClient(unittest.TestCase):
         self.assertEqual(3, self.game.game_state.out_of_town_foundations.count('Concrete'))
 
         self.assertNotIn('Bridge', self.p1.hand)
-        self.assertEqual(self.game.expected_action, message.ARCHITECT)
+        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
         self.assertEqual(self.game.game_state.active_player, self.p2)
 
 
@@ -308,7 +308,7 @@ class TestArchitectClient(unittest.TestCase):
         self.assertEqual(self.p2.buildings[0],
                 Building('Tower', 'Concrete', materials=['Wall']))
 
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
         self.assertEqual(self.game.game_state.leader_index, 1)
 
 

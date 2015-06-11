@@ -27,7 +27,7 @@ class TestMerchant(unittest.TestCase):
     def test_expects_merchant(self):
         """ The Game should expect a MERCHANT action.
         """
-        self.assertEqual(self.game.expected_action, message.MERCHANT)
+        self.assertEqual(self.game.expected_action(), message.MERCHANT)
 
 
     def test_merchant_one_from_stockpile(self):

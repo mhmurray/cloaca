@@ -23,7 +23,7 @@ class Building:
     def __str__(self):
         """ The building name is the name of the foundation card.
         """
-        return self.foundation
+        return str(self.foundation)
 
     def __repr__(self):
         s = 'Building({0!r},{1!r},{2!r},{3!r},{4!r})'.format(

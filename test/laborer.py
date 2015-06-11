@@ -27,7 +27,7 @@ class TestLaborer(unittest.TestCase):
     def test_expects_laborer(self):
         """ The Game should expect a LABORER action.
         """
-        self.assertEqual(self.game.expected_action, message.LABORER)
+        self.assertEqual(self.game.expected_action(), message.LABORER)
 
 
     def test_laborer_one_from_pool(self):

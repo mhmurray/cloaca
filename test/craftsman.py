@@ -27,7 +27,7 @@ class TestCraftsman(unittest.TestCase):
     def test_expects_craftsman(self):
         """ The Game should expect a CRAFTSMAN action.
         """
-        self.assertEqual(self.game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(self.game.expected_action(), message.CRAFTSMAN)
 
 
     def test_skip_action(self):
@@ -37,7 +37,7 @@ class TestCraftsman(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.game.game_state.leader_index, 1)
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
 
 
     def test_start_in_town(self):
