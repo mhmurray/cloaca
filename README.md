@@ -15,3 +15,9 @@ should be a long-term concern.
 However, there is a package called colorama that will wrap stdout,
 stripping ANSI color sequences and inserting the appropriate 
 windows sequences.
+
+
+installation steps:
+* install python-twisted from https://twistedmatrix.com/trac/
+* put cloaca in another directory, add this top directory to your python path
+
