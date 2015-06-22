@@ -21,3 +21,6 @@ installation steps:
 * install python-twisted from https://twistedmatrix.com/trac/
 * put cloaca in another directory, add this top directory to your python path
 
+notes from Alexis
+* used on Mac Yosemite 15 June 2015. Installed twisted & zope. Disabled
+  firewall(not sure if this was needed). 
