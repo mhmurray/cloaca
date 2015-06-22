@@ -17,9 +17,6 @@ import time
 import glob
 import copy
 
-from twisted.python.failure import Failure
-from twisted.internet.defer import Deferred
-
 lg = logging.getLogger('gtr')
 
 class StartOverException(Exception):
@@ -31,15 +28,32 @@ class CancelDialogException(Exception):
 class InvalidChoiceException(Exception):
   pass
 
-class LaborerActionBuilder(object):
-  """ Puts together the information needed for an architect action,
-  since we need multiple inputs from the user.
+class Choice(object):
+  """ Represents a choice in an ActionBuilder list.
   """
+  def __init__(self, item, description, selectable=True):
+    self.item = item
+    self.description = description
+    self.selectable = selectable
+
+  def __repr__(self):
+    return 'Choice({0!r}, {1!r}, {2!r})'.format(self.item, self.description, self.selectable)
+
+  def __str__(self):
+    return repr(self)
+
+
+class LaborerActionBuilder(object):
+  """ Puts together the information needed for a Laborer action,
+  """
+
   def __init__(self, pool, hand, has_dock=False):
 
     self.fsm = StateMachine()
 
-    self.fsm.add_state('START', None, self.start_transition)
+    self.fsm.add_adapter(self.adapter)
+
+    self.fsm.add_state('START', None, lambda _ : 'FROM_POOL')
     self.fsm.add_state('FROM_POOL',
         self.from_pool_arrival, self.from_pool_transition)
     self.fsm.add_state('FROM_HAND',
@@ -64,46 +78,41 @@ class LaborerActionBuilder(object):
     # Move from Start state
     self.fsm.pump(None)
 
+  
+  def adapter(self, choice_index):
+    if choice_index is not None:
+      selectable_items = [c.item for c in self.choices if c.selectable]
+      try:
+        item = selectable_items[choice_index]
+      except IndexError:
+        raise InvalidChoiceException()
 
-  def start_transition(self, _):
-    return 'FROM_POOL'
+      return item
+
+    else:
+      return None
 
 
   def from_pool_arrival(self):
-    self.choices = [(det(c),True) for c in self.pool_cards]
-    self.choices.append(('Skip card from pool', True))
+    self.choices = [Choice(c, det(c), True) for c in self.pool_cards]
+    self.choices.append(Choice(None, 'Skip card from pool', True))
     self.prompt = 'Performing Laborer. Select card from pool'
 
 
   def from_pool_transition(self, choice):
-    if choice >= 0 and choice < len(self.pool_cards):
-      self.pool_card = self.pool_cards[choice]
-
-    elif choice == len(self.pool_cards):
-      pass
-
-    else:
-      raise InvalidChoiceException()
+    self.pool_card = choice
 
     return 'FROM_HAND' if self.has_dock else 'FINISHED'
 
 
   def from_hand_arrival(self):
-    self.choices = [(det(c),not c=='Jack') for c in self.hand_cards]
-    self.choices.append(('Skip card from hand', True))
+    self.choices = [Choice(c, det(c), c != 'Jack') for c in self.hand_cards]
+    self.choices.append(Choice(None, 'Skip card from hand', True))
     self.prompt = 'Performing Laborer. Select card from hand'
 
 
   def from_hand_transition(self, choice):
-    choices = [c for c in self.hand_cards if c != 'Jack']
-    if choice >= 0 and choice < len(choices):
-      self.hand_card = choices[choice]
-
-    elif choice == len(choices):
-      pass
-
-    else:
-      raise InvalidChoiceException()
+    self.hand_card = choice
 
     return 'FINISHED'
 
@@ -122,45 +131,6 @@ class LaborerActionBuilder(object):
 
 
 
-if 0:
-  def show_choices(self, choices_list, prompt=None):
-    """ Returns the index in the choices_list selected by the user or
-    raises a StartOverException or a CancelDialogExeption.
-    
-    The choices_list is either a list of choices, or a list of
-    tuples of (choice, selectable) - eg. ('Rubble', False) - such
-    that a choice can be listed but unselectable.
-    """
-    i_choice = 1
-    for e in choices_list:
-      try:
-        choice = e[0]
-        selectable = e[1]
-      except TypeError:
-        choice = e
-        selectable = True
-
-      if selectable:
-        print '  [{0:2d}] {1}'.format(i_choice, choice)
-        i_choice+=1
-      else:
-        print '       {0}'.format(choice)
-
-    if prompt is not None:
-      print prompt
-    else:
-      print 'Please make a selection:'
-
-  def test_it(self):
-    while True:
-      self.show_choices(self.get_choices(), self.prompt)
-      choice = int(raw_input()) -1
-      self.make_choice(choice)
-      if self.done:
-        print 'Finished! Action: ' + repr(self.action)
-        break
-
-
 class LeadRoleActionBuilder(object):
   """ Builds up a message.LeadRoleAction.
   """
@@ -168,7 +138,9 @@ class LeadRoleActionBuilder(object):
 
     self.fsm = StateMachine()
 
-    self.fsm.add_state('START', None, self.start_transition)
+    self.fsm.add_adapter(self.adapter)
+
+    self.fsm.add_state('START', None, lambda _: 'SELECT_CARD')
     self.fsm.add_state('SELECT_CARD',
         self.select_card_arrival, self.select_card_transition)
     self.fsm.add_state('PALACE_CARDS',
@@ -185,7 +157,8 @@ class LeadRoleActionBuilder(object):
 
     self.fsm.set_start('START')
 
-    self.hand_cards = [(c, True) for c in sorted(hand, card_manager.cmp_jacks_first)]
+    # A list of cards in the hand and whether they've been used.
+    self.hand_cards = [Choice(c, det(c), True) for c in sorted(hand, card_manager.cmp_jacks_first)]
 
     self.role = None
     self.choices = None
@@ -202,21 +175,47 @@ class LeadRoleActionBuilder(object):
     # Move from Start state to SELECT_CARD
     self.fsm.pump(None)
 
+  def get_hand_card(self, card):
+    """ Gets a card in the hand that has not yet been selected.
+    Returns the Choice object corresponding to that card.
+
+    If the selectable card does not exist, raises InvalidChoiceException.
+    """
+    for choice in self.hand_cards:
+      if choice.item == card and choice.selectable:
+        return choice
+
+    raise InvalidChoiceException()
+
   
+  def adapter(self, choice_index):
+    if choice_index is not None:
+      selectable_items = [c.item for c in self.choices if c.selectable]
+      try:
+        item = selectable_items[choice_index]
+      except IndexError:
+        raise InvalidChoiceException()
+
+      return item
+
+    else:
+      return None
+
+
   def select_card_action(self, card):
-    """ Appends card to action_unit list and marks it used.
+    """ Gets the choice corresponding to card in the list of card
+    in hand, and marks it as selected. Appends card to action_unit list.
+
+    Raises InvalidChoiceException if the card is not in hand or is
+    not selectable.
     """
     try:
-      i = self.hand_cards.index((card, True))
+      choice = self.get_hand_card(card)
     except:
-      raise InvalidChoiceException('Jack not found')
+      raise InvalidChoiceException('Card not found')
 
-    self.hand_cards[i] = (card, False)
+    choice.selectable = False
     self.action_units.append([card])
-
-
-  def start_transition(self, choice):
-    return 'SELECT_CARD'
 
 
   def finished_arrival(self):
@@ -227,16 +226,12 @@ class LeadRoleActionBuilder(object):
     
 
   def jack_role_arrival(self):
-    self.choices = izip_longest(card_manager.get_all_roles(), [], fillvalue=True)
+    self.choices = [Choice(r, r, True) for r in card_manager.get_all_roles()]
     self.prompt = 'Select role for Jack'
 
 
   def jack_role_transition(self, choice):
-    try:
-      self.role = card_manager.get_all_roles()[choice]
-    except IndexError:
-      raise InvalidChoiceException('Invalid choice.')
-
+    self.role = choice
     self.select_card_action('Jack')
     
     new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
@@ -248,23 +243,19 @@ class LeadRoleActionBuilder(object):
     self.action_units.append(self.petition_cards)
 
     for card in self.petition_cards:
-      i = self.hand_cards.index((card, True))
-      self.hand_cards[i] = (card, False)
+      choice = self.get_hand_card(card)
+      choice.selectable = False
 
     self.petition_cards = []
 
 
   def petition_role_arrival(self):
-    self.choices = izip_longest(card_manager.get_all_roles(), [], fillvalue=True)
+    self.choices = [Choice(r, r, True) for r in card_manager.get_all_roles()]
     self.prompt = 'Select role for Petition'
 
 
   def petition_role_transition(self, choice):
-    try:
-      self.role = card_manager.get_all_roles()[choice]
-    except IndexError:
-      raise InvalidChoiceException('Invalid choice.')
-
+    self.role = choice
     self.finish_petition()
 
     new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
@@ -273,54 +264,42 @@ class LeadRoleActionBuilder(object):
 
  
   def first_petition_arrival(self):
-    # TODO: update this so it's only groups of 3(2) that can be selected
-    self.choices = [ (det(c[0]), c[1]) for c in self.hand_cards if c[0] != 'Jack' ]
-    self.choices.append(('Cancel petition', True))
+    self.choices = self.get_petition_filtered_hand()
+    self.choices.append(Choice(None, 'Cancel petition', True))
     
     self.prompt = 'Select cards for petition'
 
 
-  def first_petition_transition(self, choice):
-    selectable_cards = [c[0] for c in self.hand_cards if c[1] and c[0] != 'Jack']
-
-    if choice == len(selectable_cards):
+  def first_petition_transition(self, card):
+    if card is None:
       # Cancel petition. Determine where we came from with self.role
       new_state = 'PALACE_CARDS' if self.action_units else 'SELECT_CARD'
       
-    elif choice >= 0 and choice < len(selectable_cards):
-      card = selectable_cards[choice]
+    else:
       self.petition_cards.append(card)
 
       new_state = 'MORE_PETITIONS'
-
-    else:
-      raise InvalidChoiceException('Invalid choice')
 
     return new_state
 
 
   def more_petitions_arrival(self):
-    choices = self.get_petition_filtered_hand()
+    self.choices = self.get_petition_filtered_hand()
+    self.choices.append(Choice(None, 'Cancel petition', True))
 
-    self.choices = [(det(c[0]),c[1]) for c in choices]
-    self.choices.append(('Cancel petition', True))
+    self.prompt = "Select more cards for petition"
 
 
   def more_petitions_transition(self, choice):
-    choices = self.get_petition_filtered_hand()
-
-    selectable_cards = [c[0] for c in choices if c[1]]
-
-    if choice == len(selectable_cards):
+    if choice is None:
       self.petition_cards = []
 
       # Cancel petition. Determine origin state
       # by checking if the role's been defined.
       new_state = 'PALACE_CARDS' if self.action_units else 'SELECT_CARD'
-      
-    elif choice >= 0 and choice < len(selectable_cards):
-      card = selectable_cards[choice]
-      self.petition_cards.append(card)
+
+    else:
+      self.petition_cards.append(choice)
 
       if len(self.petition_cards) == self.petition_count:
         if self.role:
@@ -333,355 +312,109 @@ class LeadRoleActionBuilder(object):
       else:
         new_state = 'MORE_PETITIONS'
 
-    else:
-      raise InvalidChoiceException('Invalid choice')
-
     return new_state
 
 
   def select_card_arrival(self):
-    self.choices = [ (det(c[0]), c[1]) for c in self.hand_cards]
-    self.choices.append(('Petition', True))
+    self.choices = copy.deepcopy(self.hand_cards)
+    self.choices.append(Choice('Petition', 'Petition', True))
 
     self.prompt = 'Select card to lead'
 
 
-  def select_card_transition(self, choice):
-    selectable_cards = [c[0] for c in self.hand_cards if c[1]]
-
-    if choice == len(selectable_cards):
+  def select_card_transition(self, card):
+    if card == 'Petition':
       new_state = 'FIRST_PETITION'
 
-    elif choice>=0 and choice<len(selectable_cards):
-      card = selectable_cards[choice]
-
-      if not self.role and card == 'Jack':
+    else:
+      if self.role is None and card == 'Jack':
         new_state = 'JACK_ROLE'
 
       else:
-        if not self.role and card != 'Jack':
+        if self.role is None and card != 'Jack':
           self.role = card_manager.get_role_of_card(card)
       
         self.select_card_action(card)
 
         new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
 
-    else:
-      raise InvalidChoiceException('Invalid choice')
-
     return new_state
 
 
   def palace_cards_arrival(self):
-    self.choices = [ (det(c[0]), c[1]) for c in self.hand_cards ]
-    self.choices.append(('Petition', True))
-    self.choices.append(('Skip further Palace actions', True))
+    self.choices = copy.deepcopy(self.hand_cards)
+    for c in self.choices:
+      # Mark as unselectable cards that don't match the role being led
+      if c.item != 'Jack' and self.role != card_manager.get_role_of_card(c.item):
+        c.selectable = False
 
-    self.prompt = 'Select additional palace actions ({0:d} actions)'.format(
+    self.choices.append(Choice('Petition', 'Petition', True))
+    self.choices.append(Choice('Skip', 'Skip further Palace action', True))
+
+    self.prompt = 'Select additional palace actions (currently {0:d} actions)'.format(
         len(self.action_units))
 
 
   def palace_cards_transition(self, choice):
-    selectable_cards = [c[0] for c in self.hand_cards if c[1]]
-
-    if choice == len(selectable_cards):
-      new_state = 'FIRST_PETITION'
-
-    elif choice == len(selectable_cards) + 1:
-      new_state = 'FINISHED'
-
-    elif choice >= 0 and choice<len(selectable_cards):
-      card = selectable_cards[choice]
-
-      i = self.hand_cards.index((card, True))
-      self.hand_cards[i] = (card, False)
-
-      self.action_units.append([card])
-      new_state = 'PALACE_CARDS'
-
-    else:
-      raise InvalidChoiceException('Invalid choice')
-
-    return new_state
-
-
-  def get_petition_filtered_hand(self):
-    # TODO: update this so it's only groups of 3(2) that can be selected
-    petition_cpy = copy.deepcopy(self.petition_cards)
-    if self.petition_cards:
-      petition_role = card_manager.get_role_of_card(self.petition_cards[0])
-    else:
-      petition_role = None
-
-    choices = []
-
-    for card, selectable in self.hand_cards:
-      role_mismatch = petition_role and card != 'Jack' and \
-          petition_role != card_manager.get_role_of_card(card)
-
-      if card == 'Jack' or role_mismatch or not selectable:
-        choices.append((card,False))
-
-      elif card in petition_cpy and selectable:
-        choices.append((card,False))
-        petition_cpy.remove(card)
-
-      else:
-        choices.append((card, selectable))
-
-    return choices
-  
-
-  def get_choices(self):
-    return self.choices
-
-
-  def make_choice(self, choice):
-    self.fsm.pump(choice)
-
-
-class FollowRoleActionBuilder(object):
-  def __init__(self, role, hand, has_palace, petition_count):
-
-    self.fsm = StateMachine()
-
-    self.fsm.add_state('START', None, self.start_transition)
-    self.fsm.add_state('SELECT_CARD',
-        self.select_card_arrival, self.select_card_transition)
-    self.fsm.add_state('PALACE_CARDS',
-        self.palace_cards_arrival, self.palace_cards_transition)
-    self.fsm.add_state('FIRST_PETITION',
-        self.first_petition_arrival, self.first_petition_transition)
-    self.fsm.add_state('MORE_PETITIONS',
-        self.more_petitions_arrival, self.more_petitions_transition)
-    self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
-
-    self.fsm.set_start('START')
-
-    self.hand_cards = [(c, True) for c in sorted(hand, card_manager.cmp_jacks_first)]
-
-    self.role = role
-    self.has_palace = has_palace
-    self.petition_count = petition_count
-
-    self.choices = None
-    
-    self.action_units = [] # list of lists: [card1, card2, ... ]
-    self.petition_cards = []
-
-    self.done = False
-    self.prompt = None
-
-    # Move from Start state to SELECT_CARD
-    self.fsm.pump(None)
-
-
-  def select_card_action(self, card):
-    """ Appends card to action_unit list and marks it used.
+    """ Take an action with the palace. The role has already been
+    determined. Petitioning and skipping more Palace actions are option.
     """
-    try:
-      i = self.hand_cards.index((card, True))
-    except:
-      raise InvalidChoiceException(card + ' not found')
-
-    self.hand_cards[i] = (card, False)
-    self.action_units.append([card])
-
-
-  def start_transition(self, choice):
-    return 'SELECT_CARD'
-
-
-  def finished_arrival(self):
-    self.done = True
-    if len(self.action_units) == 0:
-      self.action = message.GameAction(message.FOLLOWROLE, True, 0, None)
-    else:
-      self.action = message.GameAction(
-          message.FOLLOWROLE, False, len(self.action_units),
-          *itertools.chain(*self.action_units))
- 
-
-  def finish_petition(self):
-    self.action_units.append(self.petition_cards)
-
-    for card in self.petition_cards:
-      i = self.hand_cards.index((card, True))
-      self.hand_cards[i] = (card, False)
-
-    self.petition_cards = []
-
-
-  def first_petition_arrival(self):
-    # TODO: update this so it's only groups of 3(2) that can be selected
-    self.choices = [ (det(c[0]), c[1]) for c in self.hand_cards if c[0] != 'Jack' ]
-    self.choices.append(('Cancel petition', True))
-    
-    self.prompt = 'Select cards for petition'
-
-
-  def first_petition_transition(self, choice):
-    selectable_cards = [c[0] for c in self.hand_cards if c[1] and c[0] != 'Jack']
-
-    if choice == len(selectable_cards):
-      # Cancel petition. Determine where we came from with self.role
-      new_state = 'PALACE_CARDS' if self.action_units else 'SELECT_CARD'
-      
-    elif choice >= 0 and choice < len(selectable_cards):
-      card = selectable_cards[choice]
-      self.petition_cards.append(card)
-
-      new_state = 'MORE_PETITIONS'
-
-    else:
-      raise InvalidChoiceException('Invalid choice')
-
-    return new_state
-
-
-  def more_petitions_arrival(self):
-    choices = self.get_petition_filtered_hand()
-
-    self.choices = [(det(c[0]),c[1]) for c in choices]
-    self.choices.append(('Cancel petition', True))
-
-
-  def more_petitions_transition(self, choice):
-    choices = self.get_petition_filtered_hand()
-
-    selectable_cards = [c[0] for c in choices if c[1]]
-
-    if choice == len(selectable_cards):
-      self.petition_cards = []
-
-      # Cancel petition. Determine origin state
-      # by checking if an action has been added
-      new_state = 'PALACE_CARDS' if self.action_units else 'SELECT_CARD'
-      
-    elif choice >= 0 and choice < len(selectable_cards):
-      card = selectable_cards[choice]
-      self.petition_cards.append(card)
-
-      if len(self.petition_cards) == self.petition_count:
-        self.finish_petition()
-        new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
-
-      else:
-        new_state = 'MORE_PETITIONS'
-
-    else:
-      raise InvalidChoiceException('Invalid choice')
-
-    return new_state
-
-
-  def select_card_arrival(self):
-    self.choices = []
-    for card, selectable in self.hand_cards:
-      if selectable and (card == 'Jack' or self.role == card_manager.get_role_of_card(card)):
-        self.choices.append((det(card), selectable))
-      else:
-        self.choices.append((det(card), False))
-
-    self.choices.append(('Petition', True))
-    self.choices.append(('Thinker instead', True))
-
-    self.prompt = 'Select card to follow with'
-
-
-  def select_card_transition(self, choice):
-    selectable_cards = []
-    for card, selectable in self.hand_cards:
-      if selectable and (card == 'Jack' or self.role == card_manager.get_role_of_card(card)):
-        selectable_cards.append(card)
-
-    if choice == len(selectable_cards):
+    if choice == 'Petition':
       new_state = 'FIRST_PETITION'
 
-    elif choice == len(selectable_cards)+1:
+    elif choice == 'Skip':
       new_state = 'FINISHED'
-
-    elif choice>=0 and choice<len(selectable_cards):
-      card = selectable_cards[choice]
-
-      self.select_card_action(card)
-
-      new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
 
     else:
-      raise InvalidChoiceException('Invalid choice')
+      c = self.get_hand_card(choice)
+      c.selectable = False
 
-    return new_state
-
-
-  def palace_cards_arrival(self):
-    self.choices = []
-    for card, selectable in self.hand_cards:
-      if selectable and (card == 'Jack' or self.role == card_manager.get_role_of_card(card)):
-        self.choices.append((det(card), selectable))
-      else:
-        self.choices.append((det(card), False))
-
-    self.choices.append(('Petition', True))
-    self.choices.append(('Skip further Palace actions', True))
-
-    self.prompt = 'Select additional palace actions ({0:d} actions)'.format(
-        len(self.action_units))
-
-
-  def palace_cards_transition(self, choice):
-    selectable_cards = []
-    for card, selectable in self.hand_cards:
-      if selectable and (card == 'Jack' or self.role == card_manager.get_role_of_card(card)):
-        selectable_cards.append(card)
-
-    if choice == len(selectable_cards):
-      new_state = 'FIRST_PETITION'
-
-    elif choice == len(selectable_cards) + 1:
-      new_state = 'FINISHED'
-
-    elif choice >= 0 and choice<len(selectable_cards):
-      card = selectable_cards[choice]
-
-      i = self.hand_cards.index((card, True))
-      self.hand_cards[i] = (card, False)
-
-      self.action_units.append([card])
+      self.action_units.append([choice])
       new_state = 'PALACE_CARDS'
-
-    else:
-      raise InvalidChoiceException('Invalid choice')
 
     return new_state
 
 
   def get_petition_filtered_hand(self):
-    # TODO: update this so it's only groups of 3(2) that can be selected
-    petition_cpy = copy.deepcopy(self.petition_cards)
+    """ Gets a copy of the list of cards in the hand, but filters
+    them so the cards that can't be added for the current petition
+    are not selectable.
+
+    This function does not change the list of cards in hand.
+    
+    TODO: update this so it's only groups of 3(2) that can be selected
+    """
+    petition_cpy = list(self.petition_cards)
     if self.petition_cards:
       petition_role = card_manager.get_role_of_card(self.petition_cards[0])
     else:
       petition_role = None
 
     choices = []
+    print self.hand_cards
 
-    for card, selectable in self.hand_cards:
-      role_mismatch = petition_role and card != 'Jack' and \
+    for choice in self.hand_cards:
+      card = choice.item
+      selectable = choice.selectable
+
+      role_mismatch = petition_role is not None and card != 'Jack' and \
           petition_role != card_manager.get_role_of_card(card)
 
-      if card == 'Jack' or role_mismatch or not selectable:
-        choices.append((card,False))
+      if card == 'Jack':
+        choices.append(Choice(card, 'Jack', False))
+
+      elif role_mismatch or not selectable:
+        choices.append(Choice(card, det(card), False))
 
       elif card in petition_cpy and selectable:
-        choices.append((card,False))
+        choices.append(Choice(card, det(card), False))
         petition_cpy.remove(card)
 
       else:
-        choices.append((card, selectable))
+        choices.append(Choice(card, det(card), selectable))
 
     return choices
-  
+
 
   def get_choices(self):
     return self.choices
@@ -690,19 +423,48 @@ class FollowRoleActionBuilder(object):
   def make_choice(self, choice):
     self.fsm.pump(choice)
 
+
+if 0:
+  def show_choices(self, choices_list, prompt=None):
+    """ Returns the index in the choices_list selected by the user or
+    raises a StartOverException or a CancelDialogExeption.
+    
+    The choices_list is a list of Choices.
+    """
+    i_choice = 1
+    for c in choices_list:
+      if c.selectable:
+        print '  [{0:2d}] {1}'.format(i_choice, c.description)
+        i_choice+=1
+      else:
+        print '       {0}'.format(c.description)
+
+    if prompt is not None:
+      print prompt
+    else:
+      print 'Please make a selection:'
+
+  def test_it(self):
+    while True:
+      self.show_choices(self.get_choices(), self.prompt)
+      choice = int(raw_input()) -1
+      self.make_choice(choice)
+      if self.done:
+        print 'Finished! Action: ' + repr(self.action)
+        break
 
 
 class SingleChoiceActionBuilder(object):
   """ Gets a simple response from a list.
   """
   def __init__(self, action_type, choices):
-    """ The parameter choices is a list of tuples with the value of
-    the choice for the GameAction and a string presented in the choice list.
+    """ The parameter choices is a list of Choice objects.
     
     For example:
 
-    [('Rubble', 'Build on a Rubble site'),
-     ('Concrete, 'cannot build on a Concrete site')]
+    [Choice('Rubble', 'Build on a Rubble site', True),
+     Choice('Concrete', 'Cannot build on Concrete', False).
+     ...]
     """
     self.choices = choices
     self.action_type = action_type
@@ -711,19 +473,14 @@ class SingleChoiceActionBuilder(object):
     self.prompt = None
 
   def get_choices(self):
-    """ Returns (choices, prompt), where choices is a list
-    of tuples of the choice and whether it's selectable.
-    
-    Eg. choices = [('Rubble', False), ('Concrete', True)]
-    """
-    return [(e[1],True) for e in self.choices]
+    return self.choices
 
-  def make_choice(self, choice):
-    if(choice < 0 or choice >= len(self.choices)):
-      raise InvalidChoiceException('Index out of range: {0:d}. Enter [0-{1:d}]'
-                               .format(choice, len(self.choices)-1))
-
-    item = self.choices[choice][0]
+  def make_choice(self, choice_index):
+    selectable_items = [c.item for c in self.choices if c.selectable]
+    try:
+      item = selectable_items[choice_index]
+    except IndexError:
+      raise InvalidChoiceException()
 
     self.action = message.GameAction(self.action_type, item)
     self.done = True
@@ -798,30 +555,20 @@ class Client(object):
     """ Returns the index in the choices_list selected by the user or
     raises a StartOverException or a CancelDialogExeption.
     
-    The choices_list is either a list of choices, or a list of
-    tuples of (choice, selectable) - eg. ('Rubble', False) - such
-    that a choice can be listed but unselectable.
+    The choices_list is a list of Choices.
     """
     i_choice = 1
-    for e in choices_list:
-      try:
-        choice = e[0]
-        selectable = e[1]
-      except TypeError:
-        choice = e
-        selectable = True
-
-      if selectable:
-        lg.info('  [{0:2d}] {1}'.format(i_choice, choice))
+    for c in choices_list:
+      if c.selectable:
+        print '  [{0:2d}] {1}'.format(i_choice, c.description)
         i_choice+=1
       else:
-        lg.info('       {0}'.format(choice))
+        print '       {0}'.format(c.description)
 
     if prompt is not None:
       print prompt
     else:
       print 'Please make a selection:'
-    
 
 
   def action_thinkerorlead(self):
@@ -829,7 +576,7 @@ class Client(object):
     turn.
     """
     self.builder = SingleChoiceActionBuilder(message.THINKERORLEAD,
-                     [(True, 'Thinker'), (False, 'Lead a role')])
+                     [Choice(True, 'Thinker'), Choice(False, 'Lead a role')])
 
 
   def action_usesenate(self):
@@ -840,8 +587,8 @@ class Client(object):
     p_name = self.game.game_state.players[p].name
 
     self.builder = SingleChoiceActionBuilder(message.USESENATE,
-        [(True, 'Take {0:d}\'s Jack with Senate'.format(p_name)),
-         (False, 'Don\'t take Jack')])
+        [Choice(True, 'Take {0:d}\'s Jack with Senate'.format(p_name)),
+         Choice(False, 'Don\'t take Jack')])
 
 
   def action_thinkertype(self):
@@ -853,8 +600,8 @@ class Client(object):
     cards_str = '{0:d} card{1}'.format(n_cards, 's' if n_cards==1 else '')
 
     self.builder = SingleChoiceActionBuilder(message.THINKERTYPE,
-        [(True, 'Thinker for Jack'),
-         (False, 'Thinker for '+cards_str)])
+        [Choice(True, 'Thinker for Jack'),
+         Choice(False, 'Thinker for '+cards_str)])
 
 
   def action_uselatrine(self):
@@ -864,8 +611,8 @@ class Client(object):
     #lg.info('Choose a card to discard with the Latrine.')
 
     sorted_hand = sorted(self.get_player().hand)
-    card_choices = [(c, gtrutils.get_detailed_card_summary(c)) for c in sorted_hand]
-    card_choices.insert(0, (None, 'Skip discard'))
+    card_choices = [Choice(c, det(c)) for c in sorted_hand]
+    card_choices.insert(0, Choice(None, 'Skip discard'))
 
     self.builder = SingleChoiceActionBuilder(message.USELATRINE, card_choices)
 
@@ -875,7 +622,7 @@ class Client(object):
   def action_skipthinker(self):
     """ Asks if the player wants to skip the thinker action.
     """
-    choices = [(True, 'Perform thinker'), (False, 'Skip thinker')]
+    choices = [Choice(True, 'Perform thinker'), Choice(False, 'Skip thinker')]
 
     self.builder = SingleChoiceActionBuilder(message.SKIPTHINKER, choices)
 
@@ -884,7 +631,7 @@ class Client(object):
 
   def action_baroraqueduct(self):
     self.builder = SingleChoiceActionBuilder(message.BARORAQUEDUCT,
-        [(True, 'Bar then Aqueduct'), (False, 'Aqueduct then Bar')])
+        [Choice(True, 'Bar then Aqueduct'), Choice(False, 'Aqueduct then Bar')])
 
     self.builder.prompt = 'Use the Bar or the Aqueduct first?'
     #TODO: We still have to answer this even if we want to skip both.
@@ -896,15 +643,15 @@ class Client(object):
     Returns True if player uses the Vomitorium, False otherwise.
     """
     self.builder = SingleChoiceActionBuilder(message.USEVOMITORIUM,
-        [(True, 'Discard all'), (False, 'Skip Vomitorium')])
+        [Choice(True, 'Discard all'), Choice(False, 'Skip Vomitorium')])
     self.builder.prompt = 'Discard hand with Vomitorium?'
 
 
   def action_patronfrompool(self):
     p = self.get_player()
     self.builder = SingleChoiceActionBuilder(message.PATRONFROMPOOL,
-        [ (c, det(c)) for c in sorted(self.game.game_state.pool) ] + \
-        [ (None, 'Skip Patron from pool') ])
+        [ Choice(c, det(c)) for c in sorted(self.game.game_state.pool) ] + \
+        [ Choice(None, 'Skip Patron from pool') ])
 
     self.builder.prompt = \
         'Performing Patron, choose a client from pool (Clientele {}/{})'.format(
@@ -914,8 +661,8 @@ class Client(object):
   def action_patronfromdeck(self):
     p = self.get_player()
     self.builder = SingleChoiceActionBuilder(message.PATRONFROMHAND,
-        [ (True, 'Patron from the deck'), 
-          (False, 'Skip Patron from deck') ])
+        [ Choice(True, 'Patron from the deck'), 
+          Choice(False, 'Skip Patron from deck') ])
 
     self.builder.prompt = \
         'Performing Patron, take a card from the deck? (Clientele {}/{})'.format(
@@ -926,8 +673,8 @@ class Client(object):
     p = self.get_player()
     cards = sorted([c for c in hand if c != 'Jack'])
     self.builder = SingleChoiceActionBuilder(message.PATRONFROMHAND,
-        [ (c, det(c)) for c in cards ] + 
-        [ (None, 'Skip Patron from hand') ])
+        [ Choice(c, det(c)) for c in cards ] + 
+        [ Choice(None, 'Skip Patron from hand') ])
 
     self.builder.prompt = \
         'Performing Patron, choose a client from pool (Clientele {}/{})'.format(
@@ -936,7 +683,7 @@ class Client(object):
 
   def action_usefountain(self):
     self.builder = SingleChoiceActionBuilder(message.USEFOUNTAIN,
-        [(True, 'Use Fountain'), (False, 'Don\'t use Fountain')])
+        [Choice(True, 'Use Fountain'), Choice(False, 'Don\'t use Fountain')])
     self.builder.prompt = 'Use Fountain to Craftsman from deck?'
 
 

@@ -7,13 +7,22 @@ class InitializationError(Exception):
 class StateMachine(object):
     """ A class to represent a Finite State Machine.
     """
-
-
     def __init__(self):
         self.handlers = {}
         self.arrival_handlers = {}
         self.endStates = []
         self.state = None
+        self.adapter = None
+
+    def add_adapter(self, func):
+        """ Adds an adapter function that takes the cargo
+        passed to each state and does something with it.
+
+        This is a function that takes a single argument that
+        is the same as the transition functions, and returns
+        what the transmission functions want to receive.
+        """
+        self.adapter = func
 
     def add_state(self, name, arrival_handler, handler, end_state=False):
         name = name.upper()
@@ -36,11 +45,16 @@ class StateMachine(object):
             raise InitializationError('No transition for state ' + str(self.state))
         if not self.endStates:
             raise  InitializationError('Must have at least one end_state.')
+
+        if self.adapter is not None:
+            adapted_cargo = self.adapter(cargo)
+            cargo = adapted_cargo
     
         try:
             new_state = handler(cargo)
-        except:
+        except Exception as e:
             print 'Failed to make choice in state {0}'.format(self.state)
+            print e.message
             return
 
         self.state = new_state
