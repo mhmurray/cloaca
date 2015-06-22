@@ -1,3 +1,34 @@
+"""A client user interface for a player in gtr.
+This is to be used by a networked client as the connection to the user.
+The interface is expected to be entirely on the command line with 
+output via stdout in a terminal window. However, the interface presented
+is a set of action_* methods that are called when a particular GameAction
+is needed. The Client object creates an ActionBuilder object (eg.
+LaborerActionBuilder) that may contain internal states on the way to building
+up a GameAction. 
+
+For example, the LaborerActionBuilder needs to get 2 inputs from the player:
+the card to take from the pool and the card to take from the players hand
+if they have a Dock. The class has an internal state machine that stores
+which of the choices have been made. Each user input causes a transition to
+a new state. Specifically, the sequence is 
+START->FROM_POOL->FROM_HAND->FINISHED
+The transition to the FINISHED state sets the LaborerActionBuilder.done
+flag and the action member to a GameAction representing the Laborer action.
+The network interface sends this action to the server.
+
+The ActionBuilder classes use lists of Choice objects to represent user
+choices. These are simply containers for an item to be selected, a 
+description of that item, and a flag to indicate whether it's selectable.
+Unselectable choices exists so that a list can be displayed with certain
+items "grayed out".
+
+The RoleActionBuilder class is used for both the follow role action and
+the lead role action because so much of the Palace and Petition code is
+shared.
+"""
+
+
 import gtrutils
 import card_manager
 from gtrutils import get_detailed_card_summary as det
@@ -29,7 +60,7 @@ class InvalidChoiceException(Exception):
     pass
 
 class Choice(object):
-    """ Represents a choice in an ActionBuilder list.
+    """Represents a choice in an ActionBuilder list.
     """
     def __init__(self, item, description, selectable=True):
         self.item = item
@@ -44,7 +75,7 @@ class Choice(object):
 
 
 class LaborerActionBuilder(object):
-    """ Puts together the information needed for a Laborer action,
+    """Puts together the information needed for a Laborer action.
     """
 
     def __init__(self, pool, hand, has_dock=False):
@@ -131,10 +162,19 @@ class LaborerActionBuilder(object):
 
 
 
-class LeadRoleActionBuilder(object):
-    """ Builds up a message.LeadRoleAction.
+class RoleActionBuilder(object):
+    """Builds up a message.GameAction for LEADROLE or FOLLOWROLE.
+    
+    If role is not None, we generate a FOLLOWROLE action instead,
+    otherwise, role is determined.
     """
-    def __init__(self, hand, has_palace=False, petition_count=3):
+
+    # The code for the petition and palace is shared between the
+    # FOLLOWROLE and LEADROLE actions, so the other states have
+    # some switches to deal with the two cases.
+    # There are notes in individual functions.
+
+    def __init__(self, hand, role=None, has_palace=False, petition_count=3):
 
         self.fsm = StateMachine()
 
@@ -154,13 +194,400 @@ class LeadRoleActionBuilder(object):
         self.fsm.add_state('PETITION_ROLE',
             self.petition_role_arrival, self.petition_role_transition)
         self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+        # THINKER state is the end state for thinkering instead of following
+        self.fsm.add_state('THINKER', self.thinker_arrival, None, True)
 
         self.fsm.set_start('START')
 
         # A list of cards in the hand and whether they've been used.
         self.hand_cards = [Choice(c, det(c), True) for c in sorted(hand, card_manager.cmp_jacks_first)]
 
-        self.role = None
+        self.role = role
+        self.choices = None
+        self.following = role is not None
+
+        self.action_units = [] # list of lists: [card1, card2, ... ]
+        self.petition_cards = []
+
+        self.has_palace = has_palace
+        self.petition_count = petition_count
+
+        self.done = False
+        self.prompt = None
+
+        # Move from Start state to SELECT_CARD
+        self.fsm.pump(None)
+
+    def get_hand_card(self, card):
+        """Gets the Choice object corresponding to an unselected card.
+
+        If the selectable card does not exist, raises InvalidChoiceException.
+        """
+        for choice in self.hand_cards:
+            if choice.item == card and choice.selectable:
+                return choice
+
+        raise InvalidChoiceException()
+
+
+    def adapter(self, choice_index):
+        """Takes the choice index from the user input and retrieves the
+        Choice.item from that selection, returning it. This is commonly used
+        by the transition functions, so the adapter makes the retrieval
+        automatic for them.
+        """
+        if choice_index is not None:
+            selectable_items = [c.item for c in self.choices if c.selectable]
+            try:
+                item = selectable_items[choice_index]
+            except IndexError:
+                raise InvalidChoiceException()
+
+            return item
+
+        else:
+            return None
+
+
+    def select_card_action(self, card):
+        """Finds the choice corresponding to card in the list of card
+        in hand, and marks it as selected. Appends card to action_unit list.
+
+        Raises InvalidChoiceException if the card is not in hand or is
+        not selectable.
+        """
+        try:
+            choice = self.get_hand_card(card)
+        except:
+            raise InvalidChoiceException('Card not found: ' + card)
+
+        choice.selectable = False
+        self.action_units.append([card])
+
+
+    def finish_petition(self):
+        """Takes the petition_cards list and adds it as an action unit to
+        the action_units list. Marks the cards added as used in the hand_cards
+        list.
+        """
+        self.action_units.append(self.petition_cards)
+
+        for card in self.petition_cards:
+            choice = self.get_hand_card(card)
+            choice.selectable = False
+
+        self.petition_cards = []
+
+
+    def finished_arrival(self):
+        self.done = True
+        if self.following:
+            self.action = message.GameAction(
+                message.FOLLOWROLE, False, len(self.action_units),
+                *itertools.chain(*self.action_units))
+
+        else:
+            self.action = message.GameAction(
+                message.LEADROLE, self.role, len(self.action_units),
+                *itertools.chain(*self.action_units))
+
+    def thinker_arrival(self):
+        self.done = True
+        self.action = message.GameAction(message.FOLLOWROLE, True, 0, None)
+
+
+    def select_card_arrival(self):
+        """This prepares the first card selection. For the case where we're
+        following, we need the option to Thinker instead, and we also mark
+        the cards that don't match the led role as unselectable.
+        """
+        self.choices = copy.deepcopy(self.hand_cards)
+
+        if self.following:
+            for c in self.choices:
+                if c.item != 'Jack' and card_manager.get_role_of_card(c.item) != self.role:
+                    c.selectable = False
+
+            self.choices.append(Choice('Petition', 'Petition', True))
+            self.choices.append(Choice('Think', 'Thinker instead of following', True))
+
+            self.prompt = 'Select card to follow with'
+
+        else:
+            self.choices.append(Choice('Petition', 'Petition', True))
+            self.prompt = 'Select card to lead with'
+
+
+    def select_card_transition(self, card):
+        """There are a couple checks if role is None,
+        for the case where we're leading. If we're following,
+        the role is always defined.
+        """
+        if self.following and card == 'Think':
+            new_state = 'THINKER'
+
+        elif card == 'Petition':
+            new_state = 'FIRST_PETITION'
+
+        else:
+            if self.role is None and card == 'Jack':
+                new_state = 'JACK_ROLE'
+
+            else:
+                if self.role is None and card != 'Jack':
+                    self.role = card_manager.get_role_of_card(card)
+
+                self.select_card_action(card)
+
+                new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
+
+        return new_state
+
+
+    def jack_role_arrival(self):
+        self.choices = [Choice(r, r, True) for r in card_manager.get_all_roles()]
+        self.prompt = 'Select role for Jack'
+
+
+    def jack_role_transition(self, choice):
+        self.role = choice
+        self.select_card_action('Jack')
+
+        new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
+
+        return new_state
+
+
+    def petition_role_arrival(self):
+        self.choices = [Choice(r, r, True) for r in card_manager.get_all_roles()]
+        self.prompt = 'Select role for Petition'
+
+
+    def petition_role_transition(self, choice):
+        self.role = choice
+        self.finish_petition()
+
+        new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
+
+        return new_state
+
+
+    def first_petition_arrival(self):
+        """Petitions are constructed one card at a time, adding
+        cards to petition_cards. Once a complete petition is assembled,
+        the cards are marked as used in hand_cards and an action unit is
+        added.
+
+        The first card for a petition can be anything where we have
+        3 (or 2 with a Circus) cards of the same role. 
+
+        Subsequent cards are restricted to be the same role.
+        """
+        #TODO: Only make groups of 3 or 2 selectable.
+        self.choices = self.get_petition_filtered_hand()
+        self.choices.append(Choice(None, 'Cancel petition', True))
+
+        self.prompt = 'Select cards for petition'
+
+
+    def first_petition_transition(self, card):
+        if card is None:
+            # Cancel petition. Determine where we came from by whether
+            # we've added any action units
+            new_state = 'PALACE_CARDS' if self.action_units else 'SELECT_CARD'
+
+        else:
+            self.petition_cards.append(card)
+
+            new_state = 'MORE_PETITIONS'
+
+        return new_state
+
+
+    def more_petitions_arrival(self):
+        """The petition cards after the first are restricted to being
+        the same role as the first petition card. Cancelling the petition
+        is as simple as clearing the petition_cards list and returning to
+        the PALACE_CARDS state or the SELECT_CARD state, depending on
+        where we came from.
+        """
+
+        self.choices = self.get_petition_filtered_hand()
+        self.choices.append(Choice(None, 'Cancel petition', True))
+
+        self.prompt = "Select more cards for petition"
+
+
+    def more_petitions_transition(self, choice):
+        if choice is None:
+            self.petition_cards = []
+
+            # Cancel petition. Determine origin state by checking if an
+            # action unit has been added.  # SELECT_CARD is the start
+            # state, so no action units will exist yet.
+            new_state = 'PALACE_CARDS' if self.action_units else 'SELECT_CARD'
+
+        else:
+            self.petition_cards.append(choice)
+
+            if len(self.petition_cards) == self.petition_count:
+                if self.role:
+                    self.finish_petition()
+                    new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
+
+                else:
+                    new_state = 'PETITION_ROLE'
+
+            else:
+                new_state = 'MORE_PETITIONS'
+
+        return new_state
+
+
+    def palace_cards_arrival(self):
+        """Adding additional cards with the palace allow only roles that
+        match the role of the first card (or the led role if following).
+        """
+        self.choices = copy.deepcopy(self.hand_cards)
+        for c in self.choices:
+            # Mark as unselectable cards that don't match the role being led
+            if c.item != 'Jack' and self.role != card_manager.get_role_of_card(c.item):
+                c.selectable = False
+
+        self.choices.append(Choice('Petition', 'Petition', True))
+        self.choices.append(Choice('Skip', 'Skip further Palace action', True))
+
+        self.prompt = 'Select additional palace actions (currently {0:d} actions)'.format(
+            len(self.action_units))
+
+
+    def palace_cards_transition(self, choice):
+        """Take an action with the palace. The role has already been
+        determined. Petitioning and skipping more Palace actions are options.
+        """
+        if choice == 'Petition':
+            new_state = 'FIRST_PETITION'
+
+        elif choice == 'Skip':
+            new_state = 'FINISHED'
+
+        else:
+            c = self.get_hand_card(choice)
+            c.selectable = False
+
+            self.action_units.append([choice])
+            new_state = 'PALACE_CARDS'
+
+        return new_state
+
+
+    def get_petition_filtered_hand(self):
+        """Gets a copy of the list of cards in the hand, but filters
+        them so the cards that can't be added for the current petition
+        are not selectable.
+
+        This function does not change the list of cards in hand.
+
+        TODO: update this so it's only groups of 3(2) that can be selected
+        """
+        petition_cpy = list(self.petition_cards)
+        if self.petition_cards:
+            petition_role = card_manager.get_role_of_card(self.petition_cards[0])
+        else:
+            petition_role = None
+
+        choices = []
+        print self.hand_cards
+
+        for choice in self.hand_cards:
+            card = choice.item
+            selectable = choice.selectable
+
+            role_mismatch = petition_role is not None and card != 'Jack' and \
+                petition_role != card_manager.get_role_of_card(card)
+
+            if card == 'Jack':
+                choices.append(Choice(card, 'Jack', False))
+
+            elif role_mismatch or not selectable:
+                choices.append(Choice(card, det(card), False))
+
+            elif card in petition_cpy and selectable:
+                choices.append(Choice(card, det(card), False))
+                petition_cpy.remove(card)
+
+            else:
+                choices.append(Choice(card, det(card), selectable))
+
+        return choices
+
+
+    def get_choices(self):
+        return self.choices
+
+
+    def make_choice(self, choice):
+        self.fsm.pump(choice)
+
+
+
+
+#if 0:
+    def show_choices(self, choices_list, prompt=None):
+        """Returns the index in the choices_list selected by the user or
+        raises a StartOverException or a CancelDialogExeption.
+
+        The choices_list is a list of Choices.
+        """
+        i_choice = 1
+        for c in choices_list:
+            if c.selectable:
+                print '  [{0:2d}] {1}'.format(i_choice, c.description)
+                i_choice+=1
+            else:
+                print '       {0}'.format(c.description)
+
+        if prompt is not None:
+            print prompt
+        else:
+            print 'Please make a selection:'
+
+    def test_it(self):
+        while True:
+            self.show_choices(self.get_choices(), self.prompt)
+            choice = int(raw_input()) -1
+            self.make_choice(choice)
+            if self.done:
+                print 'Finished! Action: ' + repr(self.action)
+                break
+
+
+class FollowRoleActionBuilder(object):
+    """Builds up a message.LeadRoleAction.
+    """
+    def __init__(self, role, hand, has_palace=False, petition_count=3):
+
+        self.fsm = StateMachine()
+
+        self.fsm.add_adapter(self.adapter)
+
+        self.fsm.add_state('START', None, lambda _: 'SELECT_CARD')
+        self.fsm.add_state('SELECT_CARD',
+            self.select_card_arrival, self.select_card_transition)
+        self.fsm.add_state('PALACE_CARDS',
+            self.palace_cards_arrival, self.palace_cards_transition)
+        self.fsm.add_state('FIRST_PETITION',
+            self.first_petition_arrival, self.first_petition_transition)
+        self.fsm.add_state('MORE_PETITIONS',
+            self.more_petitions_arrival, self.more_petitions_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
+
+        # A list of cards in the hand and whether they've been used.
+        self.hand_cards = [Choice(c, det(c), True) for c in sorted(hand, card_manager.cmp_jacks_first)]
+
+        self.role = role
         self.choices = None
 
         self.action_units = [] # list of lists: [card1, card2, ... ]
@@ -176,7 +603,7 @@ class LeadRoleActionBuilder(object):
         self.fsm.pump(None)
 
     def get_hand_card(self, card):
-        """ Gets a card in the hand that has not yet been selected.
+        """Gets a card in the hand that has not yet been selected.
         Returns the Choice object corresponding to that card.
 
         If the selectable card does not exist, raises InvalidChoiceException.
@@ -203,7 +630,7 @@ class LeadRoleActionBuilder(object):
 
 
     def select_card_action(self, card):
-        """ Gets the choice corresponding to card in the list of card
+        """Gets the choice corresponding to card in the list of card
         in hand, and marks it as selected. Appends card to action_unit list.
 
         Raises InvalidChoiceException if the card is not in hand or is
@@ -356,7 +783,7 @@ class LeadRoleActionBuilder(object):
 
 
     def palace_cards_transition(self, choice):
-        """ Take an action with the palace. The role has already been
+        """Take an action with the palace. The role has already been
         determined. Petitioning and skipping more Palace actions are option.
         """
         if choice == 'Petition':
@@ -376,7 +803,7 @@ class LeadRoleActionBuilder(object):
 
 
     def get_petition_filtered_hand(self):
-        """ Gets a copy of the list of cards in the hand, but filters
+        """Gets a copy of the list of cards in the hand, but filters
         them so the cards that can't be added for the current petition
         are not selectable.
 
@@ -424,41 +851,12 @@ class LeadRoleActionBuilder(object):
         self.fsm.pump(choice)
 
 
-if 0:
-    def show_choices(self, choices_list, prompt=None):
-        """ Returns the index in the choices_list selected by the user or
-        raises a StartOverException or a CancelDialogExeption.
-
-        The choices_list is a list of Choices.
-        """
-        i_choice = 1
-        for c in choices_list:
-            if c.selectable:
-                print '  [{0:2d}] {1}'.format(i_choice, c.description)
-                i_choice+=1
-            else:
-                print '       {0}'.format(c.description)
-
-        if prompt is not None:
-            print prompt
-        else:
-            print 'Please make a selection:'
-
-    def test_it(self):
-        while True:
-            self.show_choices(self.get_choices(), self.prompt)
-            choice = int(raw_input()) -1
-            self.make_choice(choice)
-            if self.done:
-                print 'Finished! Action: ' + repr(self.action)
-                break
-
 
 class SingleChoiceActionBuilder(object):
-    """ Gets a simple response from a list.
+    """Gets a simple response from a list.
     """
     def __init__(self, action_type, choices):
-        """ The parameter choices is a list of Choice objects.
+        """The parameter choices is a list of Choice objects.
 
         For example:
 
@@ -487,7 +885,7 @@ class SingleChoiceActionBuilder(object):
 
 
 class Client(object):
-    """ Rather than interact with the player via the command line and stdout,
+    """Rather than interact with the player via the command line and stdout,
     this client is broken out with an interface for each of the game decisions
     a player must make.
 
@@ -511,7 +909,7 @@ class Client(object):
         return self.game.game_state.players[self.player_id]
 
     def update_game_state(self, gs):
-        """ Updates the game state
+        """Updates the game state
         """
         self.game.game_state = gs
         self.game.game_state.show_public_game_state()
@@ -530,7 +928,7 @@ class Client(object):
 
 
     def make_choice(self, choice):
-        """ Makes a selection of a menu item. If the action is completed,
+        """Makes a selection of a menu item. If the action is completed,
         then return the action and reset the builder.
         If the action is not complete, return None.
         """
@@ -552,7 +950,7 @@ class Client(object):
 
 
     def show_choices(self, choices_list, prompt=None):
-        """ Returns the index in the choices_list selected by the user or
+        """Returns the index in the choices_list selected by the user or
         raises a StartOverException or a CancelDialogExeption.
 
         The choices_list is a list of Choices.
@@ -572,7 +970,7 @@ class Client(object):
 
 
     def action_thinkerorlead(self):
-        """ Asks whether the player wants to think or lead at the start of their
+        """Asks whether the player wants to think or lead at the start of their
         turn.
         """
         self.builder = SingleChoiceActionBuilder(message.THINKERORLEAD,
@@ -580,7 +978,7 @@ class Client(object):
 
 
     def action_usesenate(self):
-        """ Asks whether the player wants to think or lead at the start of their
+        """Asks whether the player wants to think or lead at the start of their
         turn.
         """
         i = self.game.game_state.kip_index
@@ -592,7 +990,7 @@ class Client(object):
 
 
     def action_thinkertype(self):
-        """ Asks for the type of thinker.
+        """Asks for the type of thinker.
         """
         p = self.get_player()
 
@@ -605,7 +1003,7 @@ class Client(object):
 
 
     def action_uselatrine(self):
-        """ Asks which card, if any, the player wishes to use with the
+        """Asks which card, if any, the player wishes to use with the
         Latrine before thinking.
         """
         #lg.info('Choose a card to discard with the Latrine.')
@@ -620,7 +1018,7 @@ class Client(object):
 
 
     def action_skipthinker(self):
-        """ Asks if the player wants to skip the thinker action.
+        """Asks if the player wants to skip the thinker action.
         """
         choices = [Choice(True, 'Perform thinker'), Choice(False, 'Skip thinker')]
 
@@ -638,7 +1036,7 @@ class Client(object):
 
 
     def action_usevomitorium(self):
-        """ Asks if the player wants to discard their hand with the Vomitorium.
+        """Asks if the player wants to discard their hand with the Vomitorium.
 
         Returns True if player uses the Vomitorium, False otherwise.
         """
@@ -688,7 +1086,7 @@ class Client(object):
 
 
     def action_fountain(self):
-        """ The Fountain allows you to draw a card from the deck, then
+        """The Fountain allows you to draw a card from the deck, then
         choose whether to use the card with a craftsman action. The player
         is allowed to just keep (draw) the card.
 
@@ -788,7 +1186,7 @@ class Client(object):
 
 
     def action_laborer(self):
-        """ Returns (card_from_pool, card_from_hand).
+        """Returns (card_from_pool, card_from_hand).
         """
         player = self.get_player()
 
@@ -850,7 +1248,7 @@ class Client(object):
         return message.GameAction(message.STAIRWAY, player_name, building_name, material, from_pool)
 
     def action_architect(self):
-        """ Returns (building, material, site, from_pool) to be built.
+        """Returns (building, material, site, from_pool) to be built.
 
         If the action is to be skipped, returns None, None, None
         """
@@ -903,7 +1301,7 @@ class Client(object):
         return message.GameAction(message.ARCHITECT, building, material, site, from_pool)
 
     def action_craftsman(self):
-        """ Returns (building, material, site) to be built.
+        """Returns (building, material, site) to be built.
         """
         p = self.get_player()
         building, material, site = None, None, None
@@ -941,7 +1339,7 @@ class Client(object):
         return message.GameAction(message.CRAFTSMAN, building, material, site)
 
     def action_merchant(self):
-        """ Prompts for which card to get from the pool and hand for a Merchant
+        """Prompts for which card to get from the pool and hand for a Merchant
         action.
 
         There are flags for the player having an Basilica or Atrium. These
@@ -997,7 +1395,7 @@ class Client(object):
         hand = self.get_player().hand
         has_palace = self.game.player_has_active_building(self.get_player(), 'Palace')
         petition_count = 2 if self.game.player_has_active_building(self.get_player(), 'Circus') else 3
-        self.builder = LeadRoleActionBuilder(hand, has_palace, petition_count)
+        self.builder = RoleActionBuilder(hand, None, has_palace, petition_count)
 
 
 
@@ -1007,4 +1405,4 @@ class Client(object):
         has_palace = self.game.player_has_active_building(self.get_player(), 'Palace')
         petition_count = 2 if self.game.player_has_active_building(self.get_player(), 'Circus') else 3
         role = self.game.game_state.role_led
-        self.builder = FollowRoleActionBuilder(role, hand, has_palace, petition_count)
+        self.builder = RoleActionBuilder(hand, role, has_palace, petition_count)
