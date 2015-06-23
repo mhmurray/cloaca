@@ -30,8 +30,10 @@ shared.
 
 
 import gtrutils
+from card_manager import get_role_of_card as card2role
+from card_manager import get_material_of_card as card2mat
 import card_manager
-from gtrutils import get_detailed_card_summary as det
+from gtrutils import get_detailed_card_summary as card2summary
 import gtr
 from building import Building
 from gamestate import GameState
@@ -125,7 +127,7 @@ class LaborerActionBuilder(object):
 
 
     def from_pool_arrival(self):
-        self.choices = [Choice(c, det(c), True) for c in self.pool_cards]
+        self.choices = [Choice(c, card2summary(c), True) for c in self.pool_cards]
         self.choices.append(Choice(None, 'Skip card from pool', True))
         self.prompt = 'Performing Laborer. Select card from pool'
 
@@ -137,7 +139,7 @@ class LaborerActionBuilder(object):
 
 
     def from_hand_arrival(self):
-        self.choices = [Choice(c, det(c), c != 'Jack') for c in self.hand_cards]
+        self.choices = [Choice(c, card2summary(c), c != 'Jack') for c in self.hand_cards]
         self.choices.append(Choice(None, 'Skip card from hand', True))
         self.prompt = 'Performing Laborer. Select card from hand'
 
@@ -199,7 +201,8 @@ class RoleActionBuilder(object):
         self.fsm.set_start('START')
 
         # A list of cards in the hand and whether they've been used.
-        self.hand_cards = [Choice(c, det(c), True) for c in sorted(hand, card_manager.cmp_jacks_first)]
+        self.hand_cards = [Choice(c, card2summary(c), True) for c in \
+                           sorted(hand, card_manager.cmp_jacks_first)]
 
         self.role = role
         self.choices = None
@@ -304,7 +307,7 @@ class RoleActionBuilder(object):
 
         if self.following:
             for c in self.choices:
-                if c.item != 'Jack' and card_manager.get_role_of_card(c.item) != self.role:
+                if c.item != 'Jack' and card2role(c.item) != self.role:
                     c.selectable = False
 
             self.choices.append(Choice('Petition', 'Petition', True))
@@ -334,7 +337,7 @@ class RoleActionBuilder(object):
 
             else:
                 if self.role is None and card != 'Jack':
-                    self.role = card_manager.get_role_of_card(card)
+                    self.role = card2role(card)
 
                 self.select_card_action(card)
 
@@ -450,7 +453,7 @@ class RoleActionBuilder(object):
         self.choices = copy.deepcopy(self.hand_cards)
         for c in self.choices:
             # Mark as unselectable cards that don't match the role being led
-            if c.item != 'Jack' and self.role != card_manager.get_role_of_card(c.item):
+            if c.item != 'Jack' and self.role != card2role(c.item):
                 c.selectable = False
 
         self.choices.append(Choice('Petition', 'Petition', True))
@@ -491,7 +494,7 @@ class RoleActionBuilder(object):
         """
         petition_cpy = list(self.petition_cards)
         if self.petition_cards:
-            petition_role = card_manager.get_role_of_card(self.petition_cards[0])
+            petition_role = card2role(self.petition_cards[0])
         else:
             petition_role = None
 
@@ -502,20 +505,20 @@ class RoleActionBuilder(object):
             selectable = choice.selectable
 
             role_mismatch = petition_role is not None and card != 'Jack' and \
-                petition_role != card_manager.get_role_of_card(card)
+                petition_role != card2role(card)
 
             if card == 'Jack':
                 choices.append(Choice(card, 'Jack', False))
 
             elif role_mismatch or not selectable:
-                choices.append(Choice(card, det(card), False))
+                choices.append(Choice(card, card2summary(card), False))
 
             elif card in petition_cpy and selectable:
-                choices.append(Choice(card, det(card), False))
+                choices.append(Choice(card, card2summary(card), False))
                 petition_cpy.remove(card)
 
             else:
-                choices.append(Choice(card, det(card), selectable))
+                choices.append(Choice(card, card2summary(card), selectable))
 
         return choices
 
@@ -526,6 +529,229 @@ class RoleActionBuilder(object):
 
     def make_choice(self, choice):
         self.fsm.pump(choice)
+
+
+
+class ArchitectActionBuilder(object):
+    """Assembles an architect action. There is a lot of info we need
+    from the GameState.
+    """
+
+    def __init__(self, buildings, stockpile, hand, pool, in_town_sites,
+            out_of_town_sites, has_archway, has_road, has_tower,
+            has_scriptorium, oot_allowed):
+
+        self.fsm = StateMachine()
+
+        self.fsm.add_adapter(self.adapter)
+
+        self.fsm.add_state('START', None,
+                lambda _: 'BUILDING' if len(self.incomplete_buildings) else 'FOUNDATION')
+        self.fsm.add_state('BUILDING', 
+                self.building_arrival, self.building_transition)
+        self.fsm.add_state('MATERIAL', 
+                self.material_arrival, self.material_transition)
+        self.fsm.add_state('FOUNDATION', 
+                self.foundation_arrival, self.foundation_transition)
+        self.fsm.add_state('SITE', 
+                self.site_arrival, self.site_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
+
+
+        self.stockpile = sorted(stockpile)
+        self.pool = sorted(pool)
+        self.hand = sorted(hand, card_manager.cmp_jacks_first)
+        self.sites_allowed = set(in_town_sites)
+        if oot_allowed:
+            self.sites_allowed.update(out_of_town_sites)
+
+        self.complete_buildings = [b for b in buildings if b.completed]
+        self.incomplete_buildings = [b for b in buildings if not b.completed]
+
+        self.has_archway = has_archway
+        self.has_road = has_road
+        self.has_tower = has_tower
+        self.has_scriptorium = has_scriptorium
+
+        self.oot_allowed = oot_allowed
+
+        self.building = None # An object of type Building
+        self.material = None
+        self.site = None
+
+        self.from_pool = False
+
+        self.done = False
+        self.prompt = None
+
+        self.fsm.pump(None)
+
+
+    def get_choices(self):
+        return self.choices
+
+    
+    def make_choice(self, choice):
+        self.fsm.pump(choice)
+
+
+    def adapter(self, choice_index):
+        """Takes the choice index from the user input and retrieves the
+        Choice.item from that selection, returning it. This is commonly used
+        by the transition functions, so the adapter makes the retrieval
+        automatic for them.
+        """
+        if choice_index is not None:
+            selectable_items = [c.item for c in self.choices if c.selectable]
+            try:
+                item = selectable_items[choice_index]
+            except IndexError:
+                raise InvalidChoiceException()
+
+            return item
+
+        else:
+            return None
+
+    
+    def building_arrival(self):
+        stockpile_materials = map(card2mat, self.stockpile)
+        pool_materials = map(card2mat, self.pool)
+
+        available_materials = list(stockpile_materials)
+        if self.has_archway:
+            available_materials.extend(pool_materials)
+
+
+        self.choices = []
+        
+        for b in self.incomplete_buildings:
+            material = card2mat(b.foundation)
+            site_material = b.site
+
+            can_add = self.has_road and 'Stone' in (material, site_material) and len(available_materials) or \
+                      self.has_tower and 'Rubble' in available_materials or \
+                      material in available_materials or site_material in available_materials or \
+                      self.has_scriptorium and 'Marble' in available_materials
+
+            self.choices.append(Choice(b, str(b), can_add))
+
+        self.choices.append(Choice('Start', 'Start a new building from hand'))
+        self.choices.append(Choice('Skip', 'Skip Architect action'))
+
+        self.prompt = 'Select a building to add a material to'
+
+
+    def building_transition(self, choice):
+        if isinstance(choice, Building):
+            self.building = choice
+            new_state = 'MATERIAL'
+            
+        elif choice is 'Start':
+            new_state = 'FOUNDATION'
+
+        else:
+            new_state = 'FINISHED'
+
+
+        return new_state
+
+
+    def material_arrival(self):
+        # Figure out which materials can potentially be added to a building
+        okay_mats = set()
+
+        if self.has_tower:
+            okay_mats.add('Rubble')
+
+        if self.has_scriptorium:
+            okay_mats.add('Marble')
+
+        materials = card2mat(self.building.foundation), self.building.site
+        okay_mats.update(materials)
+
+        if self.has_road and 'Stone' in materials:
+            okay_mats = set(card_manager.get_materials())
+
+        self.choices = [Choice(c, card2summary(c), card2mat(c) in okay_mats)
+                        for c in self.stockpile]
+
+        if self.has_archway:
+            self.choices.extend(
+                    [Choice('[POOL]'+c, '[POOL] '+ card2summary(c),
+                        card2mat(c) in okay_mats) for c in self.pool])
+
+            self.prompt = 'Select material from stockpile or pool to add to building ' + str(self.building)
+        else:
+            self.prompt = 'Select material from stockpile to add to building ' + str(self.building)
+
+        self.choices.append(Choice('Cancel', 'Cancel'))
+
+
+    def material_transition(self, choice):
+        if choice == 'Cancel':
+            self.building = None
+            return 'BUILDING'
+
+        elif choice.startswith('[POOL]'):
+            self.from_pool = True
+            choice = choice[6:]
+
+        self.material = choice
+
+        return 'FINISHED'
+
+
+    def foundation_arrival(self):
+
+        card_okay = lambda c: card2mat(c) in self.sites_allowed and \
+                c not in map(str, self.complete_buildings+self.incomplete_buildings) or c == 'Statue'
+
+        self.choices = [Choice(c, card2summary(c)) for c in self.hand if card_okay(c)]
+        self.choices.append(Choice('Cancel', 'Cancel'))
+
+        self.prompt = 'Select building to start from hand'
+
+
+    def foundation_transition(self, choice):
+        if choice == 'Cancel':
+            new_state = 'BUILDING'
+
+        else:
+            self.building = Building(choice)
+
+            if self.building.foundation == 'Statue':
+                new_state = 'SITE'
+
+            else:
+                self.site = card2mat(self.building.foundation)
+                new_state = 'FINISHED'
+
+        return new_state
+
+
+    def site_arrival(self):
+        self.choices = [Choice(c, c+' Site', c in self.sites_allowed) for c in \
+                        card_manager.get_materials()]
+
+        self.prompt = 'Select a site to start the Statue on'
+
+
+    def site_transition(self, choice):
+        self.site = choice
+        return 'FINISHED'
+
+
+    def finished_arrival(self):
+        self.done = True
+        self.action = message.GameAction(
+                message.ARCHITECT,
+                str(self.building),
+                self.material,
+                self.site,
+                self.from_pool)
 
 
 
@@ -717,7 +943,7 @@ class Client(object):
         #lg.info('Choose a card to discard with the Latrine.')
 
         sorted_hand = sorted(self.get_player().hand)
-        card_choices = [Choice(c, det(c)) for c in sorted_hand]
+        card_choices = [Choice(c, card2summary(c)) for c in sorted_hand]
         card_choices.insert(0, Choice(None, 'Skip discard'))
 
         self.builder = SingleChoiceActionBuilder(message.USELATRINE, card_choices)
@@ -756,7 +982,7 @@ class Client(object):
     def action_patronfrompool(self):
         p = self.get_player()
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMPOOL,
-            [ Choice(c, det(c)) for c in sorted(self.game.game_state.pool) ] + \
+            [ Choice(c, card2summary(c)) for c in sorted(self.game.game_state.pool) ] + \
             [ Choice(None, 'Skip Patron from pool') ])
 
         self.builder.prompt = \
@@ -779,7 +1005,7 @@ class Client(object):
         p = self.get_player()
         cards = sorted([c for c in hand if c != 'Jack'])
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMHAND,
-            [ Choice(c, det(c)) for c in cards ] +
+            [ Choice(c, card2summary(c)) for c in cards ] +
             [ Choice(None, 'Skip Patron from hand') ])
 
         self.builder.prompt = \
@@ -812,7 +1038,7 @@ class Client(object):
 
         skip, building, material, site = (False, None, None, None)
 
-        material_of_card = card_manager.get_material_of_card(p.fountain_card)
+        material_of_card = card2mat(p.fountain_card)
 
         card_choices = \
           [str(b) for b in p.get_incomplete_buildings()
@@ -841,11 +1067,11 @@ class Client(object):
             building = p.fountain_card
 
             if building == 'Statue':
-                sites = card_manager.get_all_materials()
+                sites = card_manager.get_materials()
                 site_index = self.choices_dialog(sites)
                 site = sites[site_index]
             else:
-                site = card_manager.get_material_of_card(building)
+                site = card2mat(building)
 
         else: # Adding to a building from hand
             building = card_choices[card_index-1]
@@ -858,13 +1084,13 @@ class Client(object):
         lg.info('Card to use for legionary:')
         hand = p.hand
         sorted_hand = sorted(hand)
-        card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+        card_choices = [card2summary(card) for card in sorted_hand]
 
         card_index = self.choices_dialog(card_choices,
             'Select a card to use to demand material')
         card_from_hand = sorted_hand[card_index]
 
-        lg.info('Using card %s' % gtrutils.get_detailed_card_summary(card_from_hand))
+        lg.info('Using card %s' % card2summary(card_from_hand))
         return message.GameAction(message.LEGIONARY, card_from_hand)
 
 
@@ -877,7 +1103,7 @@ class Client(object):
         done=False
         cards_to_move=[]
         choices=['All', 'None']
-        choices.extend([gtrutils.get_detailed_card_summary(card)
+        choices.extend([card2summary(card)
                         for card in p.camp if card is not 'Jack'])
         while not done:
             lg.info('Do you wish to use your Sewer?')
@@ -938,11 +1164,11 @@ class Client(object):
 
             sorted_stockpile = sorted(p.stockpile)
             lg.info('Choose a material to add from your stockpile:')
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_stockpile]
+            card_choices = [card2summary(card) for card in sorted_stockpile]
 
             if has_archway:
                 sorted_pool = sorted(self.game.game_state.pool)
-                pool_choices = ['[POOL]' + gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
+                pool_choices = ['[POOL]' + card2summary(card) for card in sorted_pool]
                 card_choices.extend(pool_choices)
 
             card_index = self.choices_dialog(card_choices, 'Select a material to add')
@@ -955,7 +1181,32 @@ class Client(object):
 
         return message.GameAction(message.STAIRWAY, player_name, building_name, material, from_pool)
 
+
     def action_architect(self):
+        """Returns (building, material, site, from_pool) to be built.
+
+        If the action is to be skipped, returns None, None, None
+        """
+        player = self.get_player()
+
+        pool = self.game.game_state.pool
+        hand = player.hand
+
+        self.builder = ArchitectActionBuilder(
+                player.buildings,
+                player.stockpile,
+                player.hand,
+                self.game.game_state.pool,
+                self.game.game_state.in_town_foundations,
+                self.game.game_state.out_of_town_foundations,
+                self.game.player_has_active_building(player, 'Archway'),
+                self.game.player_has_active_building(player, 'Road'),
+                self.game.player_has_active_building(player, 'Tower'),
+                self.game.player_has_active_building(player, 'Scriptorium'),
+                self.game.game_state.oot_allowed)
+                
+
+    def _action_architect(self):
         """Returns (building, material, site, from_pool) to be built.
 
         If the action is to be skipped, returns None, None, None
@@ -972,17 +1223,17 @@ class Client(object):
         if card_index == 1: # Starting a new building
             sorted_hand = sorted(p.hand)
             lg.info('Choose a building to start from your hand:')
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+            card_choices = [card2summary(card) for card in sorted_hand]
 
             card_index = self.choices_dialog(card_choices, 'Select a building to start')
             building = sorted_hand[card_index]
 
             if building == 'Statue':
-                sites = card_manager.get_all_materials()
+                sites = card_manager.get_materials()
                 site_index = self.choices_dialog(sites)
                 site = sites[site_index]
             else:
-                site = card_manager.get_material_of_card(building)
+                site = card2mat(building)
 
         elif card_index > 1: # Adding to a building from stockpile
             building = card_choices[card_index]
@@ -991,11 +1242,11 @@ class Client(object):
 
             sorted_stockpile = sorted(p.stockpile)
             lg.info('Choose a material to add from your stockpile:')
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_stockpile]
+            card_choices = [card2summary(card) for card in sorted_stockpile]
 
             if has_archway:
                 sorted_pool = sorted(self.game.game_state.pool)
-                pool_choices = ['[POOL]' + gtrutils.get_detailed_card_summary(card) for card in sorted_pool]
+                pool_choices = ['[POOL]' + card2summary(card) for card in sorted_pool]
                 card_choices.extend(pool_choices)
 
             card_index = self.choices_dialog(card_choices, 'Select a material to add')
@@ -1022,24 +1273,24 @@ class Client(object):
         if card_index == 0: # Starting a new building
             sorted_hand = sorted(p.hand)
             lg.info('Choose a building to start from your hand:')
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+            card_choices = [card2summary(card) for card in sorted_hand]
 
             card_index = self.choices_dialog(card_choices, 'Select a building to start')
             building = sorted_hand[card_index]
 
             if building == 'Statue':
-                sites = card_manager.get_all_materials()
+                sites = card_manager.get_materials()
                 site_index = self.choices_dialog(sites)
                 site = sites[site_index]
             else:
-                site = card_manager.get_material_of_card(building)
+                site = card2mat(building)
 
         else: # Adding to a building from hand
             building = card_choices[card_index]
 
             sorted_hand = sorted(p.hand)
             lg.info('Choose a material to add from your hand:')
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+            card_choices = [card2summary(card) for card in sorted_hand]
 
             card_index = self.choices_dialog(card_choices, 'Select a material to add')
             material = sorted_hand[card_index]
@@ -1073,7 +1324,7 @@ class Client(object):
         if len(sorted_stockpile) > 0 or has_atrium:
             lg.info('Performing Merchant, choose a card from stockpile (Vault {}/{})'.format(
               str(len(p.vault)), str(card_limit)))
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_stockpile]
+            card_choices = [card2summary(card) for card in sorted_stockpile]
             card_choices.insert(0,'Skip this action')
             card_choices.insert(1,'Take card from top of deck')
 
@@ -1088,7 +1339,7 @@ class Client(object):
         sorted_hand = sorted([card for card in p.hand if card != 'Jack'])
         if card_limit>0 and has_basilica and len(sorted_hand)>0:
             lg.info('Choose a card from your hand:')
-            card_choices = [gtrutils.get_detailed_card_summary(card) for card in sorted_hand]
+            card_choices = [card2summary(card) for card in sorted_hand]
             card_choices.insert(0,'Skip this action')
 
             card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
