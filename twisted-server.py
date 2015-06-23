@@ -61,11 +61,6 @@ class GameActionProtocol(NetstringReceiver):
             self.factory.handle_game_action(self.user, a)
 
 
-    def connectionMade(self):
-        print 'made a connection'
-        self.sendString('Connected!')
-
-
     def handle_login(self, username):
          self.user = self.factory.get_user(username)
          self.factory.associate(self, self.user)
