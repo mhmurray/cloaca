@@ -113,6 +113,11 @@ class LaborerActionBuilder(object):
 
 
     def adapter(self, choice_index):
+        """Takes the choice index from the user input and retrieves the
+        Choice.item from that selection, returning it. This is commonly used
+        by the transition functions, so the adapter makes the retrieval
+        automatic for them.
+        """
         if choice_index is not None:
             selectable_items = [c.item for c in self.choices if c.selectable]
             try:
@@ -153,6 +158,122 @@ class LaborerActionBuilder(object):
     def finished_arrival(self):
         self.done = True
         self.action = message.GameAction(message.LABORER, self.hand_card, self.pool_card)
+
+
+    def get_choices(self):
+        return self.choices
+
+
+    def make_choice(self, choice):
+        self.fsm.pump(choice)
+
+
+class MerchantActionBuilder(object):
+    """Puts together the information needed for a Laborer action.
+    """
+
+    def __init__(self, stockpile, hand, has_atrium, has_basilica):
+
+        self.fsm = StateMachine()
+
+        self.fsm.add_adapter(self.adapter)
+
+        self.fsm.add_state('START', None, lambda _ : 'FROM_STOCKPILE')
+        self.fsm.add_state('FROM_STOCKPILE',
+            self.from_stockpile_arrival, self.from_stockpile_transition)
+        self.fsm.add_state('FROM_HAND',
+            self.from_hand_arrival, self.from_hand_transition)
+        self.fsm.add_state('FROM_DECK',
+            self.from_deck_arrival, self.from_deck_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
+
+        self.hand_cards = sorted(hand, card_manager.cmp_jacks_first)
+        self.stockpile_cards = sorted(stockpile, card_manager.cmp_jacks_first)
+
+        self.has_basilica = has_basilica
+        self.has_atrium = has_atrium
+
+        self.stockpile_card = None
+        self.hand_card = None
+        self.from_deck = False
+
+        self.choices = None
+        self.prompt = None
+        self.done = False
+        self.action = None
+
+        # Move from Start state
+        self.fsm.pump(None)
+
+
+    def adapter(self, choice_index):
+        """Takes the choice index from the user input and retrieves the
+        Choice.item from that selection, returning it. This is commonly used
+        by the transition functions, so the adapter makes the retrieval
+        automatic for them.
+        """
+        if choice_index is not None:
+            selectable_items = [c.item for c in self.choices if c.selectable]
+            try:
+                item = selectable_items[choice_index]
+            except IndexError:
+                raise InvalidChoiceException()
+
+            return item
+
+        else:
+            return None
+
+
+    def from_stockpile_arrival(self):
+        self.choices = [Choice(c, card2summary(c)) for c in self.stockpile_cards]
+        self.choices.append(Choice('Skip', 'Skip card from stockpile'))
+        self.prompt = 'Select card from stockpile for Merchant'
+
+
+    def from_stockpile_transition(self, choice):
+        self.stockpile_card = choice
+
+        if self.has_basilica:
+            return 'FROM_BASILICA'
+
+        elif self.has_atrium:
+            return 'FROM_DECK'
+
+        else:
+            return 'FINISHED'
+
+
+    def from_hand_arrival(self):
+        self.choices = [Choice(c, card2summary(c), c != 'Jack') for c in self.hand_cards]
+        self.choices.append(Choice('Skip', 'Skip card from hand'))
+        self.prompt = 'Select card from hand for Merchant action (Basilica)'
+
+
+    def from_hand_transition(self, choice):
+        self.hand_card = choice
+
+        return 'FROM_DECK' if self.has_atrium else 'FINISHED'
+
+
+    def from_deck_arrival(self):
+        self.choices = [Choice(True, 'Take card from deck'),
+                        Choice(False, 'Skip card from deck')]
+        self.prompt = 'Take card from deck for Merchant action? (Atrium)'
+
+
+    def from_deck_transition(self, choice):
+        self.hand_card = choice
+
+        return 'FINISHED'
+
+
+    def finished_arrival(self):
+        self.done = True
+        self.action = message.GameAction(message.MERCHANT, self.stockpile_card,
+                self.hand_card, self.from_deck)
 
 
     def get_choices(self):
@@ -292,6 +413,7 @@ class RoleActionBuilder(object):
             self.action = message.GameAction(
                 message.LEADROLE, self.role, len(self.action_units),
                 *itertools.chain(*self.action_units))
+
 
     def thinker_arrival(self):
         self.done = True
@@ -531,7 +653,6 @@ class RoleActionBuilder(object):
         self.fsm.pump(choice)
 
 
-
 class ArchitectActionBuilder(object):
     """Assembles an architect action. There is a lot of info we need
     from the GameState.
@@ -706,8 +827,9 @@ class ArchitectActionBuilder(object):
 
     def foundation_arrival(self):
 
-        card_okay = lambda c: card2mat(c) in self.sites_allowed and \
-                c not in map(str, self.complete_buildings+self.incomplete_buildings) or c == 'Statue'
+        card_okay = lambda c: c != 'Jack' and card2mat(c) in self.sites_allowed and \
+                c not in map(str, self.complete_buildings+self.incomplete_buildings) \
+                or c == 'Statue'
 
         self.choices = [Choice(c, card2summary(c)) for c in self.hand if card_okay(c)]
         self.choices.append(Choice('Cancel', 'Cancel'))
@@ -753,6 +875,207 @@ class ArchitectActionBuilder(object):
                 self.site,
                 self.from_pool)
 
+
+class CraftsmanActionBuilder(object):
+    """Assembles an architect action. There is a lot of info we need
+    from the GameState.
+    """
+
+    def __init__(self, buildings, hand, in_town_sites,
+            out_of_town_sites, has_road, has_tower,
+            has_scriptorium, oot_allowed):
+
+        self.fsm = StateMachine()
+
+        self.fsm.add_adapter(self.adapter)
+
+        self.fsm.add_state('START', None,
+                lambda _: 'BUILDING' if len(self.incomplete_buildings) else 'FOUNDATION')
+        self.fsm.add_state('BUILDING', 
+                self.building_arrival, self.building_transition)
+        self.fsm.add_state('MATERIAL', 
+                self.material_arrival, self.material_transition)
+        self.fsm.add_state('FOUNDATION', 
+                self.foundation_arrival, self.foundation_transition)
+        self.fsm.add_state('SITE', 
+                self.site_arrival, self.site_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
+
+
+        self.hand = sorted(hand, card_manager.cmp_jacks_first)
+
+        self.sites_allowed = set(in_town_sites)
+        if oot_allowed:
+            self.sites_allowed.update(out_of_town_sites)
+
+        self.complete_buildings = [b for b in buildings if b.completed]
+        self.incomplete_buildings = [b for b in buildings if not b.completed]
+
+        self.has_road = has_road
+        self.has_tower = has_tower
+        self.has_scriptorium = has_scriptorium
+
+        self.oot_allowed = oot_allowed
+
+        self.building = None # An object of type Building
+        self.material = None
+        self.site = None
+
+        self.done = False
+        self.prompt = None
+
+        self.fsm.pump(None)
+
+
+    def get_choices(self):
+        return self.choices
+
+    
+    def make_choice(self, choice):
+        self.fsm.pump(choice)
+
+
+    def adapter(self, choice_index):
+        """Takes the choice index from the user input and retrieves the
+        Choice.item from that selection, returning it. This is commonly used
+        by the transition functions, so the adapter makes the retrieval
+        automatic for them.
+        """
+        if choice_index is not None:
+            selectable_items = [c.item for c in self.choices if c.selectable]
+            try:
+                item = selectable_items[choice_index]
+            except IndexError:
+                raise InvalidChoiceException()
+
+            return item
+
+        else:
+            return None
+
+    
+    def building_arrival(self):
+        materials = [card2mat(c) for c in self.hand if c != 'Jack']
+
+        available_materials = list(materials)
+
+        self.choices = []
+        
+        for b in self.incomplete_buildings:
+            material = card2mat(b.foundation)
+            site_material = b.site
+
+            can_add = self.has_road and 'Stone' in (material, site_material) and len(available_materials) or \
+                      self.has_tower and 'Rubble' in available_materials or \
+                      material in available_materials or site_material in available_materials or \
+                      self.has_scriptorium and 'Marble' in available_materials
+
+            self.choices.append(Choice(b, str(b), can_add))
+
+        self.choices.append(Choice('Start', 'Start a new building from hand'))
+        self.choices.append(Choice('Skip', 'Skip Craftsman action'))
+
+        self.prompt = 'Select a building to add a material to'
+
+
+    def building_transition(self, choice):
+        if isinstance(choice, Building):
+            self.building = choice
+            new_state = 'MATERIAL'
+            
+        elif choice is 'Start':
+            new_state = 'FOUNDATION'
+
+        else:
+            new_state = 'FINISHED'
+
+        return new_state
+
+
+    def material_arrival(self):
+        # Figure out which materials can potentially be added to a building
+        okay_mats = set()
+
+        if self.has_tower:
+            okay_mats.add('Rubble')
+
+        if self.has_scriptorium:
+            okay_mats.add('Marble')
+
+        materials = card2mat(self.building.foundation), self.building.site
+        okay_mats.update(materials)
+
+        if self.has_road and 'Stone' in materials:
+            okay_mats = set(card_manager.get_materials())
+
+        self.choices = [Choice(c, card2summary(c), c != 'Jack' and card2mat(c) in okay_mats)
+                        for c in self.hand]
+
+        self.choices.append(Choice('Cancel', 'Cancel'))
+
+        self.prompt = 'Select material from stockpile to add to building ' + str(self.building)
+
+
+    def material_transition(self, choice):
+        if choice == 'Cancel':
+            self.building = None
+            return 'BUILDING'
+
+        self.material = choice
+
+        return 'FINISHED'
+
+
+    def foundation_arrival(self):
+
+        card_okay = lambda c: c != 'Jack' and card2mat(c) in self.sites_allowed and \
+                c not in map(str, self.complete_buildings+self.incomplete_buildings) \
+                or c == 'Statue'
+
+        self.choices = [Choice(c, card2summary(c)) for c in self.hand if card_okay(c)]
+        self.choices.append(Choice('Cancel', 'Cancel'))
+
+        self.prompt = 'Select building to start from hand'
+
+
+    def foundation_transition(self, choice):
+        if choice == 'Cancel':
+            new_state = 'BUILDING'
+
+        else:
+            self.building = Building(choice)
+
+            if self.building.foundation == 'Statue':
+                new_state = 'SITE'
+
+            else:
+                self.site = card2mat(self.building.foundation)
+                new_state = 'FINISHED'
+
+        return new_state
+
+
+    def site_arrival(self):
+        self.choices = [Choice(c, c+' Site', c in self.sites_allowed) for c in \
+                        card_manager.get_materials()]
+
+        self.prompt = 'Select a site to start the Statue on'
+
+
+    def site_transition(self, choice):
+        self.site = choice
+        return 'FINISHED'
+
+
+    def finished_arrival(self):
+        self.done = True
+        self.action = message.GameAction(
+                message.CRAFTSMAN,
+                str(self.building),
+                self.material,
+                self.site)
 
 
 
@@ -892,15 +1215,15 @@ class Client(object):
         i_choice = 1
         for c in choices_list:
             if c.selectable:
-                print '  [{0:2d}] {1}'.format(i_choice, c.description)
+                lg.info('  [{0:2d}] {1}'.format(i_choice, c.description))
                 i_choice+=1
             else:
-                print '       {0}'.format(c.description)
+                lg.info('       {0}'.format(c.description))
 
         if prompt is not None:
-            print prompt
+            lg.info(prompt)
         else:
-            print 'Please make a selection:'
+            lg.info('Please make a selection:')
 
 
     def action_thinkerorlead(self):
@@ -992,7 +1315,7 @@ class Client(object):
 
     def action_patronfromdeck(self):
         p = self.get_player()
-        self.builder = SingleChoiceActionBuilder(message.PATRONFROMHAND,
+        self.builder = SingleChoiceActionBuilder(message.PATRONFROMDECK,
             [ Choice(True, 'Patron from the deck'),
               Choice(False, 'Skip Patron from deck') ])
 
@@ -1131,6 +1454,17 @@ class Client(object):
         self.builder = LaborerActionBuilder(pool, hand, has_dock)
 
 
+    def action_merchant(self):
+        """Returns (card_from_stockpile, card_from_hand, from_deck).
+        """
+        player = self.get_player()
+
+        self.builder = MerchantActionBuilder(
+                player.stockpile, player.hand,
+                self.game.player_has_active_building(player, 'Atrium'),
+                self.game.player_has_active_building(player, 'Basilica'))
+
+
     def action_stairway(self):
         """
         Asks the player if they wish to use the Stairway and returns
@@ -1189,9 +1523,6 @@ class Client(object):
         """
         player = self.get_player()
 
-        pool = self.game.game_state.pool
-        hand = player.hand
-
         self.builder = ArchitectActionBuilder(
                 player.buildings,
                 player.stockpile,
@@ -1200,6 +1531,24 @@ class Client(object):
                 self.game.game_state.in_town_foundations,
                 self.game.game_state.out_of_town_foundations,
                 self.game.player_has_active_building(player, 'Archway'),
+                self.game.player_has_active_building(player, 'Road'),
+                self.game.player_has_active_building(player, 'Tower'),
+                self.game.player_has_active_building(player, 'Scriptorium'),
+                self.game.game_state.oot_allowed)
+                
+
+    def action_craftsman(self):
+        """Returns (building, material, site) to be built.
+
+        If the action is to be skipped, returns None, None, None
+        """
+        player = self.get_player()
+
+        self.builder = CraftsmanActionBuilder(
+                player.buildings,
+                player.hand,
+                self.game.game_state.in_town_foundations,
+                self.game.game_state.out_of_town_foundations,
                 self.game.player_has_active_building(player, 'Road'),
                 self.game.player_has_active_building(player, 'Tower'),
                 self.game.player_has_active_building(player, 'Scriptorium'),
@@ -1259,7 +1608,7 @@ class Client(object):
 
         return message.GameAction(message.ARCHITECT, building, material, site, from_pool)
 
-    def action_craftsman(self):
+    def _action_craftsman(self):
         """Returns (building, material, site) to be built.
         """
         p = self.get_player()
@@ -1297,7 +1646,7 @@ class Client(object):
 
         return message.GameAction(message.CRAFTSMAN, building, material, site)
 
-    def action_merchant(self):
+    def _action_merchant(self):
         """Prompts for which card to get from the pool and hand for a Merchant
         action.
 

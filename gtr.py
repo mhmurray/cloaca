@@ -451,18 +451,18 @@ class Game(object):
 
 
   def handle_uselatrine(self, a):
-    p = self.game_state.get_current_player()
+    p = self.game_state.active_player
     latrine_card = a.args[0]
 
     if latrine_card is not None:
-      self.game_state.discard_for_player(player, latrine_card)
+      self.game_state.discard_for_player(p, latrine_card)
 
     self.game_state.active_player = p
     self.game_state.expected_action = message.THINKERTYPE
 
 
   def handle_thinkertype(self, a):
-    p = self.game_state.get_current_player()
+    p = self.game_state.active_player
     for_jack = a.args[0]
 
     if for_jack:
@@ -692,7 +692,7 @@ class Game(object):
 
     if do_patron:
       card = self.game_state.draw_cards(1)[0]
-      gtrutils.add_card_to_zone(card, player.clientele)
+      gtrutils.add_card_to_zone(card, p.clientele)
       if self.player_has_active_building(p, 'Bath'):
         role = card_manager.get_role_of_card(card)
         #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
