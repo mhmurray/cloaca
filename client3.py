@@ -221,7 +221,7 @@ class LegionaryActionBuilder(object):
             return None
 
 
-    def get_cards_arrival(self):
+    def get_card_arrival(self):
         self.choices = copy.deepcopy(self.hand)
 
         for c in self.cards:
@@ -235,27 +235,29 @@ class LegionaryActionBuilder(object):
 
         self.choices.append(Choice('Skip', skip_msg, True))
 
-        if len(self.cards) > 1:
+        if len(self.cards) >= 1:
             self.choices.append(Choice('Undo', 'Undo', True))
 
         self.prompt = 'Select card{0} for Legionary ({1:d}/{2:d})'.format(
                 's' if self.n_max > 1 else '',
-                len(self.cards)+1,
+                len(self.cards),
                 self.n_max)
 
 
-    def get_cards_transition(self, choice):
+    def get_card_transition(self, choice):
         if choice == 'Skip':
             new_state = 'FINISHED'
         elif choice == 'Undo':
             self.cards.pop()
             new_state = 'GET_CARD'
         else:
-            self.cards.append(choice.item)
+            self.cards.append(choice)
             if len(self.cards) == self.n_max:
                 new_state = 'FINISHED'
             elif len(self.cards) == len(self.hand):
                 new_state = 'FINISHED'
+            else:
+                new_state = 'GET_CARD'
 
         return new_state
 
@@ -272,6 +274,36 @@ class LegionaryActionBuilder(object):
 
     def make_choice(self, choice):
         self.fsm.pump(choice)
+#if 0:
+    def show_choices(self, choices_list, prompt=None):
+        """Returns the index in the choices_list selected by the user or
+        raises a StartOverException or a CancelDialogExeption.
+
+        The choices_list is a list of Choices.
+        """
+        i_choice = 1
+        for c in choices_list:
+            if c.selectable:
+                print '  [{0:2d}] {1}'.format(i_choice, c.description)
+                i_choice+=1
+            else:
+                print '       {0}'.format(c.description)
+
+        if prompt is not None:
+            print prompt
+        else:
+            print 'Please make a selection:'
+
+    def test_it(self):
+        while True:
+            if self.done:
+                print 'Finished! Action: ' + repr(self.action)
+                break
+            else:
+                self.show_choices(self.get_choices(), self.prompt)
+                choice = int(raw_input()) -1
+                self.make_choice(choice)
+
 
 
 class GiveCardsActionBuilder(object):
@@ -320,8 +352,10 @@ class GiveCardsActionBuilder(object):
         if immune:
             self.done = True
             self.action = message.GameAction(message.GIVECARDS, None)
-        else:
-            self.fsm.pump(None)
+        elif self.finished():
+            self.fsm.set_start('FINISHED')
+
+        self.fsm.pump(None)
 
 
     def adapter(self, choice_index):
@@ -367,6 +401,24 @@ class GiveCardsActionBuilder(object):
                 ', '.join(self.cards))
 
 
+
+    def finished(self):
+        leg_mats = Counter(self.mats)
+        
+        # Subtract selected cards to get the remaining required materials
+        leg_mats.subtract(map(card2mat, self.cards))
+
+        # Compare required materials with hand. There should be no overlap
+        materials = list(leg_mats.elements())
+
+        # If there's no overlap with remaining cards in hand, this subtraction
+        # shouldn't do anything to leg_mats
+        leg_mats.subtract([card2mat(c.item) for c in self.hand if c.selectable])
+        remaining_mats = list(leg_mats.elements())
+
+        return len(materials) == len(remaining_mats)
+
+
     def get_card_transition(self, choice):
         if choice == 'Undo':
             self.cards.pop()
@@ -374,21 +426,8 @@ class GiveCardsActionBuilder(object):
 
         else:
             self.cards.append(choice)
-            
-            leg_mats = Counter(self.mats)
-            
-            # Subtract selected cards to get the remaining required materials
-            leg_mats.subtract(map(card2mat, self.cards))
 
-            # Compare required materials with hand. There should be no overlap
-            materials = list(leg_mats.elements())
-
-            # If there's no overlap with remaining cards in hand, this subtraction
-            # shouldn't do anything to leg_mats
-            leg_mats.subtract([card2mat(c.item) for c in self.hand if c.selectable])
-            remaining_mats = list(leg_mats.elements())
-
-            if len(materials) == len(remaining_mats):
+            if self.finished():            
                 new_state = 'FINISHED'
             else:
                 new_state = 'GET_CARD'
@@ -431,36 +470,6 @@ class GiveCardsActionBuilder(object):
 
     def make_choice(self, choice):
         self.fsm.pump(choice)
-
-#if 0:
-    def show_choices(self, choices_list, prompt=None):
-        """Returns the index in the choices_list selected by the user or
-        raises a StartOverException or a CancelDialogExeption.
-
-        The choices_list is a list of Choices.
-        """
-        i_choice = 1
-        for c in choices_list:
-            if c.selectable:
-                print '  [{0:2d}] {1}'.format(i_choice, c.description)
-                i_choice+=1
-            else:
-                print '       {0}'.format(c.description)
-
-        if prompt is not None:
-            print prompt
-        else:
-            print 'Please make a selection:'
-
-    def test_it(self):
-        while True:
-            if self.done:
-                print 'Finished! Action: ' + repr(self.action)
-                break
-            else:
-                self.show_choices(self.get_choices(), self.prompt)
-                choice = int(raw_input()) -1
-                self.make_choice(choice)
 
 
 
@@ -1783,7 +1792,7 @@ class Client(object):
         p = self.get_player()
 
         self.builder = LegionaryActionBuilder(
-                player.hand, self.game.game_state.legionary_count)
+                p.hand, self.game.game_state.legionary_count)
 
         
     def action_givecards(self):
