@@ -40,6 +40,7 @@ class Player:
         self.revealed = revealed or []
         self.previous_revealed = []
         self.performed_craftsman = False
+        self.uid = None
 
     def __repr__(self):
         rep = ('Player(name={name!r}, hand={hand!r}, stockpile={stockpile!r}, '

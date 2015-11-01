@@ -56,6 +56,12 @@ class GameProtocol(NetstringReceiver):
             self.factory.p = self
             sys.stderr.write( "Successfully connected.\n")
 
+            print 'Requesting game state'
+            self.factory.send_command(message.GameAction(
+                    message.REQGAMESTATE))
+
+            return
+
             sys.stderr.write('Logging in user ' + self.factory.username + '\n')
             self.factory.send_command(message.GameAction(
                     message.LOGIN, self.factory.username))
@@ -73,7 +79,9 @@ class GameProtocol(NetstringReceiver):
         sys.stderr.write('Disconnected\n')
 
     def stringReceived(self, s):
-        self.factory.handle_server_msg(s)
+        print 'Received message:'
+        print repr(pickle.loads(s))
+        #self.factory.handle_server_msg(s)
 
 class GameClientFactory(ClientFactory):
     protocol = GameProtocol
@@ -87,7 +95,7 @@ class GameClientFactory(ClientFactory):
         self.start_game = start_game
         self.game_id = game_id
 
-    def startConnectint(self, connector):
+    def startedConnecting(self, connector):
         sys.stderr.write('Connecting...\n')
 
     def handle_server_msg(self, s):
@@ -167,7 +175,7 @@ class GameClientFactory(ClientFactory):
         """ Sends the command game_action to the server.
         It is of type message.GameAction.
         """
-        self.p.sendString(','.join(['0', str(game_action.action)] + map(str, game_action.args)))
+        self.p.sendString(','.join([self.username,'0', str(game_action.action)] + map(str, game_action.args)))
 
     def _fatal_error(self):
         """ Un-recoverable error. Close the connection.

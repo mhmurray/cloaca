@@ -24,12 +24,18 @@ CRAFTSMAN       = 18
 MERCHANT        = 19
 LEADROLE        = 20
 FOLLOWROLE      = 21
-GAMESTATE       = 22
-SETPLAYERID     = 23
-REQGAMESTATE    = 24
-JOINGAME        = 25
-LOGIN           = 26
-STARTGAME       = 27
+REQGAMESTATE    = 22
+GAMESTATE       = 23
+SETPLAYERID     = 24
+REQJOINGAME     = 25
+JOINGAME        = 26
+REQCREATEGAME   = 27
+CREATEGAME      = 28
+LOGIN           = 29
+REQSTARTGAME    = 30
+STARTGAME       = 31
+REQGAMELIST     = 32
+GAMELIST        = 33
 
 # A dictionary of the number of arguments for each action type
 # and their signature.
@@ -42,12 +48,18 @@ STARTGAME       = 27
 # "Card" is not a type. Cards are just strings.
 Card = str
 _action_args_dict = {
+    REQGAMESTATE   : ('reqgamestate',   0, False, () ),
     GAMESTATE      : ('gamestate',      1, False, ( (str,  'game_state'), ) ),
     SETPLAYERID    : ('setplayerid',    1, False, ( (int,  'id'), ) ),
-    REQGAMESTATE   : ('reqgamestate',   0, False, () ),
+    REQJOINGAME    : ('reqjoingame',    1, False, ( (int, 'game_id'), ) ),
     JOINGAME       : ('joingame',       1, False, ( (int, 'game_id'), ) ),
+    REQCREATEGAME  : ('reqcreategame',  0, False, () ),
+    CREATEGAME     : ('creategame',     0, False, () ),
     LOGIN          : ('login',          1, False, ( (str, 'user_name'), ) ),
+    REQSTARTGAME   : ('reqstartgame',   0, False, () ),
     STARTGAME      : ('startgame',      0, False, () ),
+    REQGAMELIST    : ('reqgamelist',    0, False, () ),
+    GAMELIST       : ('gamelist',       1, False, ( (str, 'game_list'), ) ),
 
 
     THINKERORLEAD  : ('thinkerorlead',  1, False, ( (bool, 'do_thinker'), ) ),

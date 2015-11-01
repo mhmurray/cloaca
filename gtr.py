@@ -1312,7 +1312,7 @@ class Game(object):
     def handle(self, a):
         """ Switchyard to handle game actions.
         """
-        lg.debug('Handling action: ' + repr(a))
+        lg.info('Handling action: ' + repr(a))
         if a.action != self.expected_action():
             raise Exception('Expected GameAction type: ' + str(self.expected_action())
                 + ', Got :' + repr(a))
@@ -1325,3 +1325,4 @@ class Game(object):
             raise Exception('Unhandled GameAction type: ' + str(a.action))
         else:
             method.__call__(a)
+            self.game_state.game_id += 1

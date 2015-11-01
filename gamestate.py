@@ -58,6 +58,7 @@ class GameState:
         self.kip_index = 0
         self.senate_resp_indices = []
         self.expected_action = None
+        self.game_id = 0
 
     def __repr__(self):
         rep = ('GameState(players={players!r}, leader={leader!r}, '
