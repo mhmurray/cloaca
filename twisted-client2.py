@@ -38,41 +38,11 @@ lg.addHandler(ch)
 lg.setLevel(logging.DEBUG) 
 lg.propagate = False 
 
-class IUI(Interface):
-    """An interface for a UI connection.
-    """
-
-    def set_server_protocol(p):
-        """Sets the NetstringReceiver protocol used to send messages to the
-        server.
-        """
-
-    def update_game_list(game_list):
-        """Called when the game list is updated from the server.
-        The argument is a list of games, eg. "Game 2 : ['player1', 'player2']".
-        """
-
-    def join_game(game_id):
-        """Called when the player joins a game.
-        The (integer) game_id is an argument.
-        """
-
-    def update_game_state(game_state):
-        """Called when a gamestate update is provided to the client.
-        The new game state is the argument.
-        """
-
-    def set_player_id(i):
-        """Called when the player id is set by the server. The id is provided
-        as an integer argument.
-        """
 
 class TerminalGUI(object):
     """The GUI is actually a LineReceiver protocol, which is used to connect
     to Standard IO. The lineReceived method is the input for client commands.
     """
-    implements(IUI)
-
     delimiter = '\n' # unix terminal style newlines
     
     def __init__(self, username):
@@ -287,7 +257,6 @@ class TerminalGUI(object):
         reactor.callLater(self._update_interval, self.routine_update)
 
 
-        
 class StdIOCommandProtocol(LineReceiver):
     delimiter = '\n' # unix terminal style newlines
 
@@ -303,153 +272,6 @@ class StdIOCommandProtocol(LineReceiver):
             return
 
         self._gui.handle_client_input(line)
-
-class GameProtocol(NetstringReceiver):
-
-    def __init__(self, username):
-        self.username = username
-        self.game_state = None
-        self.client = client.Client()
-        self.player_index = None
-        self.game_id = None
-
-        self.menu_sm = MainMenuSM(self)
-
-    def connectionMade(self):
-        sys.stderr.write( "Successfully connected.\n")
-        self.menu_sm.show_choices()
-
-    def loseConnection(self):
-        sys.stderr.write('Disconnected\n')
-
-    def stringReceived(self, s):
-        print 'Received message:'
-        action, args = s.split(',', 1)
-
-        action = int(action)
-
-        if action == message.GAMESTATE:
-            print 'Received game state : '
-            print repr(pickle.loads(args))
-
-        elif action == message.GAMELIST:
-            print '  List of games:'
-            print args.replace('Game', '\n\tGame')
-
-        else:
-            self.handle_server_msg(s)
-
-
-    def handle_server_msg(self, s):
-        try:
-            a = message.parse_action(s)
-        except message.BadGameActionError as e:
-            print e.message
-            print 'Message was not a valid action: ' + s
-            return
-
-        if a.action == message.SETPLAYERID:
-            self.handle_set_player_id(a)
-
-        if a.action == message.GAMESTATE:
-            self.handle_gamestate(a)
-
-        if a.action == message.GAMELIST:
-            self.handle_gamelist(a)
-
-    def handle_gamelist(self, a):
-        game_list = a.args[0]
-        print game_list
-        self.menu_sm.show_choices()
-
-    def handle_gamestate(self, a):
-        gs = pickle.loads(a.args[0])
-        self.client.update_game_state(gs)
-
-    def handle_set_player_id(self, a):
-        index = a.args[0]
-        if index is None:
-            raise Exception('Not allowed to join game')
-
-        if self.player_index is None:
-            self.player_index = int(index)
-            self.client.player_id = self.player_index
-        else:
-            raise Exception('Received second SETPLAYERID message')
-
-    def print_help(self):
-        sys.stderr.write(
-            ('Enter an integer choice or one of the following:\n'
-             '    restart : restarts the current action from the beginning\n'
-             '    quit    : exit the client.\n'))
-
-
-    def handle_client_command(self, command):
-        """ Handles input from the client.
-        """
-        if command in ['help', 'h', '?']:
-            self.print_help()
-            return
-
-        elif command in ['restart', 'r']:
-            self.client.restart_command()
-            return
-
-        elif command in ['quit', 'q']:
-            self.loseConnection()
-            from twisted.internet import reactor
-            reactor.stop()
-            return
-
-
-        # In the menu, not in the game
-        if self.game_id is None:
-            self.menu_sm.fsm.pump(int(command)-1)
-            return
-
-
-        b = self.client.builder
-        if not b:
-            sys.stderr.write('It\'s not your turn.\n')
-            return
-
-        try:
-            choice = int(command)
-        except ValueError:
-            sys.stderr.write('Invalid choice: {0}\n'.format(command))
-            self.print_help()
-            return
-
-        action = self.client.make_choice(choice)
-
-        if action is not None:
-            print 'doing action ' + repr(action)
-            self.send_command(action)
-            #self.routine_update()
-
-
-    def send_command(self, game_action):
-        """ Sends the command game_action to the server.
-        It is of type message.GameAction.
-        """
-        self.sendString(','.join([self.username,'0', str(game_action.action)] + map(str, game_action.args)))
-
-    def _fatal_error(self):
-        """ Un-recoverable error. Close the connection.
-        """
-        print 'FATAL ERROR. Disconnecting...'
-        self.loseConnection()
-
-
-class GameClientFactory(Factory):
-    """A light interface for GameProtocol to the twisted endpoint.connect
-    """
-        
-    def __init__(self, username):
-        self.username = username
-
-    def buildProtocol(self, addr):
-        return GameProtocol(self.username)
 
 class ServerProtocol(NetstringReceiver):
 
@@ -538,15 +360,9 @@ def main():
     from twisted.internet import reactor
 
     point = TCP4ClientEndpoint(reactor, args.address, args.port)
-    #d = point.connect(GameClientFactory(args.username))
 
     gui = TerminalGUI(args.username)
     d = point.connect(ServerProtocolFactory(gui))
-
-    #def setup_stdio(protocol):
-    #    stdio.StandardIO(StdIOCommandProtocol(protocol))
-
-    #d.addCallback(setup_stdio)
 
     p = stdio.StandardIO(StdIOCommandProtocol(gui))
 
@@ -560,6 +376,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-

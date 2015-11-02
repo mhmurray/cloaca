@@ -3,15 +3,29 @@ from zope.interface import Interface, implements
 
 class IGTRService(Interface):
 
-    def get_game_state():
-        """Return the full game state"""
+    def get_game_list():
+        """Return a list of GameRecord objects describing all games.
+        """
 
     def submit_action(user, game, action):
-        """Submit a GameAction to the server"""
+        """Submit a GameAction to the server
+        """
 
     def get_game_state(user, game):
         """Get the GameState object as viewed by user, formatted
         as a pickled string"""
+
+    def join_game(user, game):
+        """Join a game.
+        """
+
+    def create_game(user, game):
+        """Create game.
+        """
+
+    def start_game(user, game):
+        """Request that a game starts.
+        """
 
 
 class IGTRFactory(Interface):

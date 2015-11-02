@@ -57,7 +57,8 @@ class GTRProtocol(NetstringReceiver):
             d.addCallback(ackGameList)
 
         elif a.action == message.REQJOINGAME:
-            # Game id is the argument here.
+            # Game id is the argument here, not the game part of the request
+            # Yes this is stupid.
             g_id = a.args[0]
             d = self.factory.join_game(user, g_id)
             d.addErrback(catch_error)
@@ -146,37 +147,12 @@ components.registerAdapter(GTRFactoryFromService,
                            IGTRService,
                            IGTRFactory)
 
-class GTRService(service.Service):
-
-    implements(IGTRService)
-
-    def __init__(self, backup_file=None, load_backup_file=None):
-        self.server = GTRServer(backup_file, load_backup_file)
-
-    def submit_action(self, user, game, action):
-        self.server.handle_game_action(user, game, action) 
-
-    def get_game_state(self, user, game):
-        return self.server.get_game_state(user, game)
-
-    def join_game(self, user, game_id):
-        return self.server.join_game(user, game_id)
-
-    def create_game(self, user):
-        return self.server.create_game(user)
-
-    def start_game(self, user, game):
-        return self.server.start_game(user, game)
-
-    def get_game_list(self):
-        return self.server.get_game_list()
-
 
 application = service.Application('gtr')
-#s = GTRService('tmp/twistd_backup.dat', 'tmp/test_backup.dat')
+#s = GTRServer('tmp/twistd_backup.dat', 'tmp/test_backup.dat')
 s = GTRServer('tmp/twistd_backup.dat', None)
 serviceCollection = service.IServiceCollection(application)
 internet.TCPServer(5000, IGTRFactory(s)).setServiceParent(serviceCollection)
 
 
-# vim: set filetype=python
+# vim: set filetype=python:
