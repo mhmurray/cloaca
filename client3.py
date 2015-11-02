@@ -534,7 +534,7 @@ class MerchantActionBuilder(object):
 
     def from_stockpile_arrival(self):
         self.choices = [Choice(c, card2summary(c)) for c in self.stockpile_cards]
-        self.choices.append(Choice('Skip', 'Skip card from stockpile'))
+        self.choices.append(Choice(None, 'Skip card from stockpile'))
         self.prompt = 'Select card from stockpile for Merchant'
 
 
@@ -553,7 +553,7 @@ class MerchantActionBuilder(object):
 
     def from_hand_arrival(self):
         self.choices = [Choice(c, card2summary(c), c != 'Jack') for c in self.hand]
-        self.choices.append(Choice('Skip', 'Skip card from hand'))
+        self.choices.append(Choice(None, 'Skip card from hand'))
         self.prompt = 'Select card from hand for Merchant action (Basilica)'
 
 
