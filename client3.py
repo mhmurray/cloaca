@@ -1468,7 +1468,7 @@ class Client(object):
         try:
             self.builder.make_choice(choice-1)
         except InvalidChoiceException:
-            sys.stderr.write('Invalid choice. Enter [1-{0:d}]\n'.format(
+            lg.info('Invalid choice. Enter [1-{0:d}]\n'.format(
               len(self.builder.choices)))
 
         if self.builder.done:
