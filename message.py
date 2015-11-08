@@ -73,7 +73,7 @@ _action_args_dict = {
     PATRONFROMPOOL : ('patronfrompool', 1, False, ( (Card, 'from_pool'), ) ),
     PATRONFROMDECK : ('patronfromdeck', 1, False, ( (bool, 'from_deck'), ) ),
     PATRONFROMHAND : ('patronfromhand', 1, False, ( (Card, 'from_hand'), ) ),
-    GIVECARDS      : ('givecards',      1, True,  ( (Card, 'cards'), ) ),
+    GIVECARDS      : ('givecards',      0, True,  ( (Card, 'cards'), ) ),
     USESEWER       : ('usesewer',       1, True,  ( (Card, 'c1'), ) ),
     LEGIONARY      : ('legionary',      1, True,  ( (Card, 'from_hand'), ) ),
     LABORER        : ('laborer',        2, False,
@@ -223,9 +223,10 @@ class GameAction:
             msg = 'Number of args doesn\'t match (args={0}, n_args must be >= {1})'.format(self.args, n_args)
             raise BadGameActionError(msg)
 
-        if type_list:
+        if type_list and n_args > 0:
             # Any extra arguments must have the same type as the last argument.
-            types_args = izip_longest(type_list, self.args, fillvalue=type_list[-1])
+            # Unless there are no arguements.
+            types_args = list(izip_longest(type_list, self.args, fillvalue=type_list[-1]))
             for (arg_type, _), arg in types_args:
                 bad_arg_match = type(arg) is not arg_type
                 arg_is_none = arg is None

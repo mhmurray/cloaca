@@ -66,6 +66,24 @@ class TestLegionary(unittest.TestCase):
         self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
 
 
+    def test_opponent_has_no_match(self):
+        """ Take one card from opponent.
+        """
+        self.p1.hand = ['Atrium']
+        self.p2.hand = ['Latrine']
+
+        a = message.GameAction(message.LEGIONARY, 'Atrium')
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
+        self.assertNotIn('Latrine', self.p1.stockpile)
+        self.assertIn('Latrine', self.p2.hand)
+
+        # It should be p2's turn now
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+
 
     
 if __name__ == '__main__':
