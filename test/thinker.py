@@ -63,7 +63,7 @@ class TestHandleThinker(unittest.TestCase):
 
         
     def test_thinker_for_jack_from_empty(self):
-        """ Test thinker from empty hand to 5 orders cards.
+        """Thinker for Jack with empty hand should yield a hand of one Jack.
         """
         a = message.GameAction(message.THINKERTYPE, True)
         self.game.handle(a)

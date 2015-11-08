@@ -187,6 +187,23 @@ class TestArchitect(unittest.TestCase):
         self.assertFalse(mon.modified(self.game.game_state))
 
 
+    def test_illegal_out_of_town(self):
+        """ Start a building and add a material.
+        """
+        self.p1.hand = ['Bridge']
+
+        # Empty the in-town sites of Concrete
+        self.game.game_state.in_town_foundations = ['Rubble']
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.ARCHITECT, 'Bridge', None, 'Concrete', False)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
 class TestArchitectClient(unittest.TestCase):
     """ Test architect responses with clients.
     """
@@ -288,6 +305,7 @@ class TestArchitectClient(unittest.TestCase):
         self.assertNotIn('Bridge', self.p1.hand)
         self.assertEqual(self.game.expected_action(), message.ARCHITECT)
         self.assertEqual(self.game.game_state.active_player, self.p2)
+
 
 
     def test_follower_client(self):

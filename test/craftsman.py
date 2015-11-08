@@ -143,6 +143,24 @@ class TestCraftsman(unittest.TestCase):
         self.assertFalse(mon.modified(self.game.game_state))
 
 
+    def test_illegal_out_of_town(self):
+        """Try to start a building out of town without two actions.
+
+        This invalid game action should leave the game state unchanged.
+        """
+        self.p1.hand = ['Atrium']
+
+        self.game.game_state.in_town_foundations = ['Rubble']
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.CRAFTSMAN, 'Atrium', None, 'Brick')
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
     def test_add_to_nonexistent_building(self):
         """ Add a valid material to a building that the player doesn't own.
 

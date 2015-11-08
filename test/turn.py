@@ -46,8 +46,10 @@ class TestThinkerOrLead(unittest.TestCase):
 
         self.assertEqual(self.game.expected_action(), message.LEADROLE)
 
-    def test_thinker_many_times(self):
+    def test_thinker_for_cards_many_times(self):
         """ Thinker several times in a row for both players.
+
+        Hands start empty.
         """
         a = message.GameAction(message.THINKERORLEAD, True)
         b = message.GameAction(message.THINKERTYPE, False)
@@ -63,6 +65,48 @@ class TestThinkerOrLead(unittest.TestCase):
 
         self.assertEqual(len(self.game.game_state.players[0].hand), 14)
         self.assertEqual(len(self.game.game_state.players[1].hand), 14)
+
+    def test_thinker_for_jacks_many_times(self):
+        """ Thinker several times in a row for both players.
+
+        Three thinkers for Jacks for each player will empty the pile, 
+        since hands start empty.
+        """
+        a = message.GameAction(message.THINKERORLEAD, True)
+        b = message.GameAction(message.THINKERTYPE, True)
+
+        for i in range(3):
+            # Player 1
+            self.game.handle(a)
+            self.game.handle(b)
+
+            # Player 2
+            self.game.handle(a)
+            self.game.handle(b)
+
+        self.assertEqual(len(self.game.game_state.players[0].hand), 3)
+        self.assertEqual(len(self.game.game_state.players[1].hand), 3)
+
+    def test_thinker_for_too_many_jacks(self):
+        """ Thinker for a Jack with an empty Jack pile
+
+        This bad action should not change anything about the game state.
+        """
+        a = message.GameAction(message.THINKERORLEAD, True)
+        b = message.GameAction(message.THINKERTYPE, True)
+
+        self.game.game_state.jack_pile = []
+
+        self.game.handle(a)
+
+        # Monitor the gamestate for any changes
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        # Player 1
+        self.game.handle(b)
+
+        self.assertFalse(mon.modified(self.game.game_state))
 
 
 class TestLeadRole(unittest.TestCase):
@@ -209,31 +253,45 @@ class TestFollow(unittest.TestCase):
         self.assertFalse(mon.modified(self.game.game_state))
 
     def test_follow_role_with_petition_of_different_role(self):
-        """ Follow Laborer by petition of non-Laborer role cards
-
-        This bad action should not change anything about the game state.
+        """ Follow Laborer by petition of non-Laborer role cards.
         """
         self.p2.hand = ['Atrium', 'School', 'School']
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Atrium', 'School', 'School')
         
-        # Monitor the gamestate for any changes
-        mon = Monitor()
-        mon.modified(self.game.game_state)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action(), message.LABORER)
+        self.assertIn('Atrium', self.p2.camp)
+        self.assertEqual(self.p2.camp.count('School'), 2)
+        self.assertEqual(self.p2.hand, [])
+
+    def test_follow_role_with_petition_of_same_role(self):
+        """ Follow Laborer by petition of Laborer role cards.
+        """
+        self.p2.hand = ['Latrine', 'Insula', 'Insula']
+        
+        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula', 'Insula')
 
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertEqual(self.game.expected_action(), message.LABORER)
+        self.assertIn('Latrine', self.p2.camp)
+        self.assertEqual(self.p2.camp.count('Insula'), 2)
+        self.assertEqual(self.p2.hand, [])
 
-    def test_follow_role_with_petition_of_same_role(self):
-        """ Follow Laborer by petition of Laborer role cards
+
+    def test_follow_role_with_illegal_petition(self):
+        """ Follow Laborer by petition of the wrong number of Laborer cards.
 
         This bad action should not change anything about the game state.
         """
         self.p2.hand = ['Latrine', 'Insula', 'Insula']
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula', 'Insula')
-        
+        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula')
+
+        self.game.handle(a)
+
         # Monitor the gamestate for any changes
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -241,7 +299,6 @@ class TestFollow(unittest.TestCase):
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
-
 
 if __name__ == '__main__':
     unittest.main()
