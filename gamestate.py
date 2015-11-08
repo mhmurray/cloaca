@@ -89,7 +89,7 @@ class GameState:
         for p in self.players:
             p.vault = ['Card']*len(p.vault)
 
-            if p.name is not player_name:
+            if p.name != player_name:
                 p.hand = [c if c == 'Jack' else 'Card' for c in p.hand ]
                 p.fountain_card = 'Card' if p.fountain_card else None
 
