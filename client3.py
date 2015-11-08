@@ -52,6 +52,7 @@ import glob
 import copy
 
 lg = logging.getLogger('gtr')
+game_lg = logging.getLogger('gtr.game')
 
 class StartOverException(Exception):
     pass
@@ -293,17 +294,6 @@ class LegionaryActionBuilder(object):
             print prompt
         else:
             print 'Please make a selection:'
-
-    def test_it(self):
-        while True:
-            if self.done:
-                print 'Finished! Action: ' + repr(self.action)
-                break
-            else:
-                self.show_choices(self.get_choices(), self.prompt)
-                choice = int(raw_input()) -1
-                self.make_choice(choice)
-
 
 
 class GiveCardsActionBuilder(object):
@@ -1444,7 +1434,7 @@ class Client(object):
         """Updates the game state
         """
         self.game.game_state = gs
-        self.game.game_state.show_public_game_state()
+        #self.game.game_state.show_public_game_state()
 
         if self.player_id == self.game.game_state.get_active_player_index():
 
@@ -1453,10 +1443,9 @@ class Client(object):
 
             method()
 
-            self.show_choices(self.builder.get_choices(), self.builder.prompt)
-
         else:
-            print 'Waiting on player {0!s}'.format(self.game.game_state.get_active_player_index())
+            game_lg.info('Waiting on player {0!s}'.format(
+                    self.game.game_state.get_active_player_index()))
 
 
     def make_choice(self, choice):
@@ -1465,19 +1454,23 @@ class Client(object):
         If the action is not complete, return None.
         """
         # The GUI uses lists indexed from 1, but we need 0-indexed
+        if self.player_id != self.game.game_state.get_active_player_index():
+            game_lg.info('It\'s not your turn.')
+            return
+
         try:
             self.builder.make_choice(choice-1)
         except InvalidChoiceException:
-            lg.info('Invalid choice. Enter [1-{0:d}]\n'.format(
+            game_lg.info('Invalid choice. Enter [1-{0:d}]\n'.format(
               len(self.builder.choices)))
 
         if self.builder.done:
             action = self.builder.action
-            lg.info('Finished action ' + repr(action))
+            game_lg.info('Finished action ' + repr(action))
             self.builder = None
             return action
         else:
-            self.show_choices(self.builder.get_choices())
+            #self.show_choices(self.builder.get_choices())
             return None
 
 
@@ -1490,15 +1483,22 @@ class Client(object):
         i_choice = 1
         for c in choices_list:
             if c.selectable:
-                lg.info('  [{0:2d}] {1}'.format(i_choice, c.description))
+                game_lg.info('  [{0:2d}] {1}'.format(i_choice, c.description))
                 i_choice+=1
             else:
-                lg.info('       {0}'.format(c.description))
+                game_lg.info('       {0}'.format(c.description))
 
         if prompt is not None:
-            lg.info(prompt)
+            game_lg.info(prompt)
         else:
-            lg.info('Please make a selection:')
+            game_lg.info('Please make a selection:')
+
+
+    def get_choices(self):
+        if self.builder:
+            return self.builder.get_choices()
+        else:
+            return []
 
 
     def action_thinkerorlead(self):
@@ -1538,7 +1538,7 @@ class Client(object):
         """Asks which card, if any, the player wishes to use with the
         Latrine before thinking.
         """
-        #lg.info('Choose a card to discard with the Latrine.')
+        #game_lg.info('Choose a card to discard with the Latrine.')
 
         sorted_hand = sorted(self.get_player().hand)
         card_choices = [Choice(c, card2summary(c)) for c in sorted_hand]
@@ -1646,10 +1646,10 @@ class Client(object):
             card_choices.insert(0, 'Start {} buidling'.format(p.fountain_card))
 
         if len(card_choices) == 0:
-            lg.warn('Can\'t use {} with a craftsman action'.format(p.fountain_card))
+            game_lg.warn('Can\'t use {} with a craftsman action'.format(p.fountain_card))
             return message.GameAction(message.FOUNTAIN, True, None, None, None)
 
-        lg.info('Performing Craftsman with {}, choose a building option:'
+        game_lg.info('Performing Craftsman with {}, choose a building option:'
                      .format(p.fountain_card))
 
         choices = ['Use {} to start or add to a building'.format(p.fountain_card),
@@ -1657,7 +1657,7 @@ class Client(object):
         choice_index = self.choices_dialog(choices)
 
         if choice_index == 1:
-            lg.info('Skipping Craftsman action and drawing card')
+            game_lg.info('Skipping Craftsman action and drawing card')
             return message.GameAction(message.FOUNTAIN, True, None, None, None)
 
         card_index = self.choices_dialog(card_choices, 'Select a building option')
@@ -1678,22 +1678,16 @@ class Client(object):
         return message.GameAction(message.FOUNTAIN, False, building, material, site)
 
 
-    def _action_legionary(self):
-        p = self.get_player()
-        lg.info('Card to use for legionary:')
-        hand = p.hand
-        sorted_hand = sorted(hand)
-        card_choices = [card2summary(card) for card in sorted_hand]
-
-        card_index = self.choices_dialog(card_choices,
-            'Select a card to use to demand material')
-        card_from_hand = sorted_hand[card_index]
-
-        lg.info('Using card %s' % card2summary(card_from_hand))
-        return message.GameAction(message.LEGIONARY, card_from_hand)
-
-
     def action_usesewer(self):
+        """Asks whether the player wants to use their Sewer
+        """
+        self.builder = SingleChoiceActionBuilder(
+                message.USESEWER,
+                [Choice(True, 'Use Sewer'),
+                 Choice(False, 'Place card in stockpile')])
+        return
+
+
         p = self.get_player()
         done=False
         cards_to_move=[]
@@ -1701,7 +1695,7 @@ class Client(object):
         choices.extend([card2summary(card)
                         for card in p.camp if card is not 'Jack'])
         while not done:
-            lg.info('Do you wish to use your Sewer?')
+            game_lg.info('Do you wish to use your Sewer?')
 
             card_index = self.choices_dialog(choices, 'Select a card to take into your stockpile')
             if card_index == 0:
@@ -1754,7 +1748,7 @@ class Client(object):
                               if pl is not p
                               ]
         possible_buildings = sorted(possible_buildings, None, lambda x: x[0].name.lower() + str(x[1]).lower())
-        lg.info('Use Stairway?')
+        game_lg.info('Use Stairway?')
         building_names = [pl.name + '\'s ' + str(b) for (pl,b) in possible_buildings]
         choices = sorted(building_names)
         choices.insert(0, 'Don\'t use Stairway')
@@ -1769,7 +1763,7 @@ class Client(object):
             has_archway = self.game.player_has_active_building(p, 'Archway')
 
             sorted_stockpile = sorted(p.stockpile)
-            lg.info('Choose a material to add from your stockpile:')
+            game_lg.info('Choose a material to add from your stockpile:')
             card_choices = [card2summary(card) for card in sorted_stockpile]
 
             if has_archway:
@@ -1860,157 +1854,11 @@ class Client(object):
                 self.game.game_state.oot_allowed)
                 
 
-    def _action_architect(self):
-        """Returns (building, material, site, from_pool) to be built.
-
-        If the action is to be skipped, returns None, None, None
-        """
-        building, material, site, from_pool = None, None, None, False
-        p = self.get_player()
-
-        lg.info('Performing Architect, choose a building option:')
-        card_choices = sorted(p.get_incomplete_building_names())
-        card_choices.insert(0, 'Start a new buidling')
-        card_choices.insert(0, 'Skip action')
-
-        card_index = self.choices_dialog(card_choices, 'Select a building option')
-        if card_index == 1: # Starting a new building
-            sorted_hand = sorted(p.hand)
-            lg.info('Choose a building to start from your hand:')
-            card_choices = [card2summary(card) for card in sorted_hand]
-
-            card_index = self.choices_dialog(card_choices, 'Select a building to start')
-            building = sorted_hand[card_index]
-
-            if building == 'Statue':
-                sites = card_manager.get_materials()
-                site_index = self.choices_dialog(sites)
-                site = sites[site_index]
-            else:
-                site = card2mat(building)
-
-        elif card_index > 1: # Adding to a building from stockpile
-            building = card_choices[card_index]
-
-            has_archway = self.game.player_has_active_building(p, 'Archway')
-
-            sorted_stockpile = sorted(p.stockpile)
-            lg.info('Choose a material to add from your stockpile:')
-            card_choices = [card2summary(card) for card in sorted_stockpile]
-
-            if has_archway:
-                sorted_pool = sorted(self.game.game_state.pool)
-                pool_choices = ['[POOL]' + card2summary(card) for card in sorted_pool]
-                card_choices.extend(pool_choices)
-
-            card_index = self.choices_dialog(card_choices, 'Select a material to add')
-
-            if card_index >= len(sorted_stockpile):
-                from_pool = True
-                material = sorted_pool[card_index - len(sorted_stockpile)]
-            else:
-                material = sorted_stockpile[card_index]
-
-        return message.GameAction(message.ARCHITECT, building, material, site, from_pool)
-
-    def _action_craftsman(self):
-        """Returns (building, material, site) to be built.
-        """
-        p = self.get_player()
-        building, material, site = None, None, None
-
-        lg.info('Performing Craftsman, choose a building option:')
-        card_choices = p.get_incomplete_building_names()
-        card_choices.insert(0, 'Start a new buidling')
-
-        card_index = self.choices_dialog(card_choices, 'Select a building option')
-        if card_index == 0: # Starting a new building
-            sorted_hand = sorted(p.hand)
-            lg.info('Choose a building to start from your hand:')
-            card_choices = [card2summary(card) for card in sorted_hand]
-
-            card_index = self.choices_dialog(card_choices, 'Select a building to start')
-            building = sorted_hand[card_index]
-
-            if building == 'Statue':
-                sites = card_manager.get_materials()
-                site_index = self.choices_dialog(sites)
-                site = sites[site_index]
-            else:
-                site = card2mat(building)
-
-        else: # Adding to a building from hand
-            building = card_choices[card_index]
-
-            sorted_hand = sorted(p.hand)
-            lg.info('Choose a material to add from your hand:')
-            card_choices = [card2summary(card) for card in sorted_hand]
-
-            card_index = self.choices_dialog(card_choices, 'Select a material to add')
-            material = sorted_hand[card_index]
-
-        return message.GameAction(message.CRAFTSMAN, building, material, site)
-
-    def _action_merchant(self):
-        """Prompts for which card to get from the pool and hand for a Merchant
-        action.
-
-        There are flags for the player having an Basilica or Atrium. These
-        cause the dialog to prompt for card from the hand or replace the
-        normal merchant action with a draw from the deck.
-
-        There is a parameter that specifies the card limit for the vault. This
-        is the number of slots left in the vault.
-        """
-        p = self.get_player()
-
-        vault_limit = p.get_influence_points()
-
-        card_limit = vault_limit - len(p.vault)
-        if self.game.player_has_active_building(p, 'Market'): card_limit += 2
-
-        has_atrium = self.game.player_has_active_building(p, 'Atrium')
-        has_basilica = self.game.player_has_active_building(p, 'Basilica')
-
-        card_from_stockpile, card_from_hand, card_from_deck  = (None,None,False)
-
-        sorted_stockpile = sorted(player.stockpile)
-        if len(sorted_stockpile) > 0 or has_atrium:
-            lg.info('Performing Merchant, choose a card from stockpile (Vault {}/{})'.format(
-              str(len(p.vault)), str(card_limit)))
-            card_choices = [card2summary(card) for card in sorted_stockpile]
-            card_choices.insert(0,'Skip this action')
-            card_choices.insert(1,'Take card from top of deck')
-
-            card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
-            if card_index == 1:
-                card_from_deck = True
-                card_limit -= 1
-            elif card_index > 1:
-                card_from_stockpile = sorted_stockpile[card_index-2]
-                card_limit -= 1
-
-        sorted_hand = sorted([card for card in p.hand if card != 'Jack'])
-        if card_limit>0 and has_basilica and len(sorted_hand)>0:
-            lg.info('Choose a card from your hand:')
-            card_choices = [card2summary(card) for card in sorted_hand]
-            card_choices.insert(0,'Skip this action')
-
-            card_index = self.choices_dialog(card_choices, 'Select a card to take into your vault')
-            if card_index > 0:
-                card_from_hand = sorted_hand[card_index-1]
-
-        return message.GameAction(message.MERCHANT, card_from_stockpile, card_from_hand, card_from_deck)
-
-
-
     def action_leadrole(self):
         hand = self.get_player().hand
         has_palace = self.game.player_has_active_building(self.get_player(), 'Palace')
         petition_count = 2 if self.game.player_has_active_building(self.get_player(), 'Circus') else 3
         self.builder = RoleActionBuilder(hand, None, has_palace, petition_count)
-
-
 
 
     def action_followrole(self):

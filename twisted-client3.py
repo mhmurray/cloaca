@@ -14,7 +14,7 @@ import message
 from message import GameAction
 import client3 as client
 from client3 import Choice
-from curese_gui import CursesGUI
+from curses_gui import CursesGUI
 
 from fsm import StateMachine
 
@@ -25,12 +25,12 @@ import sys
 
 lg = logging.getLogger('gtr')
 formatter = logging.Formatter('%(message)s')
-ch = logging.StreamHandler(sys.stdout)
-ch.setLevel(logging.DEBUG)
-ch.setFormatter(formatter)
-lg.addHandler(ch)
-lg.setLevel(logging.DEBUG)
-lg.propagate = False
+#ch = logging.StreamHandler(sys.stdout)
+#ch.setLevel(logging.DEBUG)
+#ch.setFormatter(formatter)
+#lg.addHandler(ch)
+#lg.setLevel(logging.DEBUG)
+#lg.propagate = False
 
 
 class TerminalGUI(object):
@@ -48,6 +48,11 @@ class TerminalGUI(object):
         self.game_id = None
         self._update_interval = 15
         self.pump_return = None
+
+        self._gui = CursesGUI()
+        self._gui.choice_callback = self.handle_choice_input
+        self._gui.command_callback = self.handle_command_input
+        self._gui.help_callback = self.print_help
 
         self.fsm = StateMachine()
 
@@ -76,9 +81,12 @@ class TerminalGUI(object):
         self.fsm.pump(int(choice)-1)
         return self.pump_return
 
-    def handle_client_input(self, command):
-        """Handle input from client.
-        """
+    def print_help(self):
+        #lg.warn('Help!')
+        self.write_err('Help! (q to quit)')
+
+    def handle_command_input(self, command):
+        self.write_msg('Handling command input : ' + str(command))
         if command in ['help', 'h', '?']:
             self.print_help()
             return
@@ -92,28 +100,40 @@ class TerminalGUI(object):
             return
 
         elif command in ['quit', 'q']:
-            lg.info('Quitting game')
+            self.write_error('Quitting game')
             self._server_protocol.loseConnection()
-            from twisted.internet import reactor
-            reactor.stop()
+            self._gui.quit()
             return
 
         if self._in_game and not self.client.builder:
-            lg.info("It's not your turn")
+            self.write_error("It's not your turn")
             return
 
+    def write_error(self, msg):
+        #sys.stderr.write(msg)
+        self._gui.roll_write(msg)
+
+    def write_msg(self, msg):
+        self._gui.roll_write(msg)
+
+    def handle_choice_input(self, choice):
+        """Handles an input choice (integer, 1-indexed).
+        """
+        self.write_msg('Handling choice input : ' + str(choice))
         try:
-            choice = int(command)
+            choice = int(choice)
         except ValueError:
-            sys.stderr.write('Invalid choice: {0}\n'.format(command))
-            self.print_help()
+            self.write_error('Invalid choice: {0}\n'.format(choice))
             return
 
         if self._in_game:
             action = self.client.make_choice(choice)
 
-            if action is not None:
-                print 'doing action ' + repr(action)
+            if action is None:
+                # More input required
+                self.update_choices()
+            else:
+                self.write_msg('doing action ' + repr(action))
                 self.send_command(action)
 
         else:
@@ -135,7 +155,7 @@ class TerminalGUI(object):
 
         elif choice == 'Join game':
             if len(self._game_list) == 0:
-                lg.info('No games listed. Getting game list first.')
+                self.write_error('No games listed. Getting game list first.')
                 self.pump_return = GameAction(message.REQGAMELIST)
                 self._waiting_for_list = True
                 return 'MAINMENU'
@@ -143,13 +163,13 @@ class TerminalGUI(object):
                 return 'SELECTGAME'
 
         elif choice == 'Create game':
-            lg.info('Creating new game...')
+            self.write_msg('Creating new game...')
             self.pump_return = GameAction(message.REQCREATEGAME)
             self._waiting_for_join = True
             return 'MAINMENU'
 
         elif choice == 'Start game':
-            lg.info('Requesting game start...')
+            self.write_msg('Requesting game start...')
             self.pump_return = GameAction(message.REQSTARTGAME)
             self._waiting_for_start = True
             return 'MAINMENU'
@@ -176,17 +196,23 @@ class TerminalGUI(object):
         The choices_list is a list of Choices.
         """
         i_choice = 1
+        choices_list = []
         for c in self.choices:
+            line = ''
             if c.selectable:
-                lg.info('  [{0:2d}] {1}'.format(i_choice, c.description))
+                line = '  [{0:2d}] {1}'.format(i_choice, c.description)
                 i_choice+=1
             else:
-                lg.info('       {0}'.format(c.description))
+                line = '       {0}'.format(c.description)
 
-        if prompt is not None:
-            lg.info(prompt)
-        else:
-            lg.info('Please make a selection:')
+            choices_list.append(line)
+
+        self._gui.update_choices(choices_list)
+
+        if prompt is None:
+            prompt = 'Please make a selection: '
+
+        self._gui.update_prompt(prompt)
 
     def send_command(self, game_action):
         self._server_protocol.send_command(self.username, self.game_id, game_action)
@@ -197,12 +223,14 @@ class TerminalGUI(object):
         if self._waiting_for_list:
             self._waiting_for_list = False
 
-            print 'List of games:'
-            for record in self._game_list:
-                print '  ' + str(record)
-            print
+        game_list = ['List of games']
+        
 
-            self._show_choices()
+        for record in self._game_list:
+            game_list.append('  ' + str(record))
+
+        self._gui.update_state('\n'.join(game_list))
+        self._show_choices()
 
     def update_game_state(self, game_state):
         if game_state is None:
@@ -214,7 +242,6 @@ class TerminalGUI(object):
                 self.client.player_id = player_index
 
         if self._waiting_for_start or game_state.is_started:
-            lg.info('Starting game ...')
             self._waiting_for_start = False
             self._in_game = True
 
@@ -224,18 +251,33 @@ class TerminalGUI(object):
 
         if old_game_id is None or old_game_id != new_game_id:
             self.client.update_game_state(game_state)
+            self._gui.update_state('\n'.join(game_state.get_public_game_state(self.username)))
+            self.update_choices()
 
+    def update_choices(self):
+        choices = self.client.get_choices()
+
+        lines = []
+
+        i_choice = 1
+        for c in choices:
+            if c.selectable:
+                lines.append('  [{0:2d}] {1}'.format(i_choice, c.description))
+                i_choice+=1
+            else:
+                lines.append('       {0}'.format(c.description))
+
+        self._gui.update_choices(lines)
 
 
     def set_player_id(self, i):
         self.client.player_id = i
 
     def join_game(self, game_id):
-        lg.info('Joined game {0:d}, waiting to start...'.format(game_id))
+        self.write_msg('Joined game {0:d}, waiting to start...'.format(game_id))
         self.game_id = game_id
         self._waiting_for_join = False
         self._show_choices()
-        #self.routine_update()
 
     def routine_update(self):
         """Updates the game state routinely.
@@ -260,7 +302,7 @@ class StdIOCommandProtocol(LineReceiver):
         if not line:
             return
 
-        self._gui.handle_client_input(line)
+        self._gui.handle_choice_input(line)
 
 class ServerProtocol(NetstringReceiver):
 
@@ -275,7 +317,7 @@ class ServerProtocol(NetstringReceiver):
     def connectionMade(self):
         """When connected, update game list.
         """
-        lg.info('Connected! Request game list')
+        self._ui.write_msg('Connected! Request game list')
         self._ui._waiting_for_list = True
         self.send_command(self._ui.username, None, GameAction(message.REQGAMELIST))
 
@@ -295,7 +337,7 @@ class ServerProtocol(NetstringReceiver):
             print e.message
             return
 
-        lg.info("Action: " + repr(a)[0:50])
+        self._ui.write_msg("Action: " + repr(a)[0:50])
         action = a.action
 
         if action == message.GAMESTATE:
@@ -320,8 +362,8 @@ class ServerProtocol(NetstringReceiver):
             self._ui.update_game_list(game_list)
 
         else:
-            lg.warn('Unknown command')
-            lg.info(str(a))
+            self._ui.write_error('Unknown command')
+            self._ui.write_error(str(a))
 
 
 
@@ -353,14 +395,15 @@ def main():
     gui = TerminalGUI(args.username)
     d = point.connect(ServerProtocolFactory(gui))
 
-    p = stdio.StandardIO(StdIOCommandProtocol(gui))
+    #p = stdio.StandardIO(StdIOCommandProtocol(gui))
 
     def finished_protocol(_):
         gui._show_choices()
 
     d.addCallback(finished_protocol)
 
-    reactor.run()
+    #reactor.run()
+    gui._gui.run_twisted()
 
 
 if __name__ == '__main__':

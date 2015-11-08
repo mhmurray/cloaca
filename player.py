@@ -6,7 +6,7 @@ this class does not enforce anything more than physical limitations,
 like failing to get a card from an empty stack.
 """
 
-from gtrutils import get_card_from_zone
+from gtrutils import get_card_from_zone, GTRError
 from gtrutils import get_short_zone_summary
 from gtrutils import get_detailed_card_summary
 from gtrutils import get_building_info
@@ -117,7 +117,13 @@ class Player:
     def get_building(self, building_name):
         """ Gets the Building object from the name of the building.
         """
-        return [b for b in self.buildings if b.foundation == building_name][0]
+        matches = [b for b in self.buildings if b.foundation == building_name]
+        try:
+            b = matches[0]
+        except IndexError:
+            raise GTRError('Player ' + self.name + ' doesn\'t own a '\
+                           + building_name)
+        return b
 
     def get_active_buildings(self):
         """ Returns a list of just the building names for all buildings

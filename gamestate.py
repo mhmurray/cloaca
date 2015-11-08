@@ -6,7 +6,7 @@ draw a card from an empty pile.
 """
 
 import gtrutils
-from gtrutils import get_card_from_zone
+from gtrutils import get_card_from_zone, GTRError
 from player import Player
 from building import Building
 import random
@@ -77,20 +77,22 @@ class GameState:
             out_of_town_foundations=self.out_of_town_foundations,
         )
 
-    def privatize(self):
-        """ Changes card names to 'Card' in order to represent a game
-        where we don't have complete information. This is the case
-        when this object is used in the client to track the
-        server game state, for instance.
+    def privatize(self, player_name):
+        """Changes card names to 'Card' in order to represent a game
+        visible by player_name. This hides the library, vault, and other
+        players' hands, as well as the revealed card for a Fountain.
+
+        This does not hide Jacks in hand.
         """
         self.library = ['Card']*len(self.library)
 
         for p in self.players:
+            p.vault = ['Card']*len(p.vault)
 
-            if p is not self.slave_player:
-                p.vault = ['Card']*len(p.vault)
+            if p.name is not player_name:
                 p.hand = [c if c == 'Jack' else 'Card' for c in p.hand ]
-                p.fountain_card = 'Card' if p.fountain_Card else None
+                p.fountain_card = 'Card' if p.fountain_card else None
+
 
     def increment_priority_index(self):
         prev_index = self.priority_index
@@ -254,7 +256,10 @@ class GameState:
         return get_card_from_zone(card, self.exchange_area)
 
     def draw_jack(self):
-        return self.jack_pile.pop()
+        try:
+            return self.jack_pile.pop()
+        except IndexError:
+            raise GTRError('Jack pile is empty.')
 
     def draw_cards(self, n_cards):
         cards = []
@@ -277,8 +282,101 @@ class GameState:
         while self.priority_index >= len(self.players):
             self.priority_index -= len(self.players)
 
+    def get_public_game_state(self, current_player=None):
+        """Get a string that shows the current game state.
+
+        If start_player is specified, some customizations are done.
+        """
+        start_player = self.players[0]
+        for p in self.players:
+            if p.name == current_player:
+                start_player = p
+
+        s = []
+        # print leader and priority
+        s.append('--> Turn {0} | leader: {1} | priority: {2}'.format(
+          self.turn_index,
+          self.players[self.leader_index].name,
+          self.players[self.priority_index].name,
+        ))
+
+        # print pool.
+        pool_string = 'Pool: \n'
+        pool_string += gtrutils.get_detailed_zone_summary(self.pool)
+        s.append(pool_string)
+
+        # print N cards in library
+        s.append('Library : {0:d} cards'.format(len(self.library)))
+
+        # print N jacks
+        s.append('Jacks : {0:d} cards'.format(len(self.jack_pile)))
+
+        # print Foundations
+        s.append('Foundation materials:')
+        foundation_string = '  In town: ' + gtrutils.get_short_zone_summary(
+          self.in_town_foundations, 3)
+        s.append(foundation_string)
+        foundation_string = '  Out of town: ' + gtrutils.get_short_zone_summary(
+          self.out_of_town_foundations, 3)
+        s.append(foundation_string)
+
+        s.append('')
+        for player in self.get_players_in_turn_order(start_player):
+            s.extend(self.get_player_state(player))
+            s.append('')
+        
+        return s
+
+
+    def get_player_state(self, player):
+        s = []
+        # name
+        s.append('--> Player {0} :'.format(player.name))
+
+        # hand
+        s.append(player.describe_hand_private())
+
+        # Vault
+        if len(player.vault) > 0:
+            s.append(player.describe_vault_public())
+
+        # influence
+        if player.influence:
+            s.append(player.describe_influence())
+
+        # clientele
+        if len(player.clientele) > 0:
+            s.append(player.describe_clientele())
+
+        # Stockpile
+        if len(player.stockpile) > 0:
+            s.append(player.describe_stockpile())
+
+        # Buildings
+        if len(player.buildings) > 0:
+            # be sure there is at least one non-empty site
+            for building in player.buildings:
+                if building:
+                    s.append(player.describe_buildings())
+                    break
+
+
+        # Camp
+        if len(player.camp) > 0:
+            s.append(player.describe_camp())
+
+        # Revealed cards
+        if len(player.revealed) > 0:
+            s.append(player.describe_revealed())
+
+
+        # TODO Fountain revealed card
+
+        return s
+
+
     def show_public_game_state(self):
-        """ Prints the game state, showing only public information.
+        """Prints the game state, showing only public information.
 
         This is the following: cards in the pool, # of cards in the library,
         # of jacks left, # of each foundation left, who's the leader, public

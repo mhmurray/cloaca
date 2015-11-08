@@ -28,7 +28,10 @@ class GTRProtocol(NetstringReceiver):
         print reason
 
     def stringReceived(self, request):
-        print 'string received ', request
+        """Receives actions of the form "user, game_id, action".
+        Converts the game_id to an integer and tries to parse the
+        action.
+        """
         user, game, action = request.split(',', 2)
 
         game_id = int(game)
@@ -39,73 +42,8 @@ class GTRProtocol(NetstringReceiver):
             print e.message
             return
 
-        if a.action == message.REQGAMESTATE:
-            d = self.factory.get_game_state(user, game_id)
-            def ackGameState(gs):
-                a = GameAction(message.GAMESTATE, dumps(gs))
-
-                self.send_action(a)
-
-            d.addCallbacks(ackGameState, catch_error)
-
-        elif a.action == message.REQGAMELIST:
-            d = self.factory.get_game_list()
-            def ackGameList(game_list):
-                gl = dumps(game_list)
-                self.send_action(GameAction(message.GAMELIST, gl))
-
-            d.addCallback(ackGameList)
-
-        elif a.action == message.REQJOINGAME:
-            # Game id is the argument here, not the game part of the request
-            # Yes this is stupid.
-            g_id = a.args[0]
-            d = self.factory.join_game(user, g_id)
-            d.addErrback(catch_error)
-            def ackJoinGame(game_id):
-                self.send_action(GameAction(message.JOINGAME, game_id))
-
-                # If the game is started, we need the game state
-                dgs = self.factory.get_game_state(user, game_id)
-                def ackGameState(gs):
-                    if gs is not None:
-                        self.send_action(GameAction(message.GAMESTATE, dumps(gs)))
-
-                dgs.addCallbacks(ackGameState, catch_error)
-
-            d.addCallback(ackJoinGame)
-                
-
-        elif a.action == message.REQSTARTGAME:
-            d = self.factory.start_game(user, game_id)
-
-            def ackStartGame(_):
-                self.send_action(GameAction(message.STARTGAME))
-
-                dgs = self.factory.get_game_state(user, game_id)
-                def ackGameState(gs):
-                    self.send_action(GameAction(message.GAMESTATE, dumps(gs)))
-
-                dgs.addCallbacks(ackGameState, catch_error)
-
-            d.addCallbacks(ackStartGame, catch_error)
-
-
-        elif a.action == message.REQCREATEGAME:
-            d = self.factory.create_game(user)
-            d.addErrback(catch_error)
-            def ackCreateGame(game_id):
-                self.send_action(GameAction(message.JOINGAME, game_id))
-            d.addCallback(ackCreateGame)
-
-        else:
-            self.factory.submit_action(user, game_id, action)
-
-            dgs = self.factory.get_game_state(user, game_id)
-            def ackGameState(gs):
-                self.send_action(GameAction(message.GAMESTATE, dumps(gs)))
-            dgs.addCallbacks(ackGameState, catch_error)
-
+        self.factory.register(self, user)
+        self.factory.handle_action(user, game_id, a)
 
     def send_action(self, action):
         """Sends a GameAction to the client"""
@@ -115,6 +53,8 @@ class GTRProtocol(NetstringReceiver):
 
 
 class GTRFactoryFromService(protocol.ServerFactory):
+    """Handles the connections to clients via GTRProtocol intances.
+    """
 
     implements(IGTRFactory)
 
@@ -122,30 +62,32 @@ class GTRFactoryFromService(protocol.ServerFactory):
 
     def __init__(self, service):
         self.service = service
+        self.service.factory = self
+        self.users = {} # User-to-protocol dictionary. Filled when the first command is received.
 
-    def submit_action(self, user, game, action):
-        self.service.submit_action(user, game, action)
+    def register(self, protocol, user):
+        """Register protocol as associated with the specified user.
+        This replaces the old protocol silently.
+        """
+        self.users[user] = protocol
 
-    def get_game_state(self, user, game):
-        return self.service.get_game_state(user, game)
-
-    def join_game(self, user, game):
-        return self.service.join_game(user, game)
-
-    def start_game(self, user, game):
-        return self.service.start_game(user, game)
-
-    def create_game(self, user):
-        return self.service.create_game(user)
-
-    def get_game_list(self):
-        return self.service.get_game_list()
+    def send_action(self, user, action):
+        """Sends an action to the specified user.
+        """
+        try:
+            protocol = self.users[user]
+        except KeyError:
+            print 'Error. Server tried to send a command to ' + user + \
+                    ' but the user is not connected.'
+            return
         
+        protocol.send_action(action)
+
+    def handle_action(self, user, game, action):
+        self.service.handle_action(user, game, action)
 
 
-components.registerAdapter(GTRFactoryFromService,
-                           IGTRService,
-                           IGTRFactory)
+components.registerAdapter(GTRFactoryFromService, IGTRService, IGTRFactory)
 
 
 application = service.Application('gtr')

@@ -1,4 +1,5 @@
 import card_manager
+from gtrutils import GTRError
 
 class Building:
     """ A container that represents buildings in GtR. The primary

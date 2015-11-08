@@ -3,14 +3,16 @@ from gamestate import GameState
 from player import Player
 from game_record import GameRecord
 from interfaces import IGTRService
+from message import GameAction
+import message
 
 import message
 import argparse
 import uuid
+import copy
 
 from twisted.internet.protocol import ServerFactory, Protocol
 from twisted.protocols.basic import NetstringReceiver
-from twisted.internet import defer
 from twisted.application import service
 
 from zope.interface import implements
@@ -19,9 +21,17 @@ import pickle
 
 import logging
 
+def catch_error(err):
+    return "Internal error in server"
+
+
 class GTRServer(service.Service):
     """Contains a list of multiple Game objects and manages all the
     non-game actions related to e.g. connecting players and starting games.
+
+    Keeps a reference to a factory object that implements IGTRFactory.
+    This object is used to communicate with the clients via the method
+    GTRFactory.send_action(user, action).
     """
 
     implements(IGTRService)
@@ -29,18 +39,23 @@ class GTRServer(service.Service):
     def __init__(self, backup_file=None, load_backup_file=None):
         self.games = [] # Games database
         self.users = [] # User database
+        self.factory = None
         self.backup_file = backup_file
         self.load_backup_file = load_backup_file
 
         if self.load_backup_file:
             self.load_backup()
 
-
+        # for testing
         g = Game()
         g.game_state.find_or_add_player('a')
         g.game_state.find_or_add_player('b')
         self.games.append(g)
 
+    def send_action(self, user, action):
+        """Sends a message to the user if the user exists.
+        """
+        self.factory.send_action(user, action)
 
     def get_game_state(self, user, game_id):
         try:
@@ -55,48 +70,82 @@ class GTRServer(service.Service):
             return None
 
         if game.game_state.is_started:
-            return defer.succeed(game.game_state)
+            # privatize modifies the object, so make a copy
+            gs = copy.deepcopy(game.game_state)
+            gs.privatize(user)
+            return gs
         else:
-            return defer.succeed(None)
+            return None
 
+    def handle_action(self, user, game_id, a):
+        """Muliplexes the action to helper functions.
+        """
 
+        if a.action == message.REQGAMESTATE:
+            gs = self.get_game_state(user, game_id)
+            resp = GameAction(message.GAMESTATE, pickle.dumps(gs))
+            self.send_action(user, resp)
 
-    def submit_action(self, user, game_id, action):
-        try:
-            game = self.games[game_id]
-        except IndexError as e:
-            print e.message
-            return
+        elif a.action == message.REQGAMELIST:
+            gl = self.get_game_list()
+            self.send_action(user, GameAction(message.GAMELIST, pickle.dumps(gl)))
 
-        try:
-            a = message.parse_action(action)
-        except message.BadGameActionError as e:
-            print e.message
-            return
+        elif a.action == message.REQJOINGAME:
+            # Game id is the argument here, not the game part of the request
+            # Yes this is stupid.
+            g_id = a.args[0]
+            game_id = self.join_game(user, g_id)
+            self.send_action(user, GameAction(message.JOINGAME, game_id))
+                
+            # If the game is started, we need the game state
+            gs = self.get_game_state(user, game_id)
+            self.send_action(user, GameAction(message.GAMESTATE, pickle.dumps(gs)))
 
-        player_index = game.game_state.find_player_index(user)
-        if player_index is None:
-            print 'User {0:s} is not part of game {1:d}'.format(user, game_id)
-            return
+        elif a.action == message.REQSTARTGAME:
+            self.start_game(user, game_id)
 
-        print 'submit_action(), Expected action: ' + str(game.expected_action())
-        print str(message._action_args_dict[game.expected_action()])
-        print 'submit_action(), Got action: ' + repr(a)
+            gs = self.get_game_state(user, game_id)
+            for u in [p.name for p in gs.players]:
+                gs = self.get_game_state(u, game_id)
+                self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
 
-        print 'Handling action:'
-        print '  ' + repr(a)
+        elif a.action == message.REQCREATEGAME:
+            game_id = self.create_game(user)
+            self.send_action(user, GameAction(message.JOINGAME, game_id))
 
-        i_active_p = game.game_state.get_active_player_index()
+        else: # Game commands
+            try:
+                game = self.games[game_id]
+            except IndexError as e:
+                print e.message
+                return
 
-        if i_active_p == player_index:
-            print 'Game handling action: ' + str(action)
-            game.handle(a)
-            self.save_backup()
+            player_index = game.game_state.find_player_index(user)
+            if player_index is None:
+                print 'User {0:s} is not part of game {1:d}'.format(user, game_id)
+                return
 
-        else:
-            print 'Received action for player {0!s}, but waiting on player {1!s}'.format(
-                    player, i_active_p)
+            print 'submit_action(), Expected action: ' + str(game.expected_action())
+            print str(message._action_args_dict[game.expected_action()])
+            print 'submit_action(), Got action: ' + repr(a)
 
+            print 'Handling action:'
+            print '  ' + repr(a)
+
+            i_active_p = game.game_state.get_active_player_index()
+
+            if i_active_p == player_index:
+                print 'Game handling action: ' + str(a)
+                game.handle(a)
+                self.save_backup()
+
+            else:
+                print 'Received action for player {0!s}, but waiting on player {1!s}'.format(
+                        player, i_active_p)
+
+            for u in [p.name for p in game.game_state.players]:
+                gs = self.get_game_state(u, game_id)
+                self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
 
     def find_or_add_user(self, username):
         """Finds a user by username, returning the User object
@@ -114,7 +163,6 @@ class GTRServer(service.Service):
 
         return u
 
-
     def join_game(self, user, game_id):
         """Joins an existing game"""
         try:
@@ -130,13 +178,12 @@ class GTRServer(service.Service):
         #    print 'User already in this game'
         #    return
 
-        return defer.succeed(game_id)
+        return game_id
 
     def create_game(self, user):
         """Create a new game."""
         return self.join_game(user, len(self.games))
         
-
     def get_game_list(self):
         """Return list of games"""
         game_list = []
@@ -144,8 +191,7 @@ class GTRServer(service.Service):
             players = [p.name for p in game.game_state.players]
             game_list.append(GameRecord(i,players))
         
-        return defer.succeed(game_list)
-
+        return game_list
 
     def start_game(self, user, game_id):
         """Request that specified game starts"""
@@ -154,17 +200,16 @@ class GTRServer(service.Service):
             game = self.games[game_id]
         except IndexError:
             print 'Tried to start non-existent game {0:d}'.format(game)
-            return defer.succeed(None)
+            return None
 
         if game.game_state.is_started:
             print 'Game already started'
-            return defer.succeed(None)
+            return None
 
         game.start_game()
         self.save_backup()
         
-        return defer.succeed(None)
-
+        return None
 
     def load_backup(self):
         """ Loads backup from JSON-encoded constructed file.
@@ -187,7 +232,6 @@ class GTRServer(service.Service):
                 return
 
             self.games = [Game(gs) for gs in game_states]
-
 
     def save_backup(self):
         """ Writes pickled list of game states to backup file.
