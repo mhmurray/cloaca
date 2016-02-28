@@ -21,7 +21,9 @@ import message
 from itertools import product
 
 lg = logging.getLogger('gtr')
-# To set up logging, look at playgame.py
+logging.basicConfig()
+lg.setLevel(logging.INFO)
+#lg.setLevel(logging.DEBUG)
 
 class Game(object):
     initial_pool_count = 5
@@ -657,8 +659,50 @@ class Game(object):
         self.pump()
 
 
+    def check_oot_allowed(self, player):
+        """Checks if the player can start a site out of town. Here are the
+        conditions for oot being allowed.
+
+        There is another perform_role_action stack frame below this with the
+        same player.
+
+        A perform_clientele_action frame of the same role and player.
+
+        A perform_clientele_action frame of same player, and role Merchant
+        and we have a Ludus Magnus.
+
+        We have a Tower.
+
+        This checks the top stack frame, so call this after popping the action
+        in which you want to know if out-of-town is allowed.
+
+        Returns True if starting out of town is allowed, False otherwise.
+        """
+        if self.player_has_active_building(player, 'Tower'):
+            return True
+
+        has_ludus = self.player_has_active_building(player, 'Ludus Magnus')
+
+        f = self.game_state.stack.stack[-1]
+
+        # Args are (player, role)
+        if f.function_name == 'perform_role_action':
+            p, role = f.args
+
+            if p.name == player.name and role == self.game_state.role_led:
+                return True
+
+        if f.function_name == 'perform_clientele_action':
+            p, role = f.args
+
+            if p.name == player.name and \
+                    ((role=='Merchant' and has_ludus) or role == self.game_state.role_led):
+                return True
+
+        return False
+
     def perform_role_action(self, player, role):
-        """ Multiplexer function for arbitrary roles.
+        """Multiplexer function for arbitrary roles.
 
         Calls perform_<role>_action(), etc.
 
@@ -671,6 +715,9 @@ class Game(object):
 
         self.game_state.used_oot = False
         if not used_oot or (used_oot and has_tower):
+
+            self.game_state.oot_allowed = self.check_oot_allowed(player)
+
             if role=='Patron':
                 self.perform_patron_action(player)
             elif role=='Laborer':
@@ -832,13 +879,16 @@ class Game(object):
 
         if site not in self.game_state.out_of_town_foundations:
             raise GTRError('No ' +  site + ' sites left, including out of town')
-        #TODO : check if out of town allowed
+
+        if site not in self.game_state.in_town_foundations and \
+                not self.game_state.oot_allowed:
+            raise GTRError('Starting an out of town building is not allowed.')
 
         material = card_manager.get_material_of_card(building)
 
         if not (material == site or building == 'Statue'):
             raise GTRError('Illegal building/site combination (' + \
-                           building+'/'+site)
+                           building+'/'+site+').')
 
     def check_building_add_legal(self, player, building_name, material_card):
         """ Checks if the specified player is allowed to add material
@@ -944,7 +994,6 @@ class Game(object):
             self.check_building_start_legal(player, foundation, site)
 
             is_oot = site not in self.game_state.in_town_foundations
-            # TODO: Check if out-of-town is allowed
 
             if player.owns_building(foundation):
                 raise GTRError(player.name + ' already has a ' + foundation)
@@ -953,7 +1002,6 @@ class Game(object):
                 sites = self.game_state.out_of_town_foundations
                 if site not in sites:
                     raise GTRError(site + ' not available out of town.')
-
             else:
                 sites = self.game_state.in_town_foundations
                 if site not in sites:
@@ -968,6 +1016,9 @@ class Game(object):
             player.buildings.append(Building(foundation_card, site_card))
 
             self.game_state.used_oot = is_oot
+
+            if len(self.game_state.in_town_foundations) == 0:
+                self.end_game()
 
         else:
             # This raises if the add is not legal
@@ -1154,6 +1205,7 @@ class Game(object):
 
     def handle_givecards(self, a):
         cards = a.args
+        lg.debug('Received GIVECARDS(' + ','.join(cards)+')')
 
         p = self.game_state.active_player
 
@@ -1169,15 +1221,19 @@ class Game(object):
 
         if not is_immune:
             self.move_legionary_cards(p, leg_p, cards, has_bridge, has_coliseum)
+        else:
+            lg.debug('Player '+p.name+' is immune to legionary.')
 
         self.game_state.legionary_resp_indices.pop(0)
         if len(self.game_state.legionary_resp_indices):
+            lg.debug('Waiting on next player to respond to legionary.')
             next_index = self.game_state.legionary_resp_indices[0]
 
             self.active_player = self.game_state.players[next_index]
             self.game_state.expected_action = message.GIVECARDS
 
         else:
+            lg.debug('All players have responded to legionary.')
             self.pump()
 
 
@@ -1192,6 +1248,7 @@ class Game(object):
         given_cards = list(cards)
         c2m = card_manager.get_material_of_card
 
+        cards_moved_from_hand = [] # for logging
         for c in leg_p.revealed:
             mat = c2m(c)
             matched_cards = [card for card in p.hand if c2m(card) == mat]
@@ -1199,8 +1256,14 @@ class Game(object):
                 if given_card in matched_cards:
                     gtrutils.move_card(given_card, p.hand, leg_p.stockpile)
                     given_cards.remove(given_card)
+                    cards_moved_from_hand.append(given_card)
                     break
 
+        lg.debug('Moved cards from '+p.name+'\'s hand to ' +\
+                 leg_p.name+'\'s stockpile: ' +\
+                 ','.join(cards_moved_from_hand))
+
+        cards_moved_from_stockpile = [] # for logging
         if has_bridge:
             for c in leg_p.revealed:
                 mat = c2m(c)
@@ -1209,8 +1272,14 @@ class Game(object):
                     if given_card in matched_cards:
                         gtrutils.move_card(given_card, p.stockpile, leg_p.stockpile)
                         given_cards.remove(given_card)
+                        cards_moved_from_stockpile.append(given_card)
                         break
 
+        lg.debug('Moved cards from '+p.name+'\'s stockpile to ' +\
+                 leg_p.name+'\'s stockpile: ' +\
+                 ','.join(cards_moved_from_hand))
+
+        cards_moved_from_clientele = [] # for logging
         if has_coliseum:
             for c in leg_p.revealed:
                 mat = c2m(c)
@@ -1219,7 +1288,12 @@ class Game(object):
                     if given_card in matched_cards:
                         gtrutils.move_card(given_card, p.clientele, leg_p.vault)
                         given_cards.remove(given_card)
+                        cards_moved_from_clientele.append(given_card)
                         break
+
+        lg.debug('Moved cards from '+p.name+'\'s clientele to ' +\
+                 leg_p.name+'\'s vault: ' +\
+                 ','.join(cards_moved_from_hand))
 
 
     def perform_merchant_action(self, player):
@@ -1379,7 +1453,7 @@ class Game(object):
         for p in self.game_state.players:
             lg.info('Score for player {} : {}'.format(p.name, self.get_player_score(p)))
         lg.info('\n')
-        raise Exception('Game over.')
+        raise GTRError('Game over.')
 
 
     def resolve_building(self, player, building_obj):

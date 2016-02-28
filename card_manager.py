@@ -23,7 +23,14 @@ def get_cards_dict_from_json_file():
 def get_card_dict(card_name):
     """ Return dict of data for ONE card. """
     cards_dict = get_cards_dict_from_json_file()
-    card_dict = cards_dict[card_name]
+    
+    if card_name == 'Jack':
+        card_dict = {"card_count": "0", 
+                "function": "Jack",
+                "material": None
+               } 
+    else:
+        card_dict = cards_dict[card_name]
     return card_dict
 
 def get_function_of_card(card_name):

@@ -146,7 +146,16 @@ def parse_action(action_string):
 
     # Split only to the number of allowed actions.
     # Some GameActions (GAMESTATE) contain commas, and rely on n_args.
-    if n_args > 0:
+    # Actions with 0 required args and more optional args (GIVECARDS)
+    # should have a blank argument: "9,". However, if only the game
+    # action is specified, eg. "9", we can infer that there are no arguments
+    # defensively
+    try:
+        arg_tokens_presplit = action_tokens[1]
+    except IndexError:
+        arg_tokens_presplit = ''
+
+    if arg_tokens_presplit and (n_args > 0 or extras_allowed):
         arg_tokens = action_tokens[1].split(',', -1 if extras_allowed else n_args-1)
     else:
         arg_tokens = []
@@ -166,7 +175,7 @@ def parse_action(action_string):
                 elif token == 'False':
                     arg = False
                 else:
-                    arg = None
+                    raise BadGameActionError('Boolean argument expected. Received' + token)
 
             elif token == 'None':
                 arg = None
@@ -258,3 +267,6 @@ class GameAction:
     def __repr__(self):
         r = 'GameAction({0!s}, {1})'.format(self.action, ', '.join(map(repr, self.args)))
         return r
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__

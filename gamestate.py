@@ -11,6 +11,8 @@ from player import Player
 from building import Building
 import random
 import logging
+import card_manager
+from collections import Counter
 
 import stack
 
@@ -301,24 +303,24 @@ class GameState:
         ))
 
         # print pool.
-        pool_string = 'Pool: \n'
-        pool_string += gtrutils.get_detailed_zone_summary(self.pool)
+        pool_string = 'Pool: '
+        pool_mats = Counter(map(card_manager.get_material_of_card, self.pool))
+        pool_string += '  '.join([mat[:3] + ' x' + str(cnt) for mat,cnt in pool_mats.items()]) + '\n'
+
+        
+
+        #pool_string += gtrutils.get_detailed_zone_summary(self.pool)
         s.append(pool_string)
 
-        # print N cards in library
-        s.append('Library : {0:d} cards'.format(len(self.library)))
+        s.append('({0:d}/{1:d}) Library/Jacks'.format(len(self.library), len(self.jack_pile)))
 
-        # print N jacks
-        s.append('Jacks : {0:d} cards'.format(len(self.jack_pile)))
+        sites_string = ' '.join(
+                [mat[:3]+'[{0:d}/{1:d}]'.format(self.in_town_foundations.count(mat),
+                                                self.out_of_town_foundations.count(mat)) 
+                for mat in card_manager.get_materials()]
+                ) + '   Sites [in/out]'
 
-        # print Foundations
-        s.append('Foundation materials:')
-        foundation_string = '  In town: ' + gtrutils.get_short_zone_summary(
-          self.in_town_foundations, 3)
-        s.append(foundation_string)
-        foundation_string = '  Out of town: ' + gtrutils.get_short_zone_summary(
-          self.out_of_town_foundations, 3)
-        s.append(foundation_string)
+        s.append(sites_string)
 
         s.append('')
         for player in self.get_players_in_turn_order(start_player):

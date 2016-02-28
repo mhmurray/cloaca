@@ -57,10 +57,8 @@ def get_short_zone_summary(card_list, n_letters=3):
     strings are not colorized.
     """
     counter = collections.Counter(card_list)
-    cards_string = ''
-    for card, count in counter.items():
-        cards_string += '{0}[{1:d}], '.format(card[:n_letters], count)
-    cards_string.rstrip(', ')
+    cards_string = ', '.join(
+            ['{0}[{1:d}]'.format(card[:n_letters], cnt) for card, cnt in counter.items()])
     return cards_string
 
 def get_detailed_card_summary(card, count=None):
@@ -77,7 +75,7 @@ def get_detailed_card_summary(card, count=None):
         card_string += ' | {0}'.format(material[:3])
         card_string += '-{0}'.format(role[:3])
         card_string += '-{0}'.format(value)
-        card_string += ' | {0}'.format(function)
+        card_string += ' | ' + (function if len(function)<50 else function[:47] + '...')
     return card_string
 
 def get_detailed_zone_summary(zone):
@@ -87,7 +85,8 @@ def get_detailed_zone_summary(zone):
     counter_dict = dict(counter)
     cards = counter_dict.keys()
     cards.sort() # alphabetize
-    zone_string = '  Card      | Mat-Rol-$ | Description \n'
+    #zone_string = '  Card      | Mat-Rol-$ | Description \n'
+    zone_string = ''
     for card in cards:
         count = counter_dict[card]
         zone_string += '  * ' + get_detailed_card_summary(card, count)
@@ -253,15 +252,16 @@ def get_building_info(building):
     function = card_manager.get_function_of_card(title_card)
     value = card_manager.get_value_of_card(title_card)
     title_material = card_manager.get_material_of_card(title_card)
-    title_value = card_manager.get_value_of_card(title_card)
 
     info = '  * {0} | {1}-{2} | '.format(title_card, title_material[:3], value)
     if building.site:
         info += '{0} site + '.format(building.site)
-    if building.materials:
-        info += ''.join([card_manager.get_material_of_card(m)[0] for m in building.materials])
-    else: info += '___'
-    info += ' | ' + function
+
+    # Materials : "Concrete site + C_" for a wall with one concrete added.
+    info += ''.join([card_manager.get_material_of_card(m)[0] for m in building.materials])
+    info += '_' * (value-len(building.materials))
+
+    info += ' | ' + function[:40]
     return info
 
 def colorize_role(any_string):

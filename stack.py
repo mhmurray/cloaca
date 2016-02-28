@@ -5,6 +5,9 @@ class Stack(object):
     def push_frame(self, function_name, *args):
         self.stack.append(Frame(function_name, *args))
 
+    def remove(self, item):
+        self.stack.remove(item)
+
     def __str__(self):
         return str(self.stack)
 

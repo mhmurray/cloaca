@@ -4,6 +4,12 @@ import urwid
 from urwid import ListBox, LineBox, Filler, SimpleListWalker, Text, Frame, Pile, Edit, Columns, MainLoop
 import logging
 import re
+import sys
+from time import sleep
+import traceback
+import pdb
+
+from functools import wraps
 
 def main():
 
@@ -19,21 +25,30 @@ class RollLogHandler(logging.Handler):
     """Log handler that writes messages using two functions, write_msg
     and write_err. These functions are provided when making the object
     or can be set by simply modifying the properties.
+
+    This is set to logLevel=DEBUG, though the logger object might have
+    a different level
     """
 
-    def __init__(self, write_msg, write_err):
-        logging.Handler.__init__(self, logging.INFO)
+    def __init__(self, write_msg, write_err=None, write_debug=None):
+        """If write_err or write_debug aren't specified, write_msg is
+        used in their place.
+        """
+        logging.Handler.__init__(self, logging.DEBUG)
         self.write_msg = write_msg
-        self.write_err = write_err
+        self.write_err = write_err if write_err else write_msg
+        self.write_debug = write_debug if write_debug else write_msg
 
     def handle(self, record):
         """Handles a logging record. This only pipes it to write_msg
         or write_err depending on the logging level.
         """
         if record.levelno >= logging.WARNING:
-            self.write_err(record.getMessage())
+            self.write_err(record.getMessage(), 'msg_err')
+        elif record.levelno >= logging.INFO:
+            self.write_msg(record.getMessage(), 'msg_info')
         else:
-            self.write_msg(record.getMessage())
+            self.write_debug(record.getMessage(),'msg_debug')
 
 class CursesGUI(object):
 
@@ -49,6 +64,9 @@ class CursesGUI(object):
                 ('stone', 'light cyan', 'black'),
                 ('marble', 'light magenta', 'black'),
                 ('jack', 'dark gray', 'white'),
+                ('msg_info', 'white', 'black'),
+                ('msg_err', 'light red', 'black'),
+                ('msg_debug', 'light green', 'black'),
                 ]
 
         self.choice_callback = choice_callback
@@ -57,13 +75,15 @@ class CursesGUI(object):
 
         self.screen = None
         self.loop = None
+        self.called_loop_stop = False
+        self.reactor_stop_fired = False
 
         self.quit_flag = False
         self.edit_msg = "Make selection ('q' to quit): "
-        self.roll_list = SimpleListWalker([Text('first!')])
-        self.choices_list = SimpleListWalker([Text('Choice '+str(i)) for i in range(10)])
+        self.roll_list = SimpleListWalker([])
+        self.choices_list = SimpleListWalker([])
 
-        self.state_text = SimpleListWalker([Text('State goes here...')])
+        self.state_text = SimpleListWalker([Text('Connecting...')])
 
         self.edit_widget = Edit(self.edit_msg)
         self.roll = ListBox(self.roll_list)
@@ -84,11 +104,77 @@ class CursesGUI(object):
                                   body=self.columns,
                                   focus_part='footer')
 
-        game_lg = logging.getLogger('gtr.game')
-        game_lg.addHandler(RollLogHandler(self.roll_write, self.roll_write))
-        game_lg.setLevel(logging.INFO)
-        game_lg.info('Set up logger')
-        game_lg.warn('Warning. Set up logger')
+        self.exc_info = None
+
+
+    def register_loggers(self):
+        """Gets the global loggers and sets up log handlers.
+        """
+        self.game_logger_handler = RollLogHandler(self._roll_write)
+        self.logger_handler = RollLogHandler(self._roll_write)
+
+        self.game_logger = logging.getLogger('gtr.game')
+        self.logger = logging.getLogger('gtr')
+
+        self.logger.addHandler(self.logger_handler)
+        self.game_logger.addHandler(self.game_logger_handler)
+
+        #self.set_log_level(logging.INFO)
+
+
+    def unregister_loggers(self):
+        self.game_logger.removeHandler(self.game_logger_handler)
+        self.logger.removeHandler(self.logger_handler)
+
+
+    def fail_safely(f):
+        """Wraps functions in this class to catch arbitrary exceptions,
+        shut down the event loop and reset the terminal to a normal state.
+
+        It then re-raises the exception.
+        """
+        @wraps(f)
+        def wrapper(self, *args, **kwargs):
+            retval = None
+            try:
+                retval = f(self, *args, **kwargs)
+            except urwid.ExitMainLoop:
+                from twisted.internet import reactor
+                if not self.reactor_stop_fired and reactor.running:
+                    # Make sure to call reactor.stop once
+                    reactor.stop()
+                    self.reactor_stop_fired = True
+
+            except:
+                #pdb.set_trace()
+                from twisted.internet import reactor
+                if not self.reactor_stop_fired and reactor.running:
+                    # Make sure to call reactor.stop once
+                    reactor.stop()
+                    self.reactor_stop_fired = True
+
+                if not self.called_loop_stop:
+                    self.called_loop_stop = True
+                    self.loop.stop()
+                
+                # Save exception info for printing later outside the GUI.
+                self.exc_info = sys.exc_info()
+
+                raise
+
+            return retval
+
+        return wrapper
+                
+
+    def set_log_level(self, level):
+        """Set the log level as per the standard library logging module.
+
+        Default is logging.INFO.
+        """
+        logging.getLogger('gtr.game').setLevel(level)
+        logging.getLogger('gtr').setLevel(level)
+
 
     def run(self):
         loop = MainLoop(self.frame_widget, unhandled_input=self.handle_input)
@@ -96,15 +182,31 @@ class CursesGUI(object):
 
     def run_twisted(self):
         from twisted.internet import reactor
-        evloop = urwid.TwistedEventLoop(reactor)
+        evloop = urwid.TwistedEventLoop(reactor, manage_reactor=False)
         self.screen = urwid.raw_display.Screen()
         self.screen.register_palette(self.palette)
         self.loop = MainLoop(self.frame_widget, unhandled_input=self.handle_input,
                              screen = self.screen,
                              event_loop = evloop)
         self.loop.set_alarm_in(0.1, lambda loop, _: loop.draw_screen())
-        self.loop.run()
 
+        self.loop.start()
+
+        # The loggers get a Handler that writes to the screen. We want this to only
+        # happen if the screen exists, so de-register them after the reactor stops.
+        reactor.addSystemEventTrigger('after','startup', self.register_loggers)
+        reactor.addSystemEventTrigger('before','shutdown', self.unregister_loggers)
+        reactor.run()
+        
+        # We might have stopped the screen already, and the stop() method
+        # doesn't check for stopping twice.
+        if self.called_loop_stop:
+            self.logger.warn('Internal error!')
+        else:
+            self.loop.stop()
+            self.called_loop_stop = True
+
+    @fail_safely
     def handle_input(self, key):
         if key == 'enter':
             text = self.edit_widget.edit_text
@@ -124,50 +226,59 @@ class CursesGUI(object):
 
             self.edit_widget.set_edit_text('')
 
-    def roll_write(self, line):
-        """Add a line to the roll.
+    def _roll_write(self, line, attr=None):
+        """Add a line to the roll with palette attributes 'attr'.
+
+        If no attr is specified, None is used.
+
+        Default attr is plain text
         """
-        self.roll_list.append(Text(line))
+        text = Text((attr, '* ' + line))
+            
+        self.roll_list.append(text)
         self.roll_list.set_focus(len(self.roll_list)-1)
-        self.modified()
+        self._modified()
 
-    def _state_add(self, line):
-        self.state_text.append(Text(line))
-        self.modified()
-
+    @fail_safely
     def update_state(self, state):
         """Sets the game state window via one large string.
         """
+        self.logger.debug('Drawing game state.')
         self.state_text[:] = [self.colorize(s) for s in state.split('\n')]
-        self.modified()
+        self._modified()
 
+    @fail_safely
     def update_choices(self, choices):
         """Update choices list.
         """
         self.choices_list[:] = [self.colorize(str(c)) for c in choices]
-        self.modified()
+        self._modified()
 
+    @fail_safely
     def update_prompt(self, prompt):
         """Set the prompt for the input field.
         """
         self.edit_widget.set_caption(prompt)
-        self.modified()
+        self._modified()
 
 
-    def modified(self):
+    def _modified(self):
         if self.loop:
             self.loop.draw_screen()
 
 
+    @fail_safely
     def quit(self):
         """Quit the program.
         """
+        #import pdb; pdb.set_trace()
+        #raise TypeError('Artificial TypeError')
         raise urwid.ExitMainLoop()
 
     def handle_invalid_choice(self, s):
         if len(s):
-            text = '! Invalid choice: "' + s + '". Please enter an integer.'
-            self.roll_write(text)
+            text = 'Invalid choice: "' + s + '". Please enter an integer.'
+            self.logger.warn(text)
 
     def handle_quit_request(self):
         if True or self.quit_flag:
@@ -175,7 +286,7 @@ class CursesGUI(object):
         else:
             self.quit_flag = True
             text = 'Are you sure you want to quit? Press Q again to confirm.'
-            self.roll_write(text)
+            self.logger.warn(text)
 
     def handle_choice(self, i):
         if self.choice_callback:

@@ -1,7 +1,8 @@
-class InitializationError(Exception):
-    """ An exception class for StateMachine.
+class FSMError(Exception):
+    """An exception class for StateMachine.
     """
-    pass
+    def __init__(self, msg):
+        self.msg = msg
 
 
 class StateMachine(object):
@@ -46,33 +47,27 @@ class StateMachine(object):
         after the arrival_handler
         """
         if self.state in self.endStates:
-            print('Done already!')
             return
 
         try:
             handler = self.handlers[self.state]
-        except:
-            raise InitializationError('No transition for state ' + str(self.state))
+        except IndexError:
+            raise FSMError('No transition for state ' + str(self.state))
         if not self.endStates:
-            raise  InitializationError('Must have at least one end_state.')
+            raise  FSMError('Must have at least one end_state.')
 
         if self.adapter is not None:
             cargo = self.adapter(cargo)
     
-        try:
-            new_state = handler(cargo)
-        except Exception as e:
-            print 'Failed to make choice in state {0}'.format(self.state)
-            print e.message
-            return
+        new_state = handler(cargo)
 
         return_value, self.pump_return_value = self.pump_return_value, None
 
         self.state = new_state
         try:
             arrival_handler = self.arrival_handlers[self.state]
-        except:
-            raise InitializationError('No arrival handler for state ' + str(self.state))
+        except IndexError:
+            raise FSMError('No arrival handler for state ' + str(self.state))
         if arrival_handler is not None:
             arrival_handler()
 

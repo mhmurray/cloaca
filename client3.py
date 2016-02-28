@@ -51,8 +51,8 @@ import time
 import glob
 import copy
 
-lg = logging.getLogger('gtr')
 game_lg = logging.getLogger('gtr.game')
+game_lg.propagate = False
 
 class StartOverException(Exception):
     pass
@@ -77,16 +77,89 @@ class Choice(object):
     def __str__(self):
         return repr(self)
 
+class ActionBuilder(object):
+    """A base class for action builders that wraps the choices list
+    and choice-making exceptions. Most action builders will use a 
+    simple subclass of this or create a FSM to take multiple inputs
+    while building a GameAction object.
 
-class LaborerActionBuilder(object):
+    The member choices is a list of Choice objects, which can have a 
+    description and a flag for whether that choice is selectable.
+    """
+    def __init__(self):
+        self.choices = []
+        self.done = False
+        self.action = None
+        self.prompt = None
+
+    def make_selectable_choice(self, index):
+        """Make a selection from the list of choices.
+        This filters for selectable objects only.
+        """
+        selectable_items = [c.item for c in self.choices if c.selectable]
+        try:
+            item = selectable_items[index]
+        except IndexError:
+            raise InvalidChoiceException()
+        else:
+            return item
+
+class SingleChoiceActionBuilder(ActionBuilder):
+    """Gets a simple response from a list.
+    """
+    def __init__(self, action_type, choices):
+        """The parameter choices is a list of Choice objects.
+
+        For example:
+
+            [Choice('Rubble', 'Build on a Rubble site', True),
+             Choice('Concrete', 'Cannot build on Concrete', False).
+             ...]
+
+        """
+        ActionBuilder.__init__(self)
+        self.choices = choices
+        self.action_type = action_type
+        self.prompt = None
+
+    def make_choice(self, index):
+        item = self.make_selectable_choice(index)
+
+        self.action = message.GameAction(self.action_type, item)
+        self.done = True
+
+
+class FSMActionBuilder(ActionBuilder):
+    """An action builder subclass that uses a FSM to keep track of
+    multiple sequential inputs building up a GameAction over many
+    question.
+    """
+
+    def __init__(self):
+        ActionBuilder.__init__(self)
+        self.fsm = StateMachine()
+
+    def make_choice(self, index):
+        item = self.make_selectable_choice(index)
+
+        self.fsm.pump(item)
+
+
+class LaborerActionBuilder(FSMActionBuilder):
     """Puts together the information needed for a Laborer action.
     """
 
     def __init__(self, pool, hand, has_dock=False):
+        FSMActionBuilder.__init__(self)
 
-        self.fsm = StateMachine()
+        self.hand = sorted(hand, card_manager.cmp_jacks_first)
+        self.pool = sorted(pool, card_manager.cmp_jacks_first)
 
-        self.fsm.add_adapter(self.adapter)
+        self.has_dock = has_dock
+
+        self.pool_card = None
+        self.hand_card = None
+
 
         self.fsm.add_state('START', None, lambda _ : 'FROM_POOL')
         self.fsm.add_state('FROM_POOL',
@@ -97,40 +170,8 @@ class LaborerActionBuilder(object):
 
         self.fsm.set_start('START')
 
-        self.hand = sorted(hand, card_manager.cmp_jacks_first)
-        self.pool = sorted(pool, card_manager.cmp_jacks_first)
-
-        self.has_dock = has_dock
-
-        self.pool_card = None
-        self.hand_card = None
-
-        self.choices = None
-        self.prompt = None
-        self.done = False
-        self.action = None
-
         # Move from Start state
         self.fsm.pump(None)
-
-
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
 
 
     def from_pool_arrival(self):
@@ -162,30 +203,12 @@ class LaborerActionBuilder(object):
         self.action = message.GameAction(message.LABORER, self.hand_card, self.pool_card)
 
 
-    def get_choices(self):
-        return self.choices
-
-
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-
-
-class LegionaryActionBuilder(object):
+class LegionaryActionBuilder(FSMActionBuilder):
     """Assemble the list of cards used to demand with the Legionary.
     """
 
     def __init__(self, hand, n_legionary_actions):
-
-        self.fsm = StateMachine()
-
-        self.fsm.add_adapter(self.adapter)
-
-        self.fsm.add_state('START', None, lambda _ : 'GET_CARD')
-        self.fsm.add_state('GET_CARD',
-            self.get_card_arrival, self.get_card_transition)
-        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
-
-        self.fsm.set_start('START')
+        FSMActionBuilder.__init__(self)
 
         self.hand = [Choice(c, card2summary(c)) for c in \
                      sorted(hand, card_manager.cmp_jacks_first) \
@@ -194,32 +217,15 @@ class LegionaryActionBuilder(object):
         self.cards = []
         self.n_max = n_legionary_actions
 
-        self.choices = None
-        self.prompt = None
-        self.done = False
-        self.action = None
+        self.fsm.add_state('START', None, lambda _ : 'GET_CARD')
+        self.fsm.add_state('GET_CARD',
+            self.get_card_arrival, self.get_card_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
 
         # Move from Start state
         self.fsm.pump(None)
-
-
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
 
 
     def get_card_arrival(self):
@@ -265,38 +271,11 @@ class LegionaryActionBuilder(object):
 
     def finished_arrival(self):
         self.done = True
-        cards = self.cards if len(self.cards) else [None]
+        cards = self.cards if len(self.cards) else []
         self.action = message.GameAction(message.LEGIONARY, *cards)
 
 
-    def get_choices(self):
-        return self.choices
-
-
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-#if 0:
-    def show_choices(self, choices_list, prompt=None):
-        """Returns the index in the choices_list selected by the user or
-        raises a StartOverException or a CancelDialogExeption.
-
-        The choices_list is a list of Choices.
-        """
-        i_choice = 1
-        for c in choices_list:
-            if c.selectable:
-                print '  [{0:2d}] {1}'.format(i_choice, c.description)
-                i_choice+=1
-            else:
-                print '       {0}'.format(c.description)
-
-        if prompt is not None:
-            print prompt
-        else:
-            print 'Please make a selection:'
-
-
-class GiveCardsActionBuilder(object):
+class GiveCardsActionBuilder(FSMActionBuilder):
     """Assemble the set of cards to give to the Legionary player.
 
     In principle, the player can select which cards to give
@@ -307,78 +286,68 @@ class GiveCardsActionBuilder(object):
     Otherwise, we ask for the cards from the player's hand.
     """
 
+    # The member self.cards will accumulated cards as they are selected.
+    # For every re-entry into the GET_CARD state, self.cards is compared
+    # against legionary_mats to see which material demands are unsatisfied.
+
     def __init__(self, legionary_mats, hand, stockpile, clientele,
             has_bridge, has_coliseum, immune):
 
-        self.fsm = StateMachine()
-
-        self.fsm.add_adapter(self.adapter)
-
-        self.fsm.add_state('START', None, lambda _ : 'GET_CARD')
-        self.fsm.add_state('GET_CARD',
-            self.get_card_arrival, self.get_card_transition)
-        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
-
-        self.fsm.set_start('START')
-
+        FSMActionBuilder.__init__(self)
         self.hand = [Choice(c, card2summary(c)) for c in \
                      sorted(hand, card_manager.cmp_jacks_first) \
                      if c != 'Jack']
         self.stockpile = list(stockpile)
         self.clientele = list(clientele)
 
+        self.stockpile_cards = []
+        self.clientele_cards = []
+
+        # self.cards will be returned with the GIVECARDS action
         self.cards = []
         self.mats = legionary_mats
 
         self.has_bridge = has_bridge
         self.has_coliseum = has_coliseum
 
-        self.choices = None
-        self.prompt = None
-        self.done = False
-        self.action = None
+        self.get_no_choice_cards()
+
+        self.fsm.add_state('START', None, lambda _ : 'GET_CARD')
+        self.fsm.add_state('GET_CARD',
+            self.get_card_arrival, self.get_card_transition)
+        self.fsm.add_state('GLORYTOROME', self.glory_to_rome_arrival,
+                lambda _ : 'FINISHED')
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
 
         # Move from Start state
         if immune:
             self.done = True
-            self.action = message.GameAction(message.GIVECARDS, None)
-        elif self.finished():
-            self.fsm.set_start('FINISHED')
+            self.action = message.GameAction(message.GIVECARDS)
+
+        elif self.finished() and not self.stockpile_cards and not self.clientele_cards:
+            self.fsm.set_start('GLORYTOROME')
 
         self.fsm.pump(None)
-
-
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
 
 
     def get_card_arrival(self):
         self.choices = copy.deepcopy(self.hand)
         mats = list(self.mats)
 
+        # Mark as unselectable cards that have already been chosen
         for c in self.cards:
             for choice in self.choices:
                 if choice.item == c and choice.selectable:
                     choice.selectable = False
                     break
 
+        # Remove from the materials demanded the materials of the cards already chosen
         for c in self.cards:
-            mats.remove(card2mat(c))
+            m = card2mat(c)
+            if m in mats:
+                mats.remove(m)
 
         for choice in self.choices:
             choice.selectable = card2mat(choice.item) in mats
@@ -386,7 +355,9 @@ class GiveCardsActionBuilder(object):
         if len(self.cards) > 1:
             self.choices.append(Choice('Undo', 'Undo'))
 
-        self.prompt = 'Rome demands: {0}! (currently: {1})'.format(
+        self.choices.append(Choice(None, 'None'))
+
+        self.prompt = 'Rome demands: {0}! (currently giving: {1})'.format(
                 ', '.join(mats),
                 ', '.join(self.cards))
 
@@ -415,7 +386,8 @@ class GiveCardsActionBuilder(object):
             new_state = 'GET_CARD'
 
         else:
-            self.cards.append(choice)
+            if choice is not None:
+                self.cards.append(choice)
 
             if self.finished():            
                 new_state = 'FINISHED'
@@ -424,54 +396,59 @@ class GiveCardsActionBuilder(object):
 
         return new_state
 
+    def glory_to_rome_arrival(self):
+        self.choices = [\
+                Choice('Glory', 'Glory to Rome!'),
+                Choice('Skip', 'Skip this action', selectable=False)
+                ]
+
+        self.prompt = 'Please make a selection'
+
 
     def finished_arrival(self):
         self.done = True
 
-        stockpile_cards = []
-        if self.has_bridge:
-            for r in self.mats:
-                for c in self.stockpile:
-                    if card2mat(c) == r:
-                        stockpile_cards.append(c)
-                        self.stockpile.remove(c)
-                        break
-                        
-        clientele_cards = []
-        if self.has_coliseum:
-            for r in self.mats:
-                for c in self.clientele:
-                    if card2mat(c) == r:
-                        clientele_cards.append(c)
-                        self.clientele.remove(c)
-                        break
-
-        cards = self.cards + stockpile_cards + clientele_cards
-
-        if len(cards) == 0:
-            cards = [None]
+        cards = self.cards + self.stockpile_cards + self.clientele_cards
 
         self.action = message.GameAction(message.GIVECARDS, *cards)
 
 
-    def get_choices(self):
-        return self.choices
+    def get_no_choice_cards(self):
+        self.stockpile_cards = []
+        if self.has_bridge:
+            for r in self.mats:
+                for c in self.stockpile:
+                    if card2mat(c) == r:
+                        self.stockpile_cards.append(c)
+                        self.stockpile.remove(c)
+                        break
+                        
+        self.clientele_cards = []
+        if self.has_coliseum:
+            for r in self.mats:
+                for c in self.clientele:
+                    if card2mat(c) == r:
+                        self.clientele_cards.append(c)
+                        self.clientele.remove(c)
+                        break
 
 
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-
-
-
-class MerchantActionBuilder(object):
+class MerchantActionBuilder(FSMActionBuilder):
     """Puts together the information needed for a Laborer action.
     """
 
     def __init__(self, stockpile, hand, has_atrium, has_basilica):
+        FSMActionBuilder.__init__(self)
 
-        self.fsm = StateMachine()
+        self.hand = sorted(hand, card_manager.cmp_jacks_first)
+        self.stockpile_cards = sorted(stockpile, card_manager.cmp_jacks_first)
 
-        self.fsm.add_adapter(self.adapter)
+        self.has_basilica = has_basilica
+        self.has_atrium = has_atrium
+
+        self.stockpile_card = None
+        self.hand_card = None
+        self.from_deck = False
 
         self.fsm.add_state('START', None, lambda _ : 'FROM_STOCKPILE')
         self.fsm.add_state('FROM_STOCKPILE',
@@ -484,42 +461,7 @@ class MerchantActionBuilder(object):
 
         self.fsm.set_start('START')
 
-        self.hand = sorted(hand, card_manager.cmp_jacks_first)
-        self.stockpile_cards = sorted(stockpile, card_manager.cmp_jacks_first)
-
-        self.has_basilica = has_basilica
-        self.has_atrium = has_atrium
-
-        self.stockpile_card = None
-        self.hand_card = None
-        self.from_deck = False
-
-        self.choices = None
-        self.prompt = None
-        self.done = False
-        self.action = None
-
-        # Move from Start state
         self.fsm.pump(None)
-
-
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
 
 
     def from_stockpile_arrival(self):
@@ -571,15 +513,7 @@ class MerchantActionBuilder(object):
                 self.hand_card, self.from_deck)
 
 
-    def get_choices(self):
-        return self.choices
-
-
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-
-
-class RoleActionBuilder(object):
+class RoleActionBuilder(FSMActionBuilder):
     """Builds up a message.GameAction for LEADROLE or FOLLOWROLE.
     
     If role is not None, we generate a FOLLOWROLE action instead,
@@ -592,10 +526,19 @@ class RoleActionBuilder(object):
     # There are notes in individual functions.
 
     def __init__(self, hand, role=None, has_palace=False, petition_count=3):
+        FSMActionBuilder.__init__(self)
+        # A list of cards in the hand and whether they've been used.
+        self.hand = [Choice(c, card2summary(c), True) for c in \
+                           sorted(hand, card_manager.cmp_jacks_first)]
 
-        self.fsm = StateMachine()
+        self.role = role
+        self.following = role is not None
 
-        self.fsm.add_adapter(self.adapter)
+        self.action_units = [] # list of lists: [card1, card2, ... ]
+        self.petition_cards = []
+
+        self.has_palace = has_palace
+        self.petition_count = petition_count
 
         self.fsm.add_state('START', None, lambda _: 'SELECT_CARD')
         self.fsm.add_state('SELECT_CARD',
@@ -616,23 +559,6 @@ class RoleActionBuilder(object):
 
         self.fsm.set_start('START')
 
-        # A list of cards in the hand and whether they've been used.
-        self.hand = [Choice(c, card2summary(c), True) for c in \
-                           sorted(hand, card_manager.cmp_jacks_first)]
-
-        self.role = role
-        self.choices = None
-        self.following = role is not None
-
-        self.action_units = [] # list of lists: [card1, card2, ... ]
-        self.petition_cards = []
-
-        self.has_palace = has_palace
-        self.petition_count = petition_count
-
-        self.done = False
-        self.prompt = None
-
         # Move from Start state to SELECT_CARD
         self.fsm.pump(None)
 
@@ -648,25 +574,6 @@ class RoleActionBuilder(object):
         raise InvalidChoiceException()
 
 
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
-
-
     def select_card_action(self, card):
         """Finds the choice corresponding to card in the list of card
         in hand, and marks it as selected. Appends card to action_unit list.
@@ -674,10 +581,7 @@ class RoleActionBuilder(object):
         Raises InvalidChoiceException if the card is not in hand or is
         not selectable.
         """
-        try:
-            choice = self.get_hand_card(card)
-        except:
-            raise InvalidChoiceException('Card not found: ' + card)
+        choice = self.get_hand_card(card)
 
         choice.selectable = False
         self.action_units.append([card])
@@ -940,15 +844,7 @@ class RoleActionBuilder(object):
         return choices
 
 
-    def get_choices(self):
-        return self.choices
-
-
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-
-
-class ArchitectActionBuilder(object):
+class ArchitectActionBuilder(FSMActionBuilder):
     """Assembles an architect action. There is a lot of info we need
     from the GameState.
     """
@@ -957,24 +853,7 @@ class ArchitectActionBuilder(object):
             out_of_town_sites, has_archway, has_road, has_tower,
             has_scriptorium, oot_allowed):
 
-        self.fsm = StateMachine()
-
-        self.fsm.add_adapter(self.adapter)
-
-        self.fsm.add_state('START', None,
-                lambda _: 'BUILDING' if len(self.incomplete_buildings) else 'FOUNDATION')
-        self.fsm.add_state('BUILDING', 
-                self.building_arrival, self.building_transition)
-        self.fsm.add_state('MATERIAL', 
-                self.material_arrival, self.material_transition)
-        self.fsm.add_state('FOUNDATION', 
-                self.foundation_arrival, self.foundation_transition)
-        self.fsm.add_state('SITE', 
-                self.site_arrival, self.site_transition)
-        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
-
-        self.fsm.set_start('START')
-
+        FSMActionBuilder.__init__(self)
 
         self.stockpile = sorted(stockpile)
         self.pool = sorted(pool)
@@ -999,39 +878,24 @@ class ArchitectActionBuilder(object):
 
         self.from_pool = False
 
-        self.done = False
-        self.prompt = None
+
+        self.fsm.add_state('START', None,
+                lambda _: 'BUILDING' if len(self.incomplete_buildings) else 'FOUNDATION')
+        self.fsm.add_state('BUILDING', 
+                self.building_arrival, self.building_transition)
+        self.fsm.add_state('MATERIAL', 
+                self.material_arrival, self.material_transition)
+        self.fsm.add_state('FOUNDATION', 
+                self.foundation_arrival, self.foundation_transition)
+        self.fsm.add_state('SITE', 
+                self.site_arrival, self.site_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
 
         self.fsm.pump(None)
 
 
-    def get_choices(self):
-        return self.choices
-
-    
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-
-
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
-
-    
     def building_arrival(self):
         stockpile_materials = map(card2mat, self.stockpile)
         pool_materials = map(card2mat, self.pool)
@@ -1171,7 +1035,7 @@ class ArchitectActionBuilder(object):
                 self.from_pool)
 
 
-class CraftsmanActionBuilder(object):
+class CraftsmanActionBuilder(FSMActionBuilder):
     """Assembles an architect action. There is a lot of info we need
     from the GameState.
     """
@@ -1180,23 +1044,7 @@ class CraftsmanActionBuilder(object):
             out_of_town_sites, has_road, has_tower,
             has_scriptorium, oot_allowed):
 
-        self.fsm = StateMachine()
-
-        self.fsm.add_adapter(self.adapter)
-
-        self.fsm.add_state('START', None,
-                lambda _: 'BUILDING' if len(self.incomplete_buildings) else 'FOUNDATION')
-        self.fsm.add_state('BUILDING', 
-                self.building_arrival, self.building_transition)
-        self.fsm.add_state('MATERIAL', 
-                self.material_arrival, self.material_transition)
-        self.fsm.add_state('FOUNDATION', 
-                self.foundation_arrival, self.foundation_transition)
-        self.fsm.add_state('SITE', 
-                self.site_arrival, self.site_transition)
-        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
-
-        self.fsm.set_start('START')
+        FSMActionBuilder.__init__(self)
 
 
         self.hand = sorted(hand, card_manager.cmp_jacks_first)
@@ -1218,37 +1066,21 @@ class CraftsmanActionBuilder(object):
         self.material = None
         self.site = None
 
-        self.done = False
-        self.prompt = None
+        self.fsm.add_state('START', None,
+                lambda _: 'BUILDING' if len(self.incomplete_buildings) else 'FOUNDATION')
+        self.fsm.add_state('BUILDING', 
+                self.building_arrival, self.building_transition)
+        self.fsm.add_state('MATERIAL', 
+                self.material_arrival, self.material_transition)
+        self.fsm.add_state('FOUNDATION', 
+                self.foundation_arrival, self.foundation_transition)
+        self.fsm.add_state('SITE', 
+                self.site_arrival, self.site_transition)
+        self.fsm.add_state('FINISHED', self.finished_arrival, None, True)
+
+        self.fsm.set_start('START')
 
         self.fsm.pump(None)
-
-
-    def get_choices(self):
-        return self.choices
-
-    
-    def make_choice(self, choice):
-        self.fsm.pump(choice)
-
-
-    def adapter(self, choice_index):
-        """Takes the choice index from the user input and retrieves the
-        Choice.item from that selection, returning it. This is commonly used
-        by the transition functions, so the adapter makes the retrieval
-        automatic for them.
-        """
-        if choice_index is not None:
-            selectable_items = [c.item for c in self.choices if c.selectable]
-            try:
-                item = selectable_items[choice_index]
-            except IndexError:
-                raise InvalidChoiceException()
-
-            return item
-
-        else:
-            return None
 
     
     def building_arrival(self):
@@ -1374,38 +1206,6 @@ class CraftsmanActionBuilder(object):
 
 
 
-class SingleChoiceActionBuilder(object):
-    """Gets a simple response from a list.
-    """
-    def __init__(self, action_type, choices):
-        """The parameter choices is a list of Choice objects.
-
-        For example:
-
-        [Choice('Rubble', 'Build on a Rubble site', True),
-         Choice('Concrete', 'Cannot build on Concrete', False).
-         ...]
-        """
-        self.choices = choices
-        self.action_type = action_type
-        self.action = None
-        self.done = False
-        self.prompt = None
-
-    def get_choices(self):
-        return self.choices
-
-    def make_choice(self, choice_index):
-        selectable_items = [c.item for c in self.choices if c.selectable]
-        try:
-            item = selectable_items[choice_index]
-        except IndexError:
-            raise InvalidChoiceException()
-
-        self.action = message.GameAction(self.action_type, item)
-        self.done = True
-
-
 class Client(object):
     """Rather than interact with the player via the command line and stdout,
     this client is broken out with an interface for each of the game decisions
@@ -1431,72 +1231,63 @@ class Client(object):
         return self.game.game_state.players[self.player_id]
 
     def update_game_state(self, gs):
-        """Updates the game state
-        """
-        self.game.game_state = gs
-        #self.game.game_state.show_public_game_state()
+        game_lg.debug('Updating game state')
 
-        if self.player_id == self.game.game_state.get_active_player_index():
+        self.game.game_state = gs
+
+        ap = self.game.game_state.get_active_player_index()
+        if self.player_id == ap:
+            game_lg.debug('It\'s your turn')
 
             method_name = message.get_action_name(self.game.game_state.expected_action)
             method = getattr(self, 'action_' + method_name)
 
+            game_lg.debug('Setting up ' + method_name + ' action builder')
+
             method()
 
         else:
-            game_lg.info('Waiting on player {0!s}'.format(
-                    self.game.game_state.get_active_player_index()))
+            active_player = self.game.game_state.players[ap].name
+            game_lg.info('Waiting on player ' + active_player)
 
 
     def make_choice(self, choice):
-        """Makes a selection of a menu item. If the action is completed,
-        then return the action and reset the builder.
-        If the action is not complete, return None.
+        """Makes a selection of a menu item.
         """
+        game_lg.debug('Making selection for client: ' + str(choice))
+
         # The GUI uses lists indexed from 1, but we need 0-indexed
         if self.player_id != self.game.game_state.get_active_player_index():
-            game_lg.info('It\'s not your turn.')
+            game_lg.info('It\'s not your turn')
             return
 
         try:
             self.builder.make_choice(choice-1)
         except InvalidChoiceException:
-            game_lg.info('Invalid choice. Enter [1-{0:d}]\n'.format(
+            game_lg.info('Invalid choice. Enter [1-{0:d}]'.format(
               len(self.builder.choices)))
 
-        if self.builder.done:
+
+    def check_action_builder(self):
+        """Checks if the action builder is done. If so, return the action
+        and clean up the action builder.
+
+        Returns None if the action builder is not finished.
+        Returns a GameAction object if it's done.
+        """
+        if self.builder and self.builder.done:
             action = self.builder.action
-            game_lg.info('Finished action ' + repr(action))
+            game_lg.debug('Finished action builder, completed action: ' + str(action))
             self.builder = None
             return action
         else:
-            #self.show_choices(self.builder.get_choices())
+            game_lg.debug('Require more input to finish action builder.')
             return None
-
-
-    def show_choices(self, choices_list, prompt=None):
-        """Returns the index in the choices_list selected by the user or
-        raises a StartOverException or a CancelDialogExeption.
-
-        The choices_list is a list of Choices.
-        """
-        i_choice = 1
-        for c in choices_list:
-            if c.selectable:
-                game_lg.info('  [{0:2d}] {1}'.format(i_choice, c.description))
-                i_choice+=1
-            else:
-                game_lg.info('       {0}'.format(c.description))
-
-        if prompt is not None:
-            game_lg.info(prompt)
-        else:
-            game_lg.info('Please make a selection:')
 
 
     def get_choices(self):
         if self.builder:
-            return self.builder.get_choices()
+            return self.builder.choices
         else:
             return []
 
@@ -1530,7 +1321,7 @@ class Client(object):
         cards_str = '{0:d} card{1}'.format(n_cards, 's' if n_cards==1 else '')
 
         self.builder = SingleChoiceActionBuilder(message.THINKERTYPE,
-            [Choice(True, 'Thinker for Jack'),
+            [Choice(True, 'Thinker for Jack', bool(self.game.game_state.jack_pile)),
              Choice(False, 'Thinker for '+cards_str)])
 
 
@@ -1632,6 +1423,7 @@ class Client(object):
         The material will always be the Fountain card or None, and the building might be
         the Fountain card.
         """
+        #TODO: This is obsolete, but retained so the logic can be copied into a working version
         p = self.get_player()
 
         skip, building, material, site = (False, None, None, None)
@@ -1688,6 +1480,9 @@ class Client(object):
         return
 
 
+        #TODO: This is an obsolete implementation of using the Sewer separately for each card
+        # This is not how it's handled above, but maybe it should be.
+        
         p = self.get_player()
         done=False
         cards_to_move=[]
@@ -1742,6 +1537,8 @@ class Client(object):
         material: name of the material card to use
         from_pool: bool to use the Archway to take from the pool
         """
+        #TODO: This is an obsolete implementation of a Stairway.
+        #The logic needs to be converted into an action builder
         p = self.get_player()
         possible_buildings = [(pl, b) for pl in self.game.game_state.players
                               for b in pl.get_completed_buildings()
@@ -1790,7 +1587,9 @@ class Client(object):
 
         
     def action_givecards(self):
-        """A GameAction for GIVECARDS must be returned even if we're immune.
+        """A GameAction for GIVECARDS must be returned even if we're immune
+        or don't have any cards demanded, or we don't have the cards in question.
+        We can shortcut the player response, though. Glory to Rome.
         """
         p = self.get_player()
         leg_player = self.game.game_state.players[self.game.game_state.legionary_index]
@@ -1814,7 +1613,7 @@ class Client(object):
                 has_coliseum,
                 immune)
 
-
+        
     def action_architect(self):
         """Returns (building, material, site, from_pool) to be built.
 
@@ -1842,6 +1641,10 @@ class Client(object):
         If the action is to be skipped, returns None, None, None
         """
         player = self.get_player()
+
+        game_lg.debug('Starting craftsman, out-of-town is ' + \
+                        ('' if self.game.game_state.oot_allowed else 'not ') +\
+                        'allowed.')
 
         self.builder = CraftsmanActionBuilder(
                 player.buildings,

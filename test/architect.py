@@ -289,12 +289,14 @@ class TestArchitectClient(unittest.TestCase):
 
 
     def test_start_out_of_town(self):
-        """ Start a building and add a material.
+        """ Start a building out of town.
         """
         self.p1.hand = ['Bridge']
 
         # Empty the in-town sites
         self.game.game_state.in_town_foundations = ['Rubble']
+
+        self.game.game_state.oot_allowed = True
 
         a = message.GameAction(message.ARCHITECT, 'Bridge', None, 'Concrete', False)
         self.game.handle(a)
