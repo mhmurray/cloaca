@@ -19,7 +19,7 @@ import stack
 lg = logging.getLogger('gtr')
 
 class GameState:
-    """ Contains the current game state. The methods of this class
+    """Contains the current game state. The methods of this class
     represent physical changes to the game state. It's kind of like
     an API to be manipulated by an entity that enforces the rules.
     The only rules enforced by the GameState object are physical,
@@ -62,6 +62,9 @@ class GameState:
         self.expected_action = None
         self.game_id = 0
 
+        #Official game log messages, narrating what happens in a game
+        self.log = []
+
     def __repr__(self):
         rep = ('GameState(players={players!r}, leader={leader!r}, '
                'priority={priority!r}, jack_pile={jack_pile!r}, '
@@ -94,6 +97,7 @@ class GameState:
             if p.name != player_name:
                 p.hand = [c if c == 'Jack' else 'Card' for c in p.hand ]
                 p.fountain_card = 'Card' if p.fountain_card else None
+
 
 
     def increment_priority_index(self):
@@ -283,6 +287,14 @@ class GameState:
         self.priority_index += 1;
         while self.priority_index >= len(self.players):
             self.priority_index -= len(self.players)
+
+
+    def log(self, msg):
+        """Logs a game message. These are a record of the progress of the
+        game, not, eg. error messages meant for the player.
+        """
+        self.log.append(msg)
+
 
     def get_public_game_state(self, current_player=None):
         """Get a string that shows the current game state.

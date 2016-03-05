@@ -11,16 +11,6 @@ import pdb
 
 from functools import wraps
 
-def main():
-
-    c = CursesGUI()
-    def choice_callback(i):
-        c.update_choices(range(1,i+1))
-    c.choice_callback = choice_callback
-
-    c.update_state('This\nis my long string\nthat spans mulitple\n\n lines\n')
-    c.run_twisted()
-
 class RollLogHandler(logging.Handler):
     """Log handler that writes messages using two functions, write_msg
     and write_err. These functions are provided when making the object
@@ -81,24 +71,31 @@ class CursesGUI(object):
         self.quit_flag = False
         self.edit_msg = "Make selection ('q' to quit): "
         self.roll_list = SimpleListWalker([])
+        self.game_log_list = SimpleListWalker([Text('Game log here')])
         self.choices_list = SimpleListWalker([])
 
         self.state_text = SimpleListWalker([Text('Connecting...')])
 
         self.edit_widget = Edit(self.edit_msg)
         self.roll = ListBox(self.roll_list)
+        self.game_log = ListBox(self.game_log_list)
         self.choices = ListBox(self.choices_list)
         self.state = ListBox(self.state_text)
 
-        self.frame = Pile([
+        self.left_frame = Pile([
                 LineBox(self.state),
                 (13, LineBox(self.choices)),
                 ])
 
+        self.right_frame = Pile([
+                LineBox(self.game_log),
+                LineBox(self.roll)
+                ])
+
         self.state.set_focus(len(self.state_text)-1)
 
-        self.columns = Columns([('weight', 0.75, self.frame),
-                                ('weight', 0.25, LineBox(self.roll))
+        self.columns = Columns([('weight', 0.75, self.left_frame),
+                                ('weight', 0.25, self.right_frame)
                                 ])
         self.frame_widget = Frame(footer=self.edit_widget,
                                   body=self.columns,
