@@ -63,7 +63,7 @@ class GameState:
         self.game_id = 0
 
         #Official game log messages, narrating what happens in a game
-        self.log = []
+        self.game_log = []
 
     def __repr__(self):
         rep = ('GameState(players={players!r}, leader={leader!r}, '
@@ -293,7 +293,7 @@ class GameState:
         """Logs a game message. These are a record of the progress of the
         game, not, eg. error messages meant for the player.
         """
-        self.log.append(msg)
+        self.game_log.append(msg)
 
 
     def get_public_game_state(self, current_player=None):

@@ -258,6 +258,7 @@ class TerminalGUI(object):
             else:
                 lg.debug('Action requires user input. Displaying game state.')
                 self._gui.update_state('\n'.join(game_state.get_public_game_state(self.username)))
+                self._gui.update_game_log('\n'.join(game_state.game_log))
                 self.update_choices()
 
     def update_choices(self):
@@ -288,7 +289,6 @@ class TerminalGUI(object):
         self.game_id = game_id
         self._waiting_for_join = False
         self._show_choices()
-
 
 class ServerProtocol(NetstringReceiver):
 
@@ -373,11 +373,11 @@ class ServerProtocolFactory(Factory):
     """A light interface for Server connection to the twisted endpoint.connect
     """
         
-    def __init__(self, username):
-        self.username = username
+    def __init__(self, ui):
+        self.ui = ui
 
     def buildProtocol(self, addr):
-        return ServerProtocol(self.username)
+        return ServerProtocol(self.ui)
 
 
 def main():
@@ -412,8 +412,6 @@ def main():
     gui = TerminalGUI(args.username)
     if args.verbose:
         gui.set_log_level(logging.DEBUG)
-    else:
-        gui.set_log_level(logging.INFO)
 
     lg.debug('Connecting to server {0}:{1}'.format(args.address, args.port))
 

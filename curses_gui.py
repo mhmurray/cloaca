@@ -245,6 +245,14 @@ class CursesGUI(object):
         self._modified()
 
     @fail_safely
+    def update_game_log(self, log):
+        """Sets the game log window via one large string.
+        """
+        self.logger.debug('Drawing game log.')
+        self.game_log_list[:] = [self.colorize(s) for s in log.split('\n')]
+        self._modified()
+
+    @fail_safely
     def update_choices(self, choices):
         """Update choices list.
         """
