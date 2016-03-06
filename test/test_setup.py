@@ -1,7 +1,11 @@
 from cloaca.player import Player
 from cloaca.gamestate import GameState
 from cloaca.gtr import Game
+from cloaca.building import Building
+from cloaca.card_manager import get_material_of_card, get_value_of_card
 import cloaca.message as message
+
+from sys import stderr
 
 """ Utilities to easily set up test game states.
 """
@@ -38,48 +42,56 @@ def simple_two_player():
 
     return g
 
-def two_player_lead(role):
+
+def two_player_lead(role, clientele=[], buildings=[]):
     """ Two player game, advanced to the point where
     p1 has led the specified role with a Jack and p2 thinks.
 
-    Based on simple_two_player().
+    Optionally allowed to specify clients and buildings for each player. The
+    clientele argument is an iterable of iterables, where the primary index is
+    the players in order 1, 2 and each element is a list of clients that player
+    should have. Likewise with the buildings argument. The buildings should be
+    just the name of the foundations and will be completed with more copies of
+    that foundation. For example:
+
+        # Leg. and arch. client for p1, craftsman for p2.
+        clientele = (['Bath', 'Storeroom'], ['Dock'])
+        
+        # Complete Fountain for p2.
+        buildings = ([], ['Fountain'])
+
+        game = two_player_lead('Craftsman', clientele, buildings)
+
+    Adding clientele must be done before resolving the lead role action so they
+    are counted. Adding buildings usually can be done in the individual test
+    cases if they add static effects (eg. Archway), but the Fountain or Circus
+    Maximus need to be done before the lead role action. This is also more
+    convenient if you just want a static building ability active.
     """
     g = simple_two_player()
     p1, p2 = g.game_state.players
 
-    # Indicate that p1 will lead
-    a = message.GameAction(message.THINKERORLEAD, False)
-    g.handle(a)
+    if clientele:
+        try:
+            p1.clientele, p2.clientele = list(clientele[0]), list(clientele[1]) 
+        except IndexError:
+            stderr.write('Failed to initialize clientele.\n')
+            raise
 
-    p1.hand = ['Jack']
+    if buildings:
+        try:
+            p1_buildings, p2_buildings = buildings
+        except IndexError:
+            stderr.write('Failed to initialize buildings.\n')
+            raise
 
-    # p1 leads Laborer
-    a = message.GameAction(message.LEADROLE, role, 1, 'Jack')
-    g.handle(a)
-
-    # p2 thinks for a Jack
-    a = message.GameAction(message.FOLLOWROLE, True, 0, None)
-    g.handle(a)
-
-    a = message.GameAction(message.THINKERTYPE, True)
-    g.handle(a)
-
-    return g
-
-
-def two_player_lead(role, p1_clientele=[], p2_clientele=[]):
-    """ Two player game, advanced to the point where
-    p1 has led the specified role with a Jack and p2 thinks.
-
-    Optionally allowed to specify clients for each player (copies list).
-
-    Based on simple_two_player().
-    """
-    g = simple_two_player()
-    p1, p2 = g.game_state.players
-
-    p1.clientele = list(p1_clientele)
-    p2.clientele = list(p2_clientele)
+        for p, buildings in zip([p1, p2], [p1_buildings, p2_buildings]):
+            for building in buildings:
+                # Make building in completed state with all materials
+                b = Building(building, get_material_of_card(building),
+                        [building]*get_value_of_card(building), None, True)
+                p.buildings.append(b)
+            
 
     # Indicate that p1 will lead
     a = message.GameAction(message.THINKERORLEAD, False)

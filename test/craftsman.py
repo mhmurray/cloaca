@@ -193,5 +193,85 @@ class TestCraftsman(unittest.TestCase):
         self.assertFalse(mon.modified(self.game.game_state))
 
 
+class TestFoundtain(unittest.TestCase):
+    """Test Craftsman with an active Fountain building.
+    """
+
+    def setUp(self):
+        """Run prior to every test.
+        """
+        clientele = []
+        buildings = (['Fountain'],[])
+        self.game = test_setup.two_player_lead('Craftsman', clientele, buildings)
+        self.p1, self.p2 = self.game.game_state.players
+
+    def test_fountain_skip(self):
+        """Test using a fountain to look at the top card and then skip the action,
+        drawing the card.
+        """
+        self.game.game_state.library.append('Bath')
+
+        a = message.GameAction(message.USEFOUNTAIN, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.fountain_card, 'Bath')
+        self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
+
+        a = message.GameAction(message.FOUNTAIN, True, None, None, None)
+        self.game.handle(a)
+
+        self.assertIn('Bath', self.p1.hand)
+        self.assertNotEqual('Bath', self.p1.fountain_card)
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+
+    def test_fountain_start(self):
+        """Test using a fountain to look at the top card and then start a
+        building with it.
+        """
+        self.game.game_state.library.append('Bath')
+
+        a = message.GameAction(message.USEFOUNTAIN, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.fountain_card, 'Bath')
+        self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
+
+        a = message.GameAction(message.FOUNTAIN, False, 'Bath', None, 'Brick')
+        self.game.handle(a)
+
+        self.assertNotIn('Bath', self.p1.hand)
+        self.assertNotEqual('Bath', self.p1.fountain_card)
+
+        self.assertTrue(self.p1.owns_building('Bath'))
+        self.assertFalse(self.game.player_has_active_building(self.p1, 'Bath'))
+
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+
+
+    def test_fountain_add(self):
+        """Test using a fountain to look at the top card and then add it as
+        a material to a building, completing it.
+        """
+        self.game.game_state.library.append('Bath')
+
+        self.p1.buildings.append(Building('Atrium', 'Brick', ['Foundry']))
+
+        a = message.GameAction(message.USEFOUNTAIN, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.fountain_card, 'Bath')
+        self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
+
+        a = message.GameAction(message.FOUNTAIN, False, 'Atrium', 'Bath', None)
+        self.game.handle(a)
+
+        self.assertNotIn('Bath', self.p1.hand)
+        self.assertNotEqual('Bath', self.p1.fountain_card)
+
+        self.assertTrue(self.game.player_has_active_building(self.p1, 'Atrium'))
+
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+
+
 if __name__ == '__main__':
     unittest.main()
