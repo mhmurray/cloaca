@@ -137,6 +137,9 @@ class GameState:
     def get_active_player_index(self):
         return self.players.index(self.active_player)
 
+    def get_active_player_name(self):
+        return self.active_player.name
+
     def get_following_players_in_order(self):
         """ Returns a list of players in turn order starting with
         the next player after the leader, and ending with the player
@@ -263,9 +266,11 @@ class GameState:
 
     def draw_jack(self):
         try:
-            return self.jack_pile.pop()
+            c = self.jack_pile.pop()
         except IndexError:
             raise GTRError('Jack pile is empty.')
+
+        return c
 
     def draw_cards(self, n_cards):
         cards = []
