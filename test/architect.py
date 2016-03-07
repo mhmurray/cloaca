@@ -211,7 +211,7 @@ class TestArchitectClient(unittest.TestCase):
     def setUp(self):
         """ This is run prior to every test.
         """
-        self.game = test_setup.two_player_lead('Architect', ['Wall'], ['Wall'])
+        self.game = test_setup.two_player_lead('Architect', (['Wall'], ['Wall']))
         self.p1, self.p2 = self.game.game_state.players
 
 
