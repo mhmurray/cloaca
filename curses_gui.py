@@ -71,7 +71,7 @@ class CursesGUI(object):
         self.quit_flag = False
         self.edit_msg = "Make selection ('q' to quit): "
         self.roll_list = SimpleListWalker([])
-        self.game_log_list = SimpleListWalker([Text('Game log here')])
+        self.game_log_list = SimpleListWalker([])
         self.choices_list = SimpleListWalker([])
 
         self.state_text = SimpleListWalker([Text('Connecting...')])
@@ -250,6 +250,7 @@ class CursesGUI(object):
         """
         self.logger.debug('Drawing game log.')
         self.game_log_list[:] = [self.colorize(s) for s in log.split('\n')]
+        self.game_log_list.set_focus(len(self.game_log_list)-1)
         self._modified()
 
     @fail_safely
