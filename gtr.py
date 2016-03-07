@@ -19,6 +19,7 @@ import time
 import glob
 import message
 from itertools import product
+from datetime import datetime
 
 lg = logging.getLogger('gtr')
 logging.basicConfig()
@@ -48,6 +49,12 @@ class Game(object):
         self.game_state.init_players()
         self.game_state.stack.push_frame('take_turn_stacked', self.game_state.active_player)
         self.game_state.is_started = True
+
+        self.log('Starting game.')
+        self.log('Turn {0}: {1}'
+            .format(self.game_state.turn_number,
+                    self.game_state.get_current_player().name))
+
         self.pump()
 
     def expected_action(self):
@@ -98,8 +105,10 @@ class Game(object):
 
     def add_player(self, name):
         self.game_state.find_or_add_player(name)
-        if name not in self.client_dict:
-            self.client_dict[name] = client.Client(name)
+        #if name not in self.client_dict:
+        #    self.client_dict[name] = client.Client(name)
+
+        self.log('{0} has joined the game.'.format(name))
 
     def init_common_piles(self, n_players):
         lg.info('--> Initializing the game')
@@ -363,6 +372,12 @@ class Game(object):
         self.show_public_game_state()
         self.print_complete_player_state(self.game_state.players[self.game_state.leader_index])
 
+    def log(self, msg):
+        """Logs the message in the GameState log roll.
+        """
+        time = datetime.now().time().strftime('%H:%M:%S ')
+        self.game_state.log(time+msg)
+
     def pump(self):
         self.process_stack_frame()
         #self.save_game_state('tmp/log_state')
@@ -377,6 +392,9 @@ class Game(object):
         #self.print_complete_player_state(self.game_state.players[leader_index])
         leader = self.game_state.players[leader_index]
         self.game_state.stack.push_frame('take_turn_stacked', leader)
+
+        self.log('Turn {0}: {1}'.format(self.game_state.turn_number, leader.name))
+
         self.pump()
 
     def take_turn_stacked(self, player):
@@ -389,6 +407,7 @@ class Game(object):
         self.game_state.stack.push_frame("end_turn")
         self.game_state.stack.push_frame("kids_in_pool")
         self.game_state.stack.push_frame("thinker_or_lead", player)
+
         self.pump()
 
     def post_game_state(self):
@@ -414,10 +433,14 @@ class Game(object):
     def handle_skipthinker(self, a):
         skip = a.args[0]
 
+        p = self.game_state.active_player
+
         if skip:
+            self.log('{0} skips thinker with Academy'.format(p.name))
             self.pump()
 
         else:
+            self.log('{0} thinks at the end of turn with Academy'.format(p.name))
             perform_thinker_action(self.game_state.get_current_player())
 
 
@@ -447,6 +470,9 @@ class Game(object):
 
         do_discard = a.args[0]
         if do_discard:
+            self.log('{0} discards their entire hand with Vomitorium: {1}.'
+                .format(p.name, ', '.join(p.hand)))
+
             self.game_state.discard_all_for_player(p)
             a = message.GameAction(message.USELATRINE, None)
             self.handle_uselatrine(a)
@@ -466,6 +492,8 @@ class Game(object):
 
         if latrine_card is not None:
             self.game_state.discard_for_player(p, latrine_card)
+            self.log('{0} discards {1} using Latrine.'
+                .format(p.name, latrine_card))
 
         self.game_state.active_player = p
         self.game_state.expected_action = message.THINKERTYPE
@@ -475,13 +503,31 @@ class Game(object):
         p = self.game_state.active_player
         for_jack = a.args[0]
 
+        is_leader = p == self.game_state.get_current_player()
+
         if for_jack:
             self.game_state.draw_one_jack_for_player(p)
+
+            if is_leader:
+                self.log('{0} thinks for a Jack.'.format(p.name))
+            else:
+                self.log('{0} thinks for a Jack instead of following.'.format(p.name))
+
         else:
             self.game_state.thinker_for_cards(p, self.get_max_hand_size(p))
+
+            n_cards = max(1, self.get_max_hand_size(p) - len(p.hand))
+            noun = 'cards' if n_cards > 1 else 'card'
+
+            if is_leader:
+                self.log('{0} thinks for {1} {2}.'.format(p.name, n_cards, noun))
+            else:
+                self.log('{0} thinks for {1} {2} instead of following.'
+                    .format(p.name, n_cards, noun))
+
             if len(self.game_state.library) == 0:
-                lg.info('The last Orders card has been drawn, Game Over.')
-                end_game()
+                self.log('{0} has drawn the last Orders card. Game Over.'.format(p.name))
+                self.end_game()
 
         self.pump()
 
@@ -503,6 +549,13 @@ class Game(object):
         p.n_camp_actions = n_actions
         for c in cards:
             gtrutils.move_card(c, p.hand, p.camp)
+
+        if n_actions > 1:
+            self.log('{0} leads {1} for {2} actions using: {3}'
+                    .format(p.name, role, n_actions, ', '.join(cards)))
+        else:
+            self.log('{0} leads {1} using: {2}'
+                    .format(p.name, role, ', '.join(cards)))
 
         self.pump()
 
@@ -601,6 +654,13 @@ class Game(object):
             p.n_camp_actions = n_actions
             for c in cards:
                 gtrutils.move_card(c, p.hand, p.camp)
+
+            if n_actions > 1:
+                self.log('{0} follows for {1} actions using: {2}'
+                        .format(p.name, n_actions, ', '.join(cards)))
+            else:
+                self.log('{0} follows using: {1}'
+                        .format(p.name, ', '.join(cards)))
 
         self.pump()
 
@@ -762,6 +822,13 @@ class Game(object):
         if hand_c:
             gtrutils.move_card(hand_c, p.hand, p.stockpile)
 
+        if hand_c:
+            self.log('{0} performs Laborer from pool: {1} and hand: {2}.'
+                    .format(p.name, pool_c, hand_c))
+        else:
+            self.log('{0} performs Laborer from pool: {1}'
+                    .format(p.name, pool_c))
+
         self.pump()
 
 
@@ -816,10 +883,19 @@ class Game(object):
 
         if card:
             gtrutils.move_card(card, self.game_state.pool, p.clientele)
+
             if self.player_has_active_building(p, 'Bath'):
                 role = card_manager.get_role_of_card(card)
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
                 self.game_state.stack.push_frame('perform_role_action', p, role)
+                self.log(
+                    '{0} performs Patron, hiring {1} from pool and performing {2} using Bath.'
+                    .format(p.name, card, role))
+
+            else:
+                self.log(
+                    '{0} performs Patron, hiring {1} from pool.'
+                    .format(p.name, card))
 
         self.pump()
 
@@ -837,10 +913,19 @@ class Game(object):
         if do_patron:
             card = self.game_state.draw_cards(1)[0]
             gtrutils.add_card_to_zone(card, p.clientele)
+
             if self.player_has_active_building(p, 'Bath'):
                 role = card_manager.get_role_of_card(card)
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
                 self.game_state.stack.push_frame('perform_role_action', p, role)
+                self.log(
+                    '{0} performs Patron, hiring {1} from deck and performing {2} using Bath.'
+                    .format(p.name, card, role))
+
+            else:
+                self.log(
+                    '{0} performs Patron, hiring {1} from deck.'
+                    .format(p.name, card))
 
         self.pump()
 
@@ -857,10 +942,19 @@ class Game(object):
 
         if card:
             gtrutils.move_card(card, p.hand, p.clientele)
+
             if self.player_has_active_building(p, 'Bath'):
                 role = card_manager.get_role_of_card(card)
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
                 self.game_state.stack.push_frame('perform_role_action', p, role)
+                self.log(
+                    '{0} performs Patron, hiring {1} from hand and performing {2} using Bath.'
+                    .format(p.name, card, role))
+
+            else:
+                self.log(
+                    '{0} performs Patron, hiring {1} from hand.'
+                    .format(p.name, card))
 
         self.pump()
 
@@ -953,8 +1047,11 @@ class Game(object):
         p = self.game_state.active_player
 
         if use_fountain:
-            player.fountain_card = self.game_state.draw_cards(1)[0]
+            p.fountain_card = self.game_state.draw_cards(1)[0]
             self.game_state.expected_action = message.FOUNTAIN
+            self.log('{0} reveals {1} with Fountain.'
+                .format(p.name, p.fountain_card))
+
         else:
             self.game_state.expected_action = message.CRAFTSMAN
 
@@ -968,10 +1065,39 @@ class Game(object):
         p.add_cards_to_hand([p.fountain_card])
         p.fountain_card = None
 
-        if not skip:
-            self.construct(p, building, material, site)
+        if skip:
+            self.log('{0} skips Fountain, drawing {1}.'
+                .format(p.name, fountain_card))
+        else:
+            b = self.construct(p, building, material, site, p.hand)
+            self.log('{0} performs Craftsman using card revealed with Fountain.')
+            self.log_construct(p, building, material, site, ' using Fountain card')
+
+            if b.completed:
+                self.log('{0} completed.'.format(str(b)))
+                self.resolve_building(p, b)
 
         self.pump()
+
+
+    def log_construct(self, player, building, material, site, material_source=''):
+        """Logs a construct call, checking the site to see if this was a building
+        start or an addition to a building. This can be used for Craftsman or
+        Architect. An additional string material_source can be provided to indicate
+        where the material card came from, eg. ' from hand'.
+
+        Checks GameState.used_oot to log if the site was out-of-town.
+        """
+
+        if site is None:
+            self.log('{0} adds {1} as material to {2}{3}.'
+                .format(player.name, material, building, material_source))
+        elif self.game_state.used_oot:
+            self.log('{0} starts {1} on a {2} site, out of town.'
+                .format(player.name, building, site))
+        else:
+            self.log('{0} starts {1} on a {2} site.'
+                .format(player.name, building, site))
 
 
     def construct(self, player, foundation, material, site, material_zone):
@@ -985,6 +1111,8 @@ class Game(object):
         (The perform_role_action() function consumes this flag.)
 
         Else, if the site is None, add the material to the building.
+
+        Returns the modified building.
         """
         start_building = site is not None
 
@@ -1013,12 +1141,15 @@ class Game(object):
 
             site_card = gtrutils.get_card_from_zone(site, sites)
             foundation_card = gtrutils.get_card_from_zone(foundation, player.hand)
-            player.buildings.append(Building(foundation_card, site_card))
+            b = Building(foundation_card, site_card)
+            player.buildings.append(b)
 
             self.game_state.used_oot = is_oot
 
             if len(self.game_state.in_town_foundations) == 0:
                 self.end_game()
+
+            return b
 
         else:
             # This raises if the add is not legal
@@ -1049,7 +1180,8 @@ class Game(object):
             if completed:
                 b.completed = True
                 gtrutils.add_card_to_zone(b.site, player.influence)
-                self.resolve_building(player, b)
+
+            return b
 
 
     def handle_craftsman(self, a):
@@ -1061,29 +1193,44 @@ class Game(object):
             self.pump()
 
         else:
-            lg.debug('Construct building: {0}, {1}, {2}, {3}'.format(
-                str(p),str(foundation), material, site))
-            self.construct(p, foundation, material, site, p.hand)
+            b = self.construct(p, foundation, material, site, p.hand)
+            self.log('{0} performs Craftsman.'.format(p.name))
+            self.log_construct(p, foundation, material, site, ' from hand')
+
+            if b.completed:
+                self.log('{0} completed.'.format(str(b)))
+                self.resolve_building(p, b)
+
             self.pump()
 
 
     def handle_architect(self, a):
-        """Skip the action by making building = None
+        """Skip the action by making foundation = None.
         """
-        foundation, mat, site, from_pool = a.args
+        foundation, material, site, from_pool = a.args
 
         p = self.game_state.active_player
 
-        if foundation is not None:
-            material_zone = self.game_state.pool if from_pool else p.stockpile
+        if foundation:
+            if from_pool:
+                material_zone, s = self.game_state.pool, ' from pool'
+            else:
+                material_zone, s = p.stockpile, ' from stockpile'
 
-            lg.debug('Construct building: {0!s}, {1!s}, {2}{3}, {4}'.format(
-                     p,foundation, mat, ' from pool' if from_pool else '', site))
-            self.construct(p, foundation, mat, site, material_zone)
+            b = self.construct(p, foundation, material, site, material_zone)
+            self.log('{0} performs Architect.'.format(p.name))
+            self.log_construct(p, foundation, material, site, s)
+
+            if b.completed:
+                self.log('{0} completed'.format(str(b)))
+                self.resolve_building(p, b)
+
+        else:
+            self.log('{0} skips Architect action.'.format(p.name))
 
         has_stairway = self.player_has_active_building(p, 'Stairway')
         if has_stairway:
-            self.game_state.expected_action = STAIRWAY
+            self.game_state.expected_action = message.STAIRWAY
             return
 
         self.pump()
@@ -1096,20 +1243,23 @@ class Game(object):
         """
         player, foundation, material, from_pool = a.args
 
-        if player is None or foundation is None or material is None:
-            self.pump()
-
         p = self.game_state.active_player
+
+        if player is None or foundation is None or material is None:
+            self.log('{0} chooses to skip use of Stairway.'.format(p.name))
+            self.pump()
 
         b = player.get_building(foundation)
         zone = self.game_state.pool if from_pool else p.stockpile
 
-        lg.info(
-          'Player {0} used Stairway to add a material to player {1}\'s {2}, '
-          .format( p.name, player.name, str(b)) +
-          'activating its function for all players')
-
         gtrutils.move_card(material, zone, b.stairway_materials)
+
+        if from_pool:
+            self.log('{0} uses Stairway to add {1} from the pool to {2}\'s {3}.' 
+                .format(p.name, material, player.name, foundation))
+        else:
+            self.log('{0} uses Stairway to add {1} to {2}\'s {3}.' 
+                .format(p.name, material, player.name, foundation))
 
         self.pump()
 
@@ -1173,12 +1323,25 @@ class Game(object):
         # so the cards are not removed from the players hand
         p.revealed.extend(cards)
 
+        c2mat = card_manager.get_material_of_card
+
+        revealed_materials = map(c2mat, p.revealed)
+
+        self.log('{0} demands {1}! (revealing {2})'
+            .format(p.name, ', '.join(revealed_materials), ', '.join(p.revealed)))
+
         # Get cards from pool
+        pool_cards = []
         for card in cards:
             mat = card_manager.get_material_of_card(card)
             for _c in self.game_state.pool:
                 if card_manager.get_material_of_card(_c) == mat:
                     gtrutils.move_card(_c, self.game_state.pool, p.stockpile)
+                    pool_cards.append(_c)
+
+        if pool_cards:
+            self.log('{0} collected {1} from the pool.'
+                .format(p.name, ', '.join(map(c2mat, pool_cards))))
 
 
         # Get cards from other players
@@ -1204,7 +1367,7 @@ class Game(object):
 
 
     def handle_givecards(self, a):
-        cards = a.args
+        n_cards, cards = a.args[0], a.args[1:]
         lg.debug('Received GIVECARDS(' + ','.join(cards)+')')
 
         p = self.game_state.active_player
@@ -1219,10 +1382,10 @@ class Game(object):
 
         is_immune = has_wall or (has_palisade and not has_bridge)
 
-        if not is_immune:
-            self.move_legionary_cards(p, leg_p, cards, has_bridge, has_coliseum)
+        if is_immune:
+            self.log('{0} is immune to legionary.'.format(p.name))
         else:
-            lg.debug('Player '+p.name+' is immune to legionary.')
+            self.move_legionary_cards(p, leg_p, cards, has_bridge, has_coliseum)
 
         self.game_state.legionary_resp_indices.pop(0)
         if len(self.game_state.legionary_resp_indices):
@@ -1248,52 +1411,63 @@ class Game(object):
         given_cards = list(cards)
         c2m = card_manager.get_material_of_card
 
+        lg.info('Moving cards for legionary. Revealed: ' + str(rev_cards) +
+                ' Given: ' + str(given_cards))
+
         cards_moved_from_hand = [] # for logging
-        for c in leg_p.revealed:
-            mat = c2m(c)
-            matched_cards = [card for card in p.hand if c2m(card) == mat]
-            for given_card in given_cards:
-                if given_card in matched_cards:
-                    gtrutils.move_card(given_card, p.hand, leg_p.stockpile)
-                    given_cards.remove(given_card)
-                    cards_moved_from_hand.append(given_card)
-                    break
 
-        lg.debug('Moved cards from '+p.name+'\'s hand to ' +\
-                 leg_p.name+'\'s stockpile: ' +\
-                 ','.join(cards_moved_from_hand))
+        # Check that all required cards were offered.
+        revealed = Counter(map(c2m, rev_cards))
+        given = Counter(map(c2m, given_cards))
+        hand = Counter(map(c2m, p.hand))
 
-        cards_moved_from_stockpile = [] # for logging
+        unmatched = revealed - given
+        extras = given - revealed
+        ungiven = unmatched & hand # Set intersection
+
+        if len(extras):
+            raise GTRError('Extra cards given for legionary.')
+
+        if len(ungiven):
+            raise GTRError('Not enough cards given for legionary.')
+
+        for c in given_cards:
+            gtrutils.move_card(c, p.hand, leg_p.stockpile)
+
+        self.log('{0} gives cards from their hand: {1}'
+            .format(p.name, ', '.join(given_cards)))
+
+        stockpile_copy = list(p.stockpile)
+        cards_moved_from_stockpile = []
         if has_bridge:
             for c in leg_p.revealed:
-                mat = c2m(c)
-                matched_cards = [card for card in p.stockpile if c2m(card) == mat]
-                for given_card in given_cards:
-                    if given_card in matched_cards:
-                        gtrutils.move_card(given_card, p.stockpile, leg_p.stockpile)
-                        given_cards.remove(given_card)
-                        cards_moved_from_stockpile.append(given_card)
+                for card in stockpile_copy:
+                    if c2m(card) == c2m(c):
+                        cards_moved_from_stockpile.append(card)
+                        stockpile_copy.remove(card)
                         break
 
-        lg.debug('Moved cards from '+p.name+'\'s stockpile to ' +\
-                 leg_p.name+'\'s stockpile: ' +\
-                 ','.join(cards_moved_from_hand))
+            for c in cards_moved_from_stockpile:
+                gtrutils.move_card(given_card, p.stockpile, leg_p.stockpile)
 
-        cards_moved_from_clientele = [] # for logging
+            self.log('{0} gives cards from their stockpile: {1}'
+                .format(p.name, ', '.join(cards_moved_from_stockpile)))
+
+        clientele_copy = list(p.clientele)
+        cards_moved_from_clientele = []
         if has_coliseum:
             for c in leg_p.revealed:
-                mat = c2m(c)
-                matched_cards = [card for card in p.clientele if c2m(card) == mat]
-                for given_card in given_cards:
-                    if given_card in matched_cards:
-                        gtrutils.move_card(given_card, p.clientele, leg_p.vault)
-                        given_cards.remove(given_card)
-                        cards_moved_from_clientele.append(given_card)
+                for card in clientele_copy:
+                    if c2m(card) == c2m(c):
+                        cards_moved_from_clientele.append(card)
+                        clientele_copy.remove(given_card)
                         break
 
-        lg.debug('Moved cards from '+p.name+'\'s clientele to ' +\
-                 leg_p.name+'\'s vault: ' +\
-                 ','.join(cards_moved_from_hand))
+            for c in cards_moved_from_clientele:
+                gtrutils.move_card(given_card, p.clientele, leg_p.vault)
+
+            self.log('{0} feeds clientele to the lions: {1}'
+                .format(p.name, ', '.join(cards_moved_from_clientele)))
 
 
     def perform_merchant_action(self, player):
@@ -1307,23 +1481,23 @@ class Game(object):
         p = self.game_state.active_player
 
         if stockpile_card and stockpile_card not in p.stockpile:
-            lg.warn('Card ' + stockpile_card + ' not found in ' \
+            raise GTRError('Card ' + stockpile_card + ' not found in ' \
                     + p.name + '\'s stockpile.')
-            raise GTRError()
 
         if hand_card and hand_card not in p.hand:
-            lg.warn('Card ' + hand_card + ' not found in ' \
+            raise GTRError('Card ' + hand_card + ' not found in ' \
                     + p.name + '\'s hand.')
-            raise GTRError()
+
+        if stockpile_card and from_deck:
+            raise GTRError('Can\'t merchant from deck and from stockpile.')
 
         n_cards = int(stockpile_card is not None) + \
                   int(hand_card is not None) + \
                   int(from_deck)
 
         if n_cards + len(p.vault) > self.get_vault_limit(p):
-            lg.warn('Not enough room in ' + p.name + '\'s vault for ' + \
+            raise GTRError('Not enough room in ' + p.name + '\'s vault for ' + \
                     str(n_cards) + ' cards.')
-            raise GTRError()
 
         if stockpile_card:
             gtrutils.move_card(stockpile_card, p.stockpile, p.vault)
@@ -1333,6 +1507,21 @@ class Game(object):
 
         if from_deck:
             gtrutils.add_card_to_zone(self.game_state.draw_cards(1)[0], player.vault)
+
+        # Logging
+        if stockpile_card:
+            self.log(('{0} performs Merchant, selling a {1} from the stockpile'
+                      + ' and a card from their hand.' if hand_card else '.')
+                      .format(p.name, stockpile_card))
+        elif from_deck:
+            self.log(('{0} performs Merchant, selling a card from the deck'
+                      + ' and a card from their hand.' if hand_card else '.')
+                      .format(p.name))
+        elif hand_card:
+            self.log('{0} performs Merchant, selling a card from their hand.'
+                .format(p.name))
+        else:
+            self.log('{0} skips Merchant action.')
 
         self.pump()
 
@@ -1388,6 +1577,9 @@ class Game(object):
             p = self.game_state.players[p_index]
             gtrutils.move_card('Jack', p_kip.camp, p.hand)
 
+            self.log('{0} takes {1}\'s Jack with Senate.'
+                .format(p.name, p_kip.name))
+
             self.game_state.senate_resp_indices = []
 
         self.do_senate()
@@ -1402,6 +1594,9 @@ class Game(object):
                 if c == 'Jack':
                     raise Exception('Can\'t move Jacks with Sewer')
                 gtrutils.move_card(c, p.camp, p.stockpile)
+
+            self.log('{0} flushes cards down the Sewer: {1}'
+                .format(p.name, ', '.join(cards)))
 
         for c in p.camp:
             if c == 'Jack':
@@ -1450,8 +1645,10 @@ class Game(object):
         lg.info('  The only winner is Rome.')
         lg.info('  Glory to Rome!')
         lg.info('\n')
+        self.log('Game over.')
         for p in self.game_state.players:
             lg.info('Score for player {} : {}'.format(p.name, self.get_player_score(p)))
+            self.log('Score for player {} : {}'.format(p.name, self.get_player_score(p)))
         lg.info('\n')
         raise GTRError('Game over.')
 
@@ -1460,12 +1657,16 @@ class Game(object):
         """ Switch on completed building to resolve the "On Completion" effects.
         """
         if str(building_obj) == 'Catacomb':
+            self.log('{0} completed Catacomb, ending the game immediately.'
+                .format(player.name))
+
             self.end_game()
+
         elif str(building_obj) == 'Foundry':
             n = player.get_influence_points()
 
-            msg = 'Foundry: Performing {} Laborer actions for player {}'
-            lg.info(msg.format(n, player.name))
+            self.log('{0} completed Foundry, performing {1} Laborer actions.'
+                .format(player.name, n))
 
             for _ in range(n):
                 self.game_state.stack.push_frame('perform_laborer_action', player)
@@ -1473,8 +1674,8 @@ class Game(object):
         elif str(building_obj) == 'Garden':
             n = player.get_influence_points()
 
-            msg = 'Garden: Performing {} Patron actions for player {}'
-            lg.info(msg.format(n,player.name))
+            self.log('{0} completed Garden, performing {1} Patron actions.'
+                .format(player.name, n))
 
             for _ in range(n):
                 self.game_state.stack.push_frame('perform_patron_action', player)
@@ -1482,8 +1683,8 @@ class Game(object):
         elif str(building_obj) == 'School':
             n = player.get_influence_points()
 
-            msg = 'School: Performing {} Thinker actions for player {}'
-            lg.info(msg,format(n, player.name))
+            self.log('{0} completed School, think {1} times.'
+                .format(player.name, n))
 
             for _ in range(n):
                 self.game_state.stack.push_frame('perform_optional_thinker_action', player)
@@ -1491,8 +1692,8 @@ class Game(object):
         elif str(building_obj) == 'Amphitheatre':
             n = player.get_influence_points()
 
-            msg = 'Amphitheatre: Performing {} Craftsman actions for player {}'
-            lg.info(msg.format(n, player.name))
+            self.log('{0} completed Amphitheatre, performing {1} Craftsman actions.'
+                .format(player.name, n))
 
             for _ in range(n):
                 self.game_state.stack.push_frame('perform_craftsman_action', player)

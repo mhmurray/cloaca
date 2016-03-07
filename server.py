@@ -48,8 +48,8 @@ class GTRServer(service.Service):
 
         # for testing
         g = Game()
-        g.game_state.find_or_add_player('a')
-        g.game_state.find_or_add_player('b')
+        g.add_player('a')
+        g.add_player('b')
         self.games.append(g)
 
     def send_action(self, user, action):
@@ -173,7 +173,7 @@ class GTRServer(service.Service):
             game_id = self.games.index(game)
             print 'Creating new game {0:d}'.format(game_id)
 
-        player_index = game.game_state.find_or_add_player(user)
+        player_index = game.add_player(user)
         #if user.game == game_id and game.game_state.players[user.player_index] == user.name:
         #    print 'User already in this game'
         #    return
