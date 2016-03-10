@@ -1367,7 +1367,7 @@ class Game(object):
 
 
     def handle_givecards(self, a):
-        n_cards, cards = a.args[0], a.args[1:]
+        cards = a.args
         lg.debug('Received GIVECARDS(' + ','.join(cards)+')')
 
         p = self.game_state.active_player

@@ -324,7 +324,7 @@ class GiveCardsActionBuilder(FSMActionBuilder):
         # Move from Start state
         if immune:
             self.done = True
-            self.action = message.GameAction(message.GIVECARDS)
+            self.action = message.GameAction(message.GIVECARDS, None)
 
         elif self.finished() and not self.stockpile_cards and not self.clientele_cards:
             self.fsm.set_start('GLORYTOROME')
@@ -408,7 +408,8 @@ class GiveCardsActionBuilder(FSMActionBuilder):
     def finished_arrival(self):
         self.done = True
 
-        cards = self.cards + self.stockpile_cards + self.clientele_cards
+        cards = self.cards
+        #cards = self.cards + self.stockpile_cards + self.clientele_cards
 
         self.action = message.GameAction(message.GIVECARDS, *cards)
 
