@@ -216,14 +216,14 @@ class GameState:
         players. """
         players_match = filter(lambda x : x.name==player_name, self.players)
         if len(players_match) > 1:
-            lg.critical(
+            lg.warning(
               'Fatal error! Two instances of player {0}.'.format(players_match[0].name))
             raise Exception('Cannot create two players with the same name.')
         elif len(players_match) == 1:
-            lg.info('Found existing player {0}.'.format(players_match[0].name))
+            lg.debug('Found existing player {0}.'.format(players_match[0].name))
             player_index = self.players.index(players_match[0])
         else:
-            lg.info('Adding player {0}.'.format(player_name))
+            lg.debug('Adding player {0}.'.format(player_name))
             self.players.append(Player(player_name))
             player_index = len(self.players) - 1
         return player_index

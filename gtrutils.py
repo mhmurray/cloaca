@@ -29,8 +29,7 @@ def get_card_from_zone(card, zone):
     try:
         return zone.pop(zone.index(card))
     except ValueError as e:
-        logging.error('Error! card {0!s} not found in zone {1!s}'.format(card, zone))
-        raise GTRError()
+        raise GTRError('Error! card {0!s} not found in zone {1!s}'.format(card, zone))
 
 def add_card_to_zone(card, zone):
     """
@@ -44,8 +43,7 @@ def move_card(card, source_zone, dest_zone):
     try:
         card = get_card_from_zone(card, source_zone)
     except GTRError:
-        logging.info('Failed to move card')
-        raise
+        raise GTRError('Failed to move card')
 
     add_card_to_zone(card, dest_zone)
 

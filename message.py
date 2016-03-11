@@ -266,6 +266,11 @@ def parse_action(action_string):
     return GameAction(action_type, *(req_args + extended_args))
 
 
+def get_action_name(action):
+    """Returns lowercase name of action.
+    """
+    return _action_args_dict[action].name
+
 class BadGameActionError(Exception):
     pass
 

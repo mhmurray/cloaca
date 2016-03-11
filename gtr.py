@@ -111,12 +111,10 @@ class Game(object):
         self.log('{0} has joined the game.'.format(name))
 
     def init_common_piles(self, n_players):
-        lg.info('--> Initializing the game')
+        self.log('Initializing the game')
 
         self.init_library()
         first_player_index = self.init_pool(n_players)
-        first_player_name = self.game_state.players[first_player_index].name
-        lg.info('Player {} goes first'.format(first_player_name))
 
         self.game_state.active_player = self.game_state.players[first_player_index]
         self.game_state.leader_index = first_player_index
@@ -135,34 +133,33 @@ class Game(object):
             player.stockpile.extend(cards)
 
     def init_pool(self, n_players):
-        """ Returns the index of the player that goes first. Fills the pool
-        with one card per player, alphabetically first goes first. Resolves
-        ties with more cards.
+        """Deals one card to each player and place the cards in the pool.
+
+        Return the player index that goes first.
         """
-        lg.info('--> Initializing the pool')
-        player_cards = [""]*n_players
-        all_cards_drawn = []
+        all_cards = []
         has_winner = False
-        winner = None
+        players = range(n_players)
         while not has_winner:
-            # Draw new cards for winners, or everyone in the first round
-            for i,card in enumerate(player_cards):
-                if card is None: continue
-                player_cards[i] = self.game_state.draw_cards(1)[0]
-                all_cards_drawn.append(player_cards[i])
-            # Winnow player_cards to only have the alphabetically first cards
-            winning_card = min( [c for c in player_cards if c is not None])
-            has_winner = player_cards.count(winning_card) == 1
-            if has_winner: winner = player_cards.index(winning_card)
-            # Set all players' cards to None if they aren't winners
-            player_cards = map(lambda c : c if c==winning_card else None, player_cards)
+            cards = [(i,self.game_state.draw_cards(1)[0]) for i in players]
+            first = min(cards, key=lambda x : x[1].lower())
+            players = [c[0] for c in cards if c[1] == first[1]]
+            all_cards.extend([c[1] for c in cards])
 
-        self.game_state.pool.extend(all_cards_drawn)
-        return winner
+            s = ''.join(['{0} reveals {1}. '.format(self.game_state.players[i].name, card)
+                         for i, card in cards])
+            self.log(s)
 
+            if len(players)==1:
+                has_winner = True
+                self.log('{0} plays first.'.format(self.game_state.players[0].name))
+            else:
+                self.log('Deal more cards into pool to break tie.')
+
+        self.game_state.pool.extend(all_cards)
+        return players[0]
 
     def init_foundations(self, n_players):
-        lg.info('--> Initializing the foundations')
         n_out_of_town = 6 - n_players
         for material in card_manager.get_all_materials():
             self.game_state.in_town_foundations.extend([material]*n_players)
@@ -186,8 +183,6 @@ class Game(object):
         #self.game_state.library.sort()
         #print self.game_state.library
 
-        lg.info('--> Initializing the library ({0} cards)'.format(
-          len(self.game_state.library)))
         self.game_state.shuffle_library()
 
     def get_player_score(self, player):
@@ -325,7 +320,7 @@ class Game(object):
             try:
                 frame = self.game_state.stack.stack.pop()
             except IndexError:
-                lg.info('Tried to pop from empty stack!')
+                lg.warning('Tried to pop from empty stack!')
                 raise
 
             lg.debug('Pop stack frame: ' + str(frame))
@@ -678,7 +673,7 @@ class Game(object):
         (and we're leading craftsman), set "out of town allowed".
         """
         role = self.game_state.role_led
-        lg.info('Player {} is performing {}'.format(player.name, role))
+        self.log('Player {} is performing {}'.format(player.name, role))
 
         n_merchants = player.get_n_clients('Merchant')
         n_role = player.get_n_clients(role)
@@ -808,14 +803,12 @@ class Game(object):
         p = self.game_state.active_player
 
         if pool_c and pool_c not in self.game_state.pool:
-            lg.warning('Tried to move non-existent card {0} from pool'
+            raise GTRError('Tried to move non-existent card {0} from pool'
                        .format(pool_c))
-            raise GTRError()
 
         if hand_c and hand_c not in p.hand:
-            lg.warning('Tried to move non-existent card {0} from hand'
+            raise GTRError('Tried to move non-existent card {0} from hand'
                        .format(hand_c))
-            raise GTRError()
 
         if pool_c:
             gtrutils.move_card(pool_c, self.game_state.pool, p.stockpile)
@@ -878,8 +871,7 @@ class Game(object):
 
         p = self.game_state.active_player
         if len(p.clientele) >= self.get_clientele_limit(p):
-            lg.warn('Player ' + p.name + ' has no room in clientele')
-            raise GTRError
+            raise GTRError('Player ' + p.name + ' has no room in clientele')
 
         if card:
             gtrutils.move_card(card, self.game_state.pool, p.clientele)
@@ -1170,11 +1162,11 @@ class Game(object):
 
             completed = False
             if has_scriptorium and card_manager.get_material_of_card(m) == 'Marble':
-                lg.info('Player {} completed building {} using Scriptorium'.format(
+                self.log('Player {} completed building {} using Scriptorium'.format(
                   player.name, str(b)))
                 completed = True
             elif len(b.materials) == card_manager.get_value_of_material(b.site):
-                lg.info('Player {} completed building {}'.format(player.name, str(b)))
+                self.log('Player {} completed building {}'.format(player.name, str(b)))
                 completed = True
 
             if completed:
@@ -1411,7 +1403,7 @@ class Game(object):
         given_cards = list(cards)
         c2m = card_manager.get_material_of_card
 
-        lg.info('Moving cards for legionary. Revealed: ' + str(rev_cards) +
+        lg.debug('Moving cards for legionary. Revealed: ' + str(rev_cards) +
                 ' Given: ' + str(given_cards))
 
         cards_moved_from_hand = [] # for logging
@@ -1531,8 +1523,7 @@ class Game(object):
         1) If Sewer, ask to move cards into stockpile.
         2) If dropping a Jack, ask players_with_senate in order.
         """
-        lg.info('\n ==== KIDS IN POOL ====\n')
-
+        self.log('Kids in the pool.')
         self.do_kids_in_pool(self.game_state.get_current_player())
 
 
@@ -1721,14 +1712,14 @@ class Game(object):
         game_state = pickle.load(log_file)
         log_file.close()
         self.game_state = game_state
-        lg.info('Loaded game state.')
+        lg.debug('Loaded game state.')
         return game_state
 
 
     def handle(self, a):
         """ Switchyard to handle game actions.
         """
-        lg.info('Handling action: ' + repr(a))
+        lg.debug('Handling action: ' + repr(a))
         if a.action != self.expected_action():
             raise Exception('Expected GameAction type: ' + str(self.expected_action())
                 + ', Got :' + repr(a))
@@ -1745,8 +1736,8 @@ class Game(object):
             try:
                 method(a)
             except GTRError as e:
-                lg.warning('Error handling action')
-                print str(e)
+                lg.debug('Error handling action')
+                lg.debug(str(e))
                 return
 
             self.game_state.game_id += 1
