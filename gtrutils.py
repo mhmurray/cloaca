@@ -40,6 +40,8 @@ def add_card_to_zone(card, zone):
 def move_card(card, source_zone, dest_zone):
     """ Concatenates get_card_from_zone() and add_card_to_zone().
     """
+    source_zone.move_card(card, dest_zone)
+    return 
     try:
         card = get_card_from_zone(card, source_zone)
     except GTRError:

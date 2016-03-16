@@ -13,6 +13,7 @@ import random
 import logging
 import card_manager
 from collections import Counter
+from zone import Zone
 
 import stack
 
@@ -43,9 +44,9 @@ class GameState:
         self.slave_player = None
         self.priority_index = None
         self.turn_index = 0
-        self.jack_pile = jack_pile or []
-        self.library = library or []
-        self.pool = pool or []
+        self.jack_pile = jack_pile or Zone()
+        self.library = library or Zone()
+        self.pool = pool or Zone()
         self.exchange_area = exchange_area or []
         self.in_town_foundations = in_town_foundations or []
         self.out_of_town_foundations = out_of_town_foundations or []
@@ -69,7 +70,7 @@ class GameState:
         rep = ('GameState(players={players!r}, leader={leader!r}, '
                'priority={priority!r}, jack_pile={jack_pile!r}, '
                'library={library!r}, '
-               'in_town_foundations={in_town_foundations!r}'
+               'in_town_foundations={in_town_foundations!r},'
                'out_of_town_foundations={out_of_town_foundations!r})'
                )
         return rep.format(
@@ -89,7 +90,7 @@ class GameState:
 
         This does not hide Jacks in hand.
         """
-        self.library = ['Card']*len(self.library)
+        self.library = Card(-1)*len(self.library)
 
         for p in self.players:
             p.vault = ['Card']*len(p.vault)

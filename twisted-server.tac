@@ -91,8 +91,8 @@ components.registerAdapter(GTRFactoryFromService, IGTRService, IGTRFactory)
 
 
 application = service.Application('gtr')
-s = GTRServer('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
-#s = GTRServer('tmp/twistd_backup.dat', None)
+#s = GTRServer('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
+s = GTRServer('tmp/twistd_backup.dat', None)
 serviceCollection = service.IServiceCollection(application)
 internet.TCPServer(5000, IGTRFactory(s)).setServiceParent(serviceCollection)
 

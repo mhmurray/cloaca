@@ -11,6 +11,9 @@ class Stack(object):
     def __str__(self):
         return str(self.stack)
 
+    def __repr__(self):
+        return 'Stack({0!r})'.format(self.stack)
+
 
 class Frame(object):
     def __init__(self, function_name, *args):

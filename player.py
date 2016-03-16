@@ -13,6 +13,7 @@ from gtrutils import get_building_info
 from gtrutils import get_detailed_zone_summary
 import card_manager
 from building import Building
+from zone import Zone
 
 import logging
 import collections
@@ -24,21 +25,19 @@ class Player:
     max_hand_size = 5
     # Must use this None->(if hand)->[] method because all players end up
     # pointing to the same list if the default is [].
-    def __init__(self, name='Player', hand=None, stockpile=None, clientele=None,
-                 vault=None, camp=None, buildings=None, influence=None,
-                 revealed=None):
+    def __init__(self, name):
         self.name = name
-        self.hand = hand if hand is not None else []
-        self.stockpile = stockpile if stockpile is not None else []
-        self.clientele = clientele if clientele is not None else []
-        self.vault = vault if vault is not None else []
-        self.camp = camp if camp is not None else []
+        self.hand = Zone()
+        self.stockpile = Zone()
+        self.clientele = Zone()
+        self.vault = Zone()
+        self.camp = Zone()
         self.fountain_card = None
         self.n_camp_actions = 0
-        self.buildings = buildings if buildings is not None else []
-        self.influence = influence if influence is not None else []
-        self.revealed = revealed or []
-        self.previous_revealed = []
+        self.buildings = []
+        self.influence = []
+        self.revealed = Zone()
+        self.previous_revealed = Zone()
         self.performed_craftsman = False
         self.uid = None
 
@@ -91,33 +90,33 @@ class Player:
         """ Returns a list of the names of all buildings this
         player owns, complete or incomplete.
         """
-        return [b.foundation for b in self.buildings]
+        return [b.foundation.name for b in self.buildings]
 
-    def get_completed_building_names(self):
+    def get_complete_building_names(self):
         """ Returns a list of the building names (string) for all (owned)
-        completed buildings.
+        complete buildings.
         """
-        return [b.foundation for b in self.buildings]
+        return [b.foundation.name for b in self.buildings]
 
-    def get_completed_buildings(self):
-        """ Returns a list of all owned completed Building objects.
+    def get_complete_buildings(self):
+        """ Returns a list of all owned complete Building objects.
         """
-        return filter(Building.is_completed, self.buildings)
+        return filter(lambda x: x.complete, self.buildings)
 
     def get_incomplete_building_names(self):
         """ Returns a list of all incomplete building names.
         """
-        return [b.foundation for b in self.buildings if not b.is_completed()]
+        return [b.foundation.name for b in self.buildings if not b.complete]
 
     def get_incomplete_buildings(self):
         """ Returns a list of all incomplete Building objects.
         """
-        return [b for b in self.buildings if not b.is_completed()]
+        return [b for b in self.buildings if not b.complete]
 
     def get_building(self, building_name):
         """ Gets the Building object from the name of the building.
         """
-        matches = [b for b in self.buildings if b.foundation == building_name]
+        matches = [b for b in self.buildings if b.foundation.name == building_name]
         try:
             b = matches[0]
         except IndexError:
@@ -128,12 +127,12 @@ class Player:
     def get_active_buildings(self):
         """ Returns a list of just the building names for all buildings
         that are active. This includes an incomplete marble building while
-        we have a completed Gate.
+        we have a complete Gate.
 
         This doesn't check other players for Stairway modifications.
         """
-        active_buildings = self.get_completed_buildings()
-        if 'Gate' in self.get_completed_building_names():
+        active_buildings = self.get_complete_buildings()
+        if 'Gate' in self.get_complete_building_names():
             # find marble buildings and append to active buildings list
             incomplete_marble_buildings =\
               filter(lambda x : x.is_composed_of('Marble'), self.get_incomplete_buildings())
@@ -144,11 +143,11 @@ class Player:
     def get_active_building_names(self):
         """ Returns a list of just the building names for all buildings
         that are active. This includes an incomplete marble building while
-        we have a completed Gate.
+        we have a complete Gate.
 
         This doesn't check other players for Stairway modifications.
         """
-        return [b.foundation for b in self.get_active_buildings()]
+        return [b.foundation.name for b in self.get_active_buildings()]
 
     def get_stairwayed_buildings(self):
         """ Returns a list of Building objects that have a material added
@@ -157,7 +156,7 @@ class Player:
         return [b for b in self.get_owned_buildings() if b.is_stairwayed()]
 
     def get_stairwayed_building_names(self):
-        return [b.foundation for b in self.get_stairwayed_buildings()]
+        return [b.foundation.name for b in self.get_stairwayed_buildings()]
 
     def get_n_clients(self, role=None, active_buildings=[]):
         """ Return the number of clients of the specified role. This counts
@@ -171,12 +170,11 @@ class Player:
         elif role == 'Laborer' and 'Storeroom' in active_buildings:
             n_clients = len(self.clientele)
         else:
-            role_list = map(card_manager.get_role_of_card, self.clientele)
-            n_clients = role_list.count(role)
+            n_clients = len(filter(lambda c: c.role == role, self.clientele))
 
             # Ludus Magna adds to any non-Merchant count.
             if role != 'Merchant' and 'Ludus Magna' in active_buildings:
-                n_clients += role_list.count('Merchant')
+                n_clients += len(filter(lambda c: c.role == 'Merchant', self.clientele))
 
         return n_clients
 

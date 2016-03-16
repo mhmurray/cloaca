@@ -1,5 +1,5 @@
 """Provides the Game class, which has little state of its own,
-but provides the methods for game flow control.
+/ibut provides the methods for game flow control.
 """
 
 from player import Player
@@ -9,6 +9,8 @@ import gtrutils
 from gtrutils import GTRError, check_petition_combos
 import card_manager
 from building import Building
+from card import Card
+from zone import Zone
 #import client2 as client
 
 from collections import Counter
@@ -60,41 +62,6 @@ class Game(object):
     def expected_action(self):
         return self.game_state.expected_action
 
-    def test_set_n_in_town(self, n_sites):
-        self.game_state.in_town_foundations = []
-        for material in card_manager.get_all_materials():
-            self.game_state.in_town_foundations.extend([material]*n_sites)
-
-    def test_set_n_out_of_town(self, n_sites):
-        self.game_state.out_of_town_foundations = []
-        for material in card_manager.get_all_materials():
-            self.game_state.out_of_town_foundations.extend([material]*n_sites)
-
-    def test_all_get_client(self, client_card):
-        for p in self.game_state.players:
-            p.clientele.append(client_card)
-
-    def test_all_get_complete_building(self, building_name):
-        from building import Building
-        b = Building(
-                building_name,
-                card_manager.get_material_of_card(building_name),
-                [building_name]*card_manager.get_value_of_card(building_name),
-                None, True)
-        from copy import copy
-        for p in self.game_state.players:
-            p.buildings.append(copy(b))
-
-    def test_all_get_incomplete_building(self, building_name):
-        from building import Building
-        b = Building(
-                building_name,
-                card_manager.get_material_of_card(building_name),
-                [building_name]*(card_manager.get_value_of_card(building_name)-1),
-                None, False)
-        from copy import copy
-        for p in self.game_state.players:
-            p.buildings.append(copy(b))
 
     def get_client(self, player_name):
         """ Returns the client object and updates the GameState to be current.
@@ -105,8 +72,6 @@ class Game(object):
 
     def add_player(self, name):
         self.game_state.find_or_add_player(name)
-        #if name not in self.client_dict:
-        #    self.client_dict[name] = client.Client(name)
 
         self.log('{0} has joined the game.'.format(name))
 
@@ -119,34 +84,26 @@ class Game(object):
         self.game_state.active_player = self.game_state.players[first_player_index]
         self.game_state.leader_index = first_player_index
         self.game_state.priority_index = first_player_index
-        self.game_state.jack_pile.extend(['Jack'] * Game.initial_jack_count)
-        self.init_foundations(n_players)
+        self.game_state.jack_pile = Zone([Card(i) for i in range(Game.initial_jack_count)])
+        self.init_sites(n_players)
 
-    def testing_init_piles(self, n_players):
-        lg.info('--> Intializing for tests (Extra cards for everyone!)')
-
-        cards=['Dock','Latrine','Storeroom','Atrium','Villa','Basilica']
-        self.game_state.pool.extend(cards)
-        for player in self.game_state.players:
-            player.hand.extend(cards)
-            player.hand.append('Jack')
-            player.stockpile.extend(cards)
 
     def init_pool(self, n_players):
         """Deals one card to each player and place the cards in the pool.
 
         Return the player index that goes first.
         """
-        all_cards = []
+        all_cards = Zone()
         has_winner = False
         players = range(n_players)
         while not has_winner:
+            # Make list of (player, card) pairs
             cards = [(i,self.game_state.draw_cards(1)[0]) for i in players]
-            first = min(cards, key=lambda x : x[1].lower())
-            players = [c[0] for c in cards if c[1] == first[1]]
+            first = min(cards, key=lambda x : x[1])
+            players = [c[0] for c in cards if c[1].name == first[1].name]
             all_cards.extend([c[1] for c in cards])
 
-            s = ''.join(['{0} reveals {1}. '.format(self.game_state.players[i].name, card)
+            s = ''.join(['{0} reveals {1!s}. '.format(self.game_state.players[i].name, card)
                          for i, card in cards])
             self.log(s)
 
@@ -159,30 +116,16 @@ class Game(object):
         self.game_state.pool.extend(all_cards)
         return players[0]
 
-    def init_foundations(self, n_players):
+    def init_sites(self, n_players):
         n_out_of_town = 6 - n_players
         for material in card_manager.get_all_materials():
             self.game_state.in_town_foundations.extend([material]*n_players)
             self.game_state.out_of_town_foundations.extend([material]*n_out_of_town)
 
     def init_library(self):
-        """ Starts with just a list of names for now.  """
-
-        # read in card definitions from csv file:
-        card_definitions_dict = card_manager.get_cards_dict_from_json_file()
-        # the keys of the card dict are the card names:
-        card_names = card_definitions_dict.keys()
-        card_names.sort()
-
-        self.game_state.library = []
-        for card_name in card_names:
-
-            card_count = card_manager.get_count_of_card(card_name)
-            self.game_state.library.extend([card_name]*card_count)
-
-        #self.game_state.library.sort()
-        #print self.game_state.library
-
+        """Initializes the library as a list of Card objects
+        """
+        self.game_state.library = card_manager.get_orders_card_set()
         self.game_state.shuffle_library()
 
     def get_player_score(self, player):
@@ -217,7 +160,7 @@ class Game(object):
             name, maximum = None, 0
             for player in self.game_state.players:
                 material_cards = filter(
-                    lambda x : card_manager.get_material_of_card(x) == material, player.vault)
+                    lambda c : c.material == material, player.vault)
                 n = len(material_cards)
                 if n > maximum:
                     name = player.name
@@ -232,7 +175,7 @@ class Game(object):
 
         card_pts = 0
         for card in player.vault:
-            card_pts += card_manager.get_value_of_card(card)
+            card_pts += card.value
 
         return card_pts + bonus_pts
 
@@ -254,12 +197,21 @@ class Game(object):
         return limit
 
     def player_has_building(self, player, building):
-        """ Checks if the player has the specific building object, not
+        """Checks if the player has the specific building object, not
         just a building of the same name.
+
+        Args:
+        building -- Building object
         """
         return building in player.get_owned_buildings()
 
     def player_has_active_building(self, player, building):
+        """True if the building is active for the player.
+
+        Args:
+        player -- Player object
+        building -- string
+        """
         return building in self.get_active_building_names(player)
 
     def get_active_building_names(self, player):
@@ -268,7 +220,7 @@ class Game(object):
         get_active_buildings() method for reference, but note that
         this method does not return duplicate names.
         """
-        names = [b.foundation for b in self.get_active_buildings(player)]
+        names = map(str, self.get_active_buildings(player))
         return list(set(names))
 
     def get_active_buildings(self, player):
@@ -375,7 +327,6 @@ class Game(object):
 
     def pump(self):
         self.process_stack_frame()
-        #self.save_game_state('tmp/log_state')
 
     def advance_turn(self):
         """ Moves the leader index, prints game state, saves, and pushes the next turn.
@@ -383,8 +334,6 @@ class Game(object):
         self.game_state.turn_number += 1
         self.game_state.increment_leader_index()
         leader_index = self.game_state.leader_index
-        #self.show_public_game_state()
-        #self.print_complete_player_state(self.game_state.players[leader_index])
         leader = self.game_state.players[leader_index]
         self.game_state.stack.push_frame('take_turn_stacked', leader)
 
@@ -640,10 +589,7 @@ class Game(object):
             self.check_action_units(p, self.game_state.role_led, n_actions, cards)
 
             # Check if cards exist in hand
-            c = Counter(cards)
-            h = Counter(p.hand)
-            match = (c & h) == c # intersection
-            if not match:
+            if not p.hand.contains(cards):
                 raise GTRError('Not all cards specified exist in hand.')
 
             p.n_camp_actions = n_actions
@@ -1000,10 +946,8 @@ class Game(object):
 
         # The sites are 'Wood', 'Concrete', etc.
         site_mat = building.site
-        foundation = building.foundation
         material = card_manager.get_material_of_card(material_card)
-
-        found_mat = card_manager.get_material_of_card(foundation)
+        found_mat = building.foundation.material
 
         if (has_tower and material == 'Rubble') or \
                (has_scriptorium and material == 'Marble') or \
@@ -1065,7 +1009,7 @@ class Game(object):
             self.log('{0} performs Craftsman using card revealed with Fountain.')
             self.log_construct(p, building, material, site, ' using Fountain card')
 
-            if b.completed:
+            if b.complete:
                 self.log('{0} completed.'.format(str(b)))
                 self.resolve_building(p, b)
 
@@ -1132,7 +1076,7 @@ class Game(object):
                                '\'s hand.')
 
             site_card = gtrutils.get_card_from_zone(site, sites)
-            foundation_card = gtrutils.get_card_from_zone(foundation, player.hand)
+            foundation_card = player.hand.pop(player.hand.index(foundation))
             b = Building(foundation_card, site_card)
             player.buildings.append(b)
 
@@ -1149,28 +1093,29 @@ class Game(object):
 
             # Both these raise if the card/building isn't found
             b = player.get_building(foundation)
-            if b.is_completed():
+            if b.complete:
                 raise GTRError('Cannot add to ' + foundation + \
                                ' because it is already complete.')
 
             # Raises if material doesn't exist
-            m = gtrutils.get_card_from_zone(material, material_zone)
+            #m = gtrutils.get_card_from_zone(material, material_zone)
+            material_zone.move_card(material, b.materials)
 
-            b.add_material(m)
+            #b.add_material(m)
 
             has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
 
-            completed = False
+            complete = False
             if has_scriptorium and card_manager.get_material_of_card(m) == 'Marble':
                 self.log('Player {} completed building {} using Scriptorium'.format(
                   player.name, str(b)))
-                completed = True
+                complete = True
             elif len(b.materials) == card_manager.get_value_of_material(b.site):
                 self.log('Player {} completed building {}'.format(player.name, str(b)))
-                completed = True
+                complete = True
 
-            if completed:
-                b.completed = True
+            if complete:
+                b.complete = True
                 gtrutils.add_card_to_zone(b.site, player.influence)
 
             return b
@@ -1189,7 +1134,7 @@ class Game(object):
             self.log('{0} performs Craftsman.'.format(p.name))
             self.log_construct(p, foundation, material, site, ' from hand')
 
-            if b.completed:
+            if b.complete:
                 self.log('{0} completed.'.format(str(b)))
                 self.resolve_building(p, b)
 
@@ -1213,7 +1158,7 @@ class Game(object):
             self.log('{0} performs Architect.'.format(p.name))
             self.log_construct(p, foundation, material, site, s)
 
-            if b.completed:
+            if b.complete:
                 self.log('{0} completed'.format(str(b)))
                 self.resolve_building(p, b)
 
@@ -1313,27 +1258,26 @@ class Game(object):
 
         # Player.revealed isn't a zone, but a list of revealed cards in the hand
         # so the cards are not removed from the players hand
-        p.revealed.extend(cards)
+        p.revealed.extend(p.hand.get_cards(cards))
 
-        c2mat = card_manager.get_material_of_card
-
-        revealed_materials = map(c2mat, p.revealed)
+        revealed_materials = [c.material for c in  p.revealed]
 
         self.log('{0} demands {1}! (revealing {2})'
-            .format(p.name, ', '.join(revealed_materials), ', '.join(p.revealed)))
+            .format(p.name, ', '.join(revealed_materials), 
+                ', '.join(map(str,p.revealed))))
 
         # Get cards from pool
         pool_cards = []
         for card in cards:
             mat = card_manager.get_material_of_card(card)
             for _c in self.game_state.pool:
-                if card_manager.get_material_of_card(_c) == mat:
+                if _c.material == mat:
                     gtrutils.move_card(_c, self.game_state.pool, p.stockpile)
                     pool_cards.append(_c)
 
         if pool_cards:
             self.log('{0} collected {1} from the pool.'
-                .format(p.name, ', '.join(map(c2mat, pool_cards))))
+                .format(p.name, ', '.join([c.material for c in  pool_cards])))
 
 
         # Get cards from other players
@@ -1409,9 +1353,9 @@ class Game(object):
         cards_moved_from_hand = [] # for logging
 
         # Check that all required cards were offered.
-        revealed = Counter(map(c2m, rev_cards))
+        revealed = Counter([c.material for c in rev_cards])
         given = Counter(map(c2m, given_cards))
-        hand = Counter(map(c2m, p.hand))
+        hand = Counter([c.material for c in p.hand])
 
         unmatched = revealed - given
         extras = given - revealed
@@ -1590,7 +1534,7 @@ class Game(object):
                 .format(p.name, ', '.join(cards)))
 
         for c in p.camp:
-            if c == 'Jack':
+            if c.name == 'Jack':
                 gtrutils.move_card(c, p.camp, self.game_state.jack_pile)
             else:
                 gtrutils.move_card(c, p.camp, self.game_state.pool)
@@ -1645,7 +1589,7 @@ class Game(object):
 
 
     def resolve_building(self, player, building_obj):
-        """ Switch on completed building to resolve the "On Completion" effects.
+        """Switch on completed building to resolve the "On Completion" effects.
         """
         if str(building_obj) == 'Catacomb':
             self.log('{0} completed Catacomb, ending the game immediately.'
@@ -1722,7 +1666,7 @@ class Game(object):
         lg.debug('Handling action: ' + repr(a))
         if a.action != self.expected_action():
             raise Exception('Expected GameAction type: ' + str(self.expected_action())
-                + ', Got :' + repr(a))
+                + ', got: ' + repr(a))
 
         method_name = 'handle_' + str(a)
 
