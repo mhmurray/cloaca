@@ -5,6 +5,8 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
+import cloaca.card_manager as cm
+
 import cloaca.message as message
 from cloaca.message import BadGameActionError
 
@@ -33,8 +35,8 @@ class TestLegionary(unittest.TestCase):
     def test_legionary(self):
         """Take one card from the pool with legionary action.
         """
-        self.p1.hand = ['Atrium']
-        self.game.game_state.pool = ['Foundry']
+        self.p1.hand.set_content(cm.get_cards(['Atrium']))
+        self.game.game_state.pool.set_content(cm.get_cards(['Foundry']))
 
         a = message.GameAction(message.LEGIONARY, 'Atrium')
         self.game.handle(a)
@@ -50,8 +52,8 @@ class TestLegionary(unittest.TestCase):
     def test_give_cards(self):
         """Take one card from opponent.
         """
-        self.p1.hand = ['Atrium']
-        self.p2.hand = ['Foundry']
+        self.p1.hand.set_content(cm.get_cards(['Atrium']))
+        self.p2.hand.set_content(cm.get_cards(['Foundry']))
 
         a = message.GameAction(message.LEGIONARY, 'Atrium')
         self.game.handle(a)
@@ -69,8 +71,8 @@ class TestLegionary(unittest.TestCase):
     def test_opponent_has_no_match(self):
         """Demand card that opponent doesn't have.
         """
-        self.p1.hand = ['Atrium']
-        self.p2.hand = ['Latrine']
+        self.p1.hand.set_content(cm.get_cards(['Atrium']))
+        self.p2.hand.set_content(cm.get_cards(['Latrine']))
 
         a = message.GameAction(message.LEGIONARY, 'Atrium')
         self.game.handle(a)

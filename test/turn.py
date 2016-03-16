@@ -4,6 +4,8 @@ from cloaca.gtr import Game
 from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
+from cloaca.zone import Zone
+import cloaca.card_manager as cm
 
 import cloaca.message as message
 from cloaca.message import BadGameActionError
@@ -95,7 +97,7 @@ class TestThinkerOrLead(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, True)
         b = message.GameAction(message.THINKERTYPE, True)
 
-        self.game.game_state.jack_pile = []
+        self.game.game_state.jack_pile.set_content([])
 
         self.game.handle(a)
 
@@ -127,7 +129,7 @@ class TestLeadRole(unittest.TestCase):
     def test_handle_lead_role_with_orders(self):
         """ Leading a role sets GameState.role_led, camp actions.
         """
-        self.p1.hand = ['Latrine']
+        self.p1.hand.set_content([cm.get_card('Latrine')])
 
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, 'Latrine')
         self.game.handle(a)
@@ -142,7 +144,7 @@ class TestLeadRole(unittest.TestCase):
     def test_handle_lead_latrine_with_jack(self):
         """ Leading a role sets GameState.role_led, camp actions.
         """
-        self.p1.hand = ['Jack']
+        self.p1.hand.set_content([cm.get_card('Jack')])
 
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, 'Jack')
         self.game.handle(a)
@@ -168,7 +170,7 @@ class TestFollow(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, False)
         self.game.handle(a)
 
-        self.p1.hand = ['Jack']
+        self.p1.hand.set_content([cm.get_card('Jack')])
 
         # p1 leads Laborer
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, 'Jack')
@@ -194,7 +196,7 @@ class TestFollow(unittest.TestCase):
     def test_follow_role_with_jack(self):
         """ Follow Laborer with a Jack.
         """
-        self.p2.hand = ['Jack']
+        self.p2.hand.set_content([cm.get_card('Jack')])
 
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Jack')
         self.game.handle(a)
@@ -208,7 +210,7 @@ class TestFollow(unittest.TestCase):
     def test_follow_role_with_orders(self):
         """ Follow Laborer with a Latrine.
         """
-        self.p2.hand = ['Latrine']
+        self.p2.hand.set_content([cm.get_card('Latrine')])
 
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine')
         self.game.handle(a)
@@ -219,19 +221,26 @@ class TestFollow(unittest.TestCase):
         self.assertEqual(self.p2.n_camp_actions, 1)
 
     def test_follow_role_with_nonexistent_card(self):
-        """ Follow Laborer specifying a non-existent card.
+        """Follow Laborer specifying a non-existent card.
 
         This bad action should not change anything about the game state.
         """
-        self.p2.hand = []
+        self.p2.hand.set_content([])
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine')
         
         # Monitor the gamestate for any changes
         mon = Monitor()
         mon.modified(self.game.game_state)
+        #print self.game.game_state.__dict__
 
-        self.game.handle(a)
+        #self.game.handle(a)
+        #print self.game.game_state.__dict__
+
+        #from copy import deepcopy
+        #gs2 = deepcopy(self.game.game_state)
+        #print gs2 == self.game.game_state
+        #self.assertEqual(self.game.game_state, gs2)
 
         self.assertFalse(mon.modified(self.game.game_state))
 
@@ -240,7 +249,7 @@ class TestFollow(unittest.TestCase):
 
         This bad action should not change anything about the game state.
         """
-        self.p2.hand = ['Atrium']
+        self.p2.hand.set_content([cm.get_card('Atrium')])
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Atrium')
         
@@ -255,7 +264,7 @@ class TestFollow(unittest.TestCase):
     def test_follow_role_with_petition_of_different_role(self):
         """ Follow Laborer by petition of non-Laborer role cards.
         """
-        self.p2.hand = ['Atrium', 'School', 'School']
+        self.p2.hand.set_content(cm.get_cards(['Atrium', 'School', 'School']))
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Atrium', 'School', 'School')
         
@@ -264,12 +273,12 @@ class TestFollow(unittest.TestCase):
         self.assertEqual(self.game.expected_action(), message.LABORER)
         self.assertIn('Atrium', self.p2.camp)
         self.assertEqual(self.p2.camp.count('School'), 2)
-        self.assertEqual(self.p2.hand, [])
+        self.assertEqual(len(self.p2.hand), 0)
 
     def test_follow_role_with_petition_of_same_role(self):
         """ Follow Laborer by petition of Laborer role cards.
         """
-        self.p2.hand = ['Latrine', 'Insula', 'Insula']
+        self.p2.hand.set_content(cm.get_cards(['Latrine', 'Insula', 'Insula']))
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula', 'Insula')
 
@@ -278,7 +287,7 @@ class TestFollow(unittest.TestCase):
         self.assertEqual(self.game.expected_action(), message.LABORER)
         self.assertIn('Latrine', self.p2.camp)
         self.assertEqual(self.p2.camp.count('Insula'), 2)
-        self.assertEqual(self.p2.hand, [])
+        self.assertEqual(len(self.p2.hand), 0)
 
 
     def test_follow_role_with_illegal_petition(self):
@@ -286,7 +295,7 @@ class TestFollow(unittest.TestCase):
 
         This bad action should not change anything about the game state.
         """
-        self.p2.hand = ['Latrine', 'Insula', 'Insula']
+        self.p2.hand.set_content(cm.get_cards(['Latrine', 'Road', 'Insula']))
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula')
 
@@ -299,6 +308,7 @@ class TestFollow(unittest.TestCase):
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
+
 
 if __name__ == '__main__':
     unittest.main()

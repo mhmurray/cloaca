@@ -4,6 +4,10 @@ from cloaca.gtr import Game
 from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
+from cloaca.zone import Zone
+from cloaca.card import Card
+
+import cloaca.card_manager as cm
 
 import cloaca.message as message
 from cloaca.message import BadGameActionError
@@ -55,15 +59,16 @@ class TestArchitect(unittest.TestCase):
     def test_start_in_town(self):
         """ Start an in-town building.
         """
-        self.p1.hand = ['Latrine']
+        latrine = cm.get_card('Latrine')
+        self.p1.hand.set_content([latrine])
 
         a = message.GameAction(message.ARCHITECT, 'Latrine', None, 'Rubble', False)
         self.game.handle(a)
 
-        self.assertNotIn('Latrine', self.p1.hand)
+        self.assertNotIn(latrine, self.p1.hand)
 
         self.assertTrue(self.p1.owns_building('Latrine'))
-        self.assertEqual(self.p1.buildings[0], Building('Latrine', 'Rubble'))
+        self.assertEqual(self.p1.buildings[0], Building(latrine, 'Rubble'))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Latrine'))
 
@@ -71,16 +76,21 @@ class TestArchitect(unittest.TestCase):
     def test_add_to_empty_building(self):
         """ Add a valid material to a building with no materials.
         """
-        self.p1.stockpile = ['Atrium']
-        self.p1.buildings = [Building('Foundry', 'Brick')]
+        atrium = cm.get_card('Atrium')
+        foundry = cm.get_card('Foundry')
+        self.p1.stockpile.set_content([atrium])
+        self.p1.buildings = [Building(foundry, 'Brick')]
 
         a = message.GameAction(message.ARCHITECT, 'Foundry', 'Atrium', None, False)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.p1.stockpile)
 
+
+        self.assertEqual(self.p1.buildings[0].materials,
+                Building(foundry, 'Brick', materials=[atrium]).materials)
         self.assertEqual(self.p1.buildings[0],
-                Building('Foundry', 'Brick', materials=['Atrium']))
+                Building(foundry, 'Brick', materials=[atrium]))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Foundry'))
 
@@ -89,16 +99,19 @@ class TestArchitect(unittest.TestCase):
         """ Add a valid material to a building with one material, but this
         does not complete it.
         """
-        self.p1.stockpile = ['Statue']
-        self.p1.buildings = [Building('Temple', 'Marble', materials=['Temple'])]
+        statue = cm.get_card('Statue')
+        temple = cm.get_card('Temple')
+        stairway = cm.get_card('Stairway')
+        self.p1.stockpile.set_content([statue])
+        self.p1.buildings = [Building(temple, 'Marble', materials=[stairway])]
 
         a = message.GameAction(message.ARCHITECT, 'Temple', 'Statue', None, False)
         self.game.handle(a)
 
-        self.assertNotIn('Statue', self.p1.stockpile)
+        self.assertNotIn(statue, self.p1.stockpile)
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Temple', 'Marble', materials=['Temple', 'Statue']))
+                Building(temple, 'Marble', materials=[stairway, statue]))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Temple'))
 
@@ -106,20 +119,22 @@ class TestArchitect(unittest.TestCase):
     def test_complete_building(self):
         """ Complete a building.
         """
-        self.p1.stockpile = ['Statue']
-        self.p1.buildings = [Building('Temple', 'Marble', materials=['Temple', 'Fountain'])]
+        statue, temple, fountain, stairway = cm.get_cards(
+                ['Statue', 'Temple', 'Fountain', 'Stairway'])
+        self.p1.stockpile.set_content([statue])
+        self.p1.buildings = [Building(temple, 'Marble', materials=[fountain,stairway])]
 
         a = message.GameAction(message.ARCHITECT, 'Temple', 'Statue', None, False)
         self.game.handle(a)
 
-        self.assertNotIn('Statue', self.p1.stockpile)
+        self.assertNotIn(statue, self.p1.stockpile)
         self.assertIn('Marble', self.p1.influence)
         self.assertTrue(self.game.player_has_active_building(self.p1, 'Temple'))
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Temple', 'Marble',
-                    materials=['Temple', 'Fountain', 'Statue'],
-                    completed=True))
+                Building(temple, 'Marble',
+                    materials=[fountain, stairway, statue],
+                    complete=True))
 
 
 
@@ -128,7 +143,8 @@ class TestArchitect(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.hand = ['Atrium']
+        atrium = cm.get_card('Atrium')
+        self.p1.hand.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -204,14 +220,14 @@ class TestArchitect(unittest.TestCase):
         self.assertFalse(mon.modified(self.game.game_state))
 
 
-class TestArchitectClient(unittest.TestCase):
-    """ Test architect responses with clients.
+class TestArchitectClientele(unittest.TestCase):
+    """Test architect responses with clients.
     """
 
     def setUp(self):
-        """ This is run prior to every test.
+        """This is run prior to every test.
         """
-        self.game = test_setup.two_player_lead('Architect', (['Wall'], ['Wall']))
+        self.game = test_setup.two_player_lead('Architect', (['Storeroom'], ['Storeroom']))
         self.p1, self.p2 = self.game.game_state.players
 
 
@@ -233,56 +249,62 @@ class TestArchitectClient(unittest.TestCase):
     def test_add_two_materials(self):
         """ Add materials with subsequent architect actions.
         """
-        self.p1.stockpile = ['Wall', 'Wall']
-        self.p1.buildings = [Building('Tower', 'Concrete')]
+        wall, storeroom = cm.get_cards(['Wall', 'Storeroom'])
+        tower = cm.get_card('Tower')
+        self.p1.stockpile.set_content([wall, storeroom])
+        self.p1.buildings = [Building(tower, 'Concrete')]
 
         a = message.GameAction(message.ARCHITECT, 'Tower', 'Wall', None, False)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Tower', 'Concrete', materials=['Wall']))
+                Building(tower, 'Concrete', materials=[wall]))
 
+        a = message.GameAction(message.ARCHITECT, 'Tower', 'Storeroom', None, False)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Tower', 'Concrete', materials=['Wall', 'Wall'], completed=True))
+                Building(tower, 'Concrete', materials=[wall, storeroom], complete=True))
 
 
     def test_start_and_add(self):
         """ Start a building and add a material.
         """
-        self.p1.stockpile = ['Wall']
-        self.p1.hand = ['Tower']
+        wall, tower = cm.get_cards(['Wall', 'Tower'])
+        self.p1.stockpile.set_content([wall])
+        self.p1.hand.set_content([tower])
 
         a = message.GameAction(message.ARCHITECT, 'Tower', None, 'Concrete', False)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.buildings[0], Building('Tower', 'Concrete'))
+        self.assertEqual(self.p1.buildings[0], Building(tower, 'Concrete'))
 
         a = message.GameAction(message.ARCHITECT, 'Tower', 'Wall', None, False)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Tower', 'Concrete', materials=['Wall']))
+                Building(tower, 'Concrete', materials=[wall]))
 
 
     def test_start_two_buildings(self):
-        """ Start a building and add a material.
+        """Start two buildings.
         """
-        self.p1.hand = ['Tower', 'Bridge']
+        tower, bridge = cm.get_cards(['Tower', 'Bridge'])
+        self.p1.hand.set_content([tower, bridge])
 
         a = message.GameAction(message.ARCHITECT, 'Tower', None, 'Concrete', False)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.buildings[0], Building('Tower', 'Concrete'))
+        self.assertEqual(self.p1.buildings[0], Building(tower, 'Concrete'))
+        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
 
         a = message.GameAction(message.ARCHITECT, 'Bridge', None, 'Concrete', False)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[1],
-                Building('Bridge', 'Concrete'))
+                Building(bridge, 'Concrete'))
 
-        self.assertEqual(self.p1.hand, [])
+        self.assertEqual(len(self.p1.hand), 0)
         self.assertNotIn('Concrete', self.game.game_state.in_town_foundations)
 
         self.assertEqual(self.game.game_state.active_player, self.p2)
@@ -291,7 +313,8 @@ class TestArchitectClient(unittest.TestCase):
     def test_start_out_of_town(self):
         """ Start a building out of town.
         """
-        self.p1.hand = ['Bridge']
+        bridge = cm.get_card('Bridge')
+        self.p1.hand.set_content([bridge])
 
         # Empty the in-town sites
         self.game.game_state.in_town_foundations = ['Rubble']
@@ -301,10 +324,10 @@ class TestArchitectClient(unittest.TestCase):
         a = message.GameAction(message.ARCHITECT, 'Bridge', None, 'Concrete', False)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.buildings[0], Building('Bridge', 'Concrete'))
+        self.assertEqual(self.p1.buildings[0], Building(bridge, 'Concrete'))
         self.assertEqual(3, self.game.game_state.out_of_town_foundations.count('Concrete'))
 
-        self.assertNotIn('Bridge', self.p1.hand)
+        self.assertNotIn(bridge, self.p1.hand)
         self.assertEqual(self.game.expected_action(), message.ARCHITECT)
         self.assertEqual(self.game.game_state.active_player, self.p2)
 
@@ -313,8 +336,9 @@ class TestArchitectClient(unittest.TestCase):
     def test_follower_client(self):
         """ Add materials with subsequent architect client, even after thinking.
         """
-        self.p2.stockpile = ['Wall', 'Wall']
-        self.p2.buildings = [Building('Tower', 'Concrete')]
+        tower, wall, storeroom = cm.get_cards(['Tower', 'Wall', 'Storeroom'])
+        self.p2.stockpile.set_content([wall, storeroom])
+        self.p2.buildings = [Building(tower, 'Concrete')]
 
         # Skip p1 architects
         a = message.GameAction(message.ARCHITECT, None, None, None, False)
@@ -326,7 +350,7 @@ class TestArchitectClient(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.p2.buildings[0],
-                Building('Tower', 'Concrete', materials=['Wall']))
+                Building(tower, 'Concrete', materials=[wall]))
 
         self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
         self.assertEqual(self.game.game_state.leader_index, 1)

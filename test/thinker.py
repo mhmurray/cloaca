@@ -5,6 +5,8 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 import cloaca.message as message
+import cloaca.card_manager as cm
+from cloaca.card import Card
 
 import cloaca.test.test_setup as test_setup
 
@@ -52,7 +54,7 @@ class TestHandleThinker(unittest.TestCase):
 
 
     def test_thinker_for_one(self):
-        self.p1.hand.extend(['Latrine']*5)
+        self.p1.hand.set_content(cm.get_cards(['Latrine']*5))
         self.assertEqual(len(self.p1.hand), 5)
 
         a = message.GameAction(message.THINKERTYPE, False)
@@ -69,25 +71,25 @@ class TestHandleThinker(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(len(self.p1.hand), 1)
-        self.assertEqual(self.p1.hand[0], 'Jack')
+        self.assertIn('Jack', self.p1.hand)
 
 
     def test_thinker_for_jack_from_full(self):
         """ Thinker for Jack with full hand should draw Jack.
         """
-        self.p1.hand.extend(['Latrine']*5)
+        self.p1.hand.set_content(cm.get_cards(['Latrine']*5))
 
         a = message.GameAction(message.THINKERTYPE, True)
         self.game.handle(a)
 
         self.assertEqual(len(self.p1.hand), 6)
-        self.assertTrue('Jack' in self.p1.hand)
+        self.assertIn('Jack', self.p1.hand)
 
     def test_thinker_for_four_cards_with_one_orders(self):
         """ Thinker for cards with 1 card in hand should draw 4.
         Test with initial card being a Jack or Latrine
         """
-        self.p1.hand = ['Latrine']
+        self.p1.hand.set_content(cm.get_cards(['Latrine']))
 
         a = message.GameAction(message.THINKERTYPE, False)
         self.game.handle(a)
@@ -98,7 +100,7 @@ class TestHandleThinker(unittest.TestCase):
         """ Thinker for cards with 1 card in hand should draw 4.
         Test with initial card being a Jack or Latrine
         """
-        self.p1.hand = ['Jack']
+        self.p1.hand.set_content(cm.get_cards(['Jack']))
 
         a = message.GameAction(message.THINKERTYPE, False)
         self.game.handle(a)

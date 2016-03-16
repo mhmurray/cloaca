@@ -2,8 +2,9 @@ from cloaca.player import Player
 from cloaca.gamestate import GameState
 from cloaca.gtr import Game
 from cloaca.building import Building
-from cloaca.card_manager import get_material_of_card, get_value_of_card
+import cloaca.card_manager as cm
 import cloaca.message as message
+from cloaca.zone import Zone
 
 from sys import stderr
 
@@ -27,10 +28,10 @@ def simple_two_player():
 
     g = Game(gs)
     g.init_common_piles(2)
-    gs.pool = []
+    gs.pool = Zone()
     
-    p1.hand = []
-    p2.hand = []
+    p1.hand = Zone()
+    p2.hand = Zone()
 
     gs.turn_index = 0
     gs.leader_index = 0
@@ -73,7 +74,8 @@ def two_player_lead(role, clientele=[], buildings=[]):
 
     if clientele:
         try:
-            p1.clientele, p2.clientele = list(clientele[0]), list(clientele[1]) 
+            p1.clientele.set_content(cm.get_cards(clientele[0]))
+            p2.clientele.set_content(cm.get_cards(clientele[1]))
         except IndexError:
             stderr.write('Failed to initialize clientele.\n')
             raise
@@ -87,9 +89,14 @@ def two_player_lead(role, clientele=[], buildings=[]):
 
         for p, buildings in zip([p1, p2], [p1_buildings, p2_buildings]):
             for building in buildings:
-                # Make building in completed state with all materials
-                b = Building(building, get_material_of_card(building),
-                        [building]*get_value_of_card(building), None, True)
+                # To complete the building we need more materials of
+                # the same material, but we don't want to use the exact smae
+                # card as the foundation.
+                foundation = cm.get_card(building)
+                others = cm.get_cards_of_material(foundation.material)
+                others.remove(foundation)
+                materials = others[:foundation.value]
+                b = Building(foundation, None, others, None, True)
                 p.buildings.append(b)
             
 
@@ -97,7 +104,7 @@ def two_player_lead(role, clientele=[], buildings=[]):
     a = message.GameAction(message.THINKERORLEAD, False)
     g.handle(a)
 
-    p1.hand = ['Jack']
+    p1.hand.set_content(cm.get_cards(['Jack']))
 
     # p1 leads Laborer
     a = message.GameAction(message.LEADROLE, role, 1, 'Jack')

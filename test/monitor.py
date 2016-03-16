@@ -29,5 +29,6 @@ class Monitor():
         changed = False
         if obj in self.objects:
             changed = current_pickle != self.objects[obj]
+
         self.objects[obj] = current_pickle
         return changed

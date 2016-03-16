@@ -5,6 +5,8 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
+import cloaca.card_manager as cm
+
 import cloaca.message as message
 from cloaca.message import BadGameActionError
 
@@ -33,7 +35,7 @@ class TestPatron(unittest.TestCase):
     def test_patron_one_from_pool(self):
         """ Take one card from the pool with patron action.
         """
-        self.game.game_state.pool = ['Atrium']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
 
         a = message.GameAction(message.PATRONFROMPOOL, 'Atrium')
         self.game.handle(a)
@@ -47,7 +49,7 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool = ['Atrium']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -63,8 +65,8 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool = ['Atrium']
-        self.p1.clientele = ['Insula', 'Dock']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        self.p1.clientele.set_content(cm.get_cards(['Insula', 'Dock']))
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -80,8 +82,8 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool = ['Atrium']
-        self.p1.clientele = ['Insula', 'Dock', 'Palisade']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        self.p1.clientele.set_content(cm.get_cards(['Insula', 'Dock', 'Palisade']))
         self.p1.influence.append('Wood')
 
         mon = Monitor()
@@ -98,8 +100,8 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool = ['Atrium']
-        self.p1.clientele = ['Insula', 'Dock']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        self.p1.clientele.set_content(cm.get_cards(['Insula', 'Dock']))
         self.p1.influence.append('Wood')
 
         a = message.GameAction(message.PATRONFROMPOOL, 'Atrium')

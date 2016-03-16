@@ -1,7 +1,74 @@
 #!/usr/bin/env python
 
+from cloaca.gtr import Game
+from cloaca.gamestate import GameState
+from cloaca.player import Player
+from cloaca.building import Building
+from cloaca.zone import Zone
+import cloaca.card_manager as cm
+
+import cloaca.message as message
+from cloaca.message import BadGameActionError
+
 import unittest
 from cloaca import gtrutils
+
+from collections import Counter
+
+class TestInitPool(unittest.TestCase):
+    """Test initialization of the pool and determining who goes first.
+    """
+
+    def test_two_player(self):
+        p1 = Player('p1')
+        p2 = Player('p2')
+
+        gs = GameState(players=['p1','p2'])
+        gs.players = (p1, p2)
+
+        gs.library.set_content(cm.get_cards(['Bar', 'Circus']))
+
+        g = Game(gs)
+
+        first = g.init_pool(len(gs.players))
+
+        self.assertEqual(first, 0)
+        self.assertIn('Bar', gs.pool)
+        self.assertIn('Circus', gs.pool)
+
+    def test_five_player(self):
+        gs = GameState(players=['p'+str(i) for i in range(5)])
+
+        gs.library.set_content(cm.get_cards(['Statue', 'Circus', 'Dock', 'Dock', 'Ludus Magna']))
+
+        g = Game(gs)
+
+        first = g.init_pool(len(gs.players))
+
+        self.assertEqual(first, 1)
+        self.assertIn('Statue', gs.pool)
+        self.assertIn('Circus', gs.pool)
+        self.assertIn('Ludus Magna', gs.pool)
+        self.assertEqual(gs.pool.count('Dock'), 2)
+
+    def test_resolve_tie(self):
+        gs = GameState(players=['p'+str(i) for i in range(3)])
+
+        gs.library.set_content(cm.get_cards(
+            ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
+             'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum',
+             ]))
+
+        g = Game(gs)
+
+        first = g.init_pool(len(gs.players))
+
+        self.assertEqual(first, 2)
+        z = Zone(cm.get_cards(
+                ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus',
+                 'Circus', 'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum']))
+        self.assertTrue(z.equal_contents(gs.pool))
+
 
 class TestCheckPetitionCombos(unittest.TestCase):
     """Test Palace / petition checker function.

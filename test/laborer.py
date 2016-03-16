@@ -5,6 +5,7 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
+import cloaca.card_manager as cm
 import cloaca.message as message
 from cloaca.message import BadGameActionError
 
@@ -33,7 +34,7 @@ class TestLaborer(unittest.TestCase):
     def test_laborer_one_from_pool(self):
         """ Take one card from the pool with laborer action.
         """
-        self.game.game_state.pool = ['Atrium']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
 
         a = message.GameAction(message.LABORER, None, 'Atrium')
         self.game.handle(a)
@@ -47,7 +48,7 @@ class TestLaborer(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool = ['Atrium']
+        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
 
         mon = Monitor()
         mon.modified(self.game.game_state)

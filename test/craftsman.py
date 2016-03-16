@@ -5,6 +5,8 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
+import cloaca.card_manager as cm
+
 import cloaca.message as message
 from cloaca.message import BadGameActionError
 
@@ -43,15 +45,16 @@ class TestCraftsman(unittest.TestCase):
     def test_start_in_town(self):
         """ Start an in-town building.
         """
-        self.p1.hand = ['Latrine']
+        latrine = cm.get_card('Latrine')
+        self.p1.hand.set_content([latrine])
 
         a = message.GameAction(message.CRAFTSMAN, 'Latrine', None, 'Rubble')
         self.game.handle(a)
 
-        self.assertNotIn('Latrine', self.p1.hand)
+        self.assertNotIn(latrine, self.p1.hand)
 
         self.assertTrue(self.p1.owns_building('Latrine'))
-        self.assertEqual(self.p1.buildings[0], Building('Latrine', 'Rubble'))
+        self.assertEqual(self.p1.buildings[0], Building(latrine, 'Rubble'))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Latrine'))
 
@@ -59,16 +62,18 @@ class TestCraftsman(unittest.TestCase):
     def test_add_to_empty_building(self):
         """ Add a valid material to a building with no materials.
         """
-        self.p1.hand = ['Atrium']
-        self.p1.buildings = [Building('Foundry', 'Brick')]
+        atrium, foundry = cm.get_cards(['Atrium', 'Foundry'])
+        self.p1.hand.set_content([atrium])
+
+        self.p1.buildings = [Building(foundry, 'Brick')]
 
         a = message.GameAction(message.CRAFTSMAN, 'Foundry', 'Atrium', None)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.p1.hand)
+        self.assertNotIn(atrium, self.p1.hand)
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Foundry', 'Brick', materials=['Atrium']))
+                Building(foundry, 'Brick', materials=[atrium]))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Foundry'))
 
@@ -77,16 +82,19 @@ class TestCraftsman(unittest.TestCase):
         """ Add a valid material to a building with one material, but this
         does not complete it.
         """
-        self.p1.hand = ['Statue']
-        self.p1.buildings = [Building('Temple', 'Marble', materials=['Temple'])]
+        statue, temple, fountain, stairway = cm.get_cards(
+                ['Statue', 'Temple', 'Fountain', 'Stairway'])
+        self.p1.hand.set_content([statue])
+
+        self.p1.buildings = [Building(temple, 'Marble', materials=[fountain])]
 
         a = message.GameAction(message.CRAFTSMAN, 'Temple', 'Statue', None)
         self.game.handle(a)
 
-        self.assertNotIn('Statue', self.p1.hand)
+        self.assertNotIn(statue, self.p1.hand)
 
         self.assertEqual(self.p1.buildings[0],
-                Building('Temple', 'Marble', materials=['Temple', 'Statue']))
+                Building(temple, 'Marble', materials=[fountain, statue]))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Temple'))
 
@@ -94,21 +102,24 @@ class TestCraftsman(unittest.TestCase):
     def test_complete_building(self):
         """ Complete a building by adding a material.
         """
-        self.p1.hand = ['Statue']
-        self.p1.buildings = [Building('Temple', 'Marble', materials=['Temple', 'Fountain'])]
+        statue, temple, fountain, stairway = cm.get_cards(
+                ['Statue', 'Temple', 'Fountain', 'Stairway'])
+        self.p1.hand.set_content([statue])
+
+        self.p1.buildings = [Building(temple, 'Marble', materials=[fountain, stairway])]
 
         a = message.GameAction(message.CRAFTSMAN, 'Temple', 'Statue', None)
         self.game.handle(a)
 
-        self.assertNotIn('Statue', self.p1.hand)
+        self.assertNotIn(statue, self.p1.hand)
         self.assertIn('Marble', self.p1.influence)
         self.assertTrue(self.game.player_has_active_building(self.p1, 'Temple'))
     
         # The completed building keeps its site. A copy is added to influence.
         self.assertEqual(self.p1.buildings[0],
-                Building('Temple', 'Marble',
-                    materials=['Temple', 'Fountain', 'Statue'],
-                    completed=True))
+                Building(temple, 'Marble',
+                    materials=[fountain, stairway, statue],
+                    complete=True))
 
     
     def test_non_existent_card(self):
@@ -116,7 +127,8 @@ class TestCraftsman(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.hand = ['Atrium']
+        atrium = cm.get_card('Atrium')
+        self.p1.hand.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -132,7 +144,8 @@ class TestCraftsman(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.hand = ['Atrium']
+        atrium = cm.get_card('Atrium')
+        self.p1.hand.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -148,7 +161,8 @@ class TestCraftsman(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.hand = ['Atrium']
+        atrium = cm.get_card('Atrium')
+        self.p1.hand.set_content([atrium])
 
         self.game.game_state.in_town_foundations = ['Rubble']
 
@@ -166,7 +180,8 @@ class TestCraftsman(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.hand = ['Atrium']
+        atrium, foundry = cm.get_cards(['Atrium', 'Foundry'])
+        self.p1.hand.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -182,7 +197,8 @@ class TestCraftsman(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.hand = ['Atrium']
+        atrium, foundry = cm.get_cards(['Atrium', 'Foundry'])
+        self.p1.hand.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -193,7 +209,7 @@ class TestCraftsman(unittest.TestCase):
         self.assertFalse(mon.modified(self.game.game_state))
 
 
-class TestFoundtain(unittest.TestCase):
+class TestFountain(unittest.TestCase):
     """Test Craftsman with an active Fountain building.
     """
 
@@ -209,38 +225,40 @@ class TestFoundtain(unittest.TestCase):
         """Test using a fountain to look at the top card and then skip the action,
         drawing the card.
         """
-        self.game.game_state.library.append('Bath')
+        bath = cm.get_card('Bath')
+        self.game.game_state.library.append(bath)
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.fountain_card, 'Bath')
+        self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, True, None, None, None)
         self.game.handle(a)
 
-        self.assertIn('Bath', self.p1.hand)
-        self.assertNotEqual('Bath', self.p1.fountain_card)
+        self.assertIn(bath, self.p1.hand)
+        self.assertIsNone(self.p1.fountain_card)
         self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
 
     def test_fountain_start(self):
         """Test using a fountain to look at the top card and then start a
         building with it.
         """
-        self.game.game_state.library.append('Bath')
+        bath = cm.get_card('Bath')
+        self.game.game_state.library.append(bath)
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.fountain_card, 'Bath')
+        self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, False, 'Bath', None, 'Brick')
         self.game.handle(a)
 
-        self.assertNotIn('Bath', self.p1.hand)
-        self.assertNotEqual('Bath', self.p1.fountain_card)
+        self.assertNotIn(bath, self.p1.hand)
+        self.assertIsNone(self.p1.fountain_card)
 
         self.assertTrue(self.p1.owns_building('Bath'))
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Bath'))
@@ -252,21 +270,22 @@ class TestFoundtain(unittest.TestCase):
         """Test using a fountain to look at the top card and then add it as
         a material to a building, completing it.
         """
-        self.game.game_state.library.append('Bath')
+        bath, atrium, foundry = cm.get_cards(['Bath', 'Atrium', 'Foundry'])
+        self.game.game_state.library.append(bath)
 
-        self.p1.buildings.append(Building('Atrium', 'Brick', ['Foundry']))
+        self.p1.buildings.append(Building(atrium, 'Brick', materials=[foundry]))
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.fountain_card, 'Bath')
+        self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, False, 'Atrium', 'Bath', None)
         self.game.handle(a)
 
-        self.assertNotIn('Bath', self.p1.hand)
-        self.assertNotEqual('Bath', self.p1.fountain_card)
+        self.assertNotIn(bath, self.p1.hand)
+        self.assertIsNone(self.p1.fountain_card)
 
         self.assertTrue(self.game.player_has_active_building(self.p1, 'Atrium'))
 

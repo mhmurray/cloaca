@@ -5,6 +5,8 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
+import cloaca.card_manager as cm
+
 import cloaca.message as message
 from cloaca.message import BadGameActionError
 
@@ -33,7 +35,7 @@ class TestMerchant(unittest.TestCase):
     def test_merchant_one_from_stockpile(self):
         """ Take one card from the stockpile with merchant action.
         """
-        self.p1.stockpile = ['Atrium']
+        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
 
         a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
         self.game.handle(a)
@@ -61,8 +63,8 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.stockpile = ['Atrium']
-        self.p1.vault = ['Insula', 'Dock']
+        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
+        self.p1.vault.set_content(cm.get_cards(['Insula', 'Dock']))
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -78,8 +80,8 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.stockpile = ['Atrium']
-        self.p1.vault = ['Insula', 'Dock', 'Palisade']
+        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
+        self.p1.vault.set_content(cm.get_cards(['Insula', 'Dock', 'Palisade']))
         self.p1.influence.append('Wood')
 
         mon = Monitor()
@@ -96,8 +98,8 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.stockpile = ['Atrium']
-        self.p1.vault = ['Insula', 'Dock']
+        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
+        self.p1.vault.set_content(cm.get_cards(['Insula', 'Dock']))
         self.p1.influence.append('Wood')
 
         a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
