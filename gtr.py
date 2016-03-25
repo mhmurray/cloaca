@@ -1255,7 +1255,15 @@ class Game(object):
     def handle_legionary(self, a):
         cards = a.args
 
+        if len([c for c in cards if c.name == 'Jack']):
+            raise GTRError('Cannot demand material with Jack.')
+
         p = self.game_state.active_player
+
+        if not p.hand.contains(cards):
+            raise GTRError('Demanding with cards not in hand: {0}.'
+                .format(', '.join(map(str,cards))))
+
 
         # Player.revealed isn't a zone, but a list of revealed cards in the hand
         # so the cards are not removed from the players hand

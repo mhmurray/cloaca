@@ -90,6 +90,37 @@ class TestLegionary(unittest.TestCase):
         self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
 
 
+    def test_demand_jack(self):
+        """Demand Jack illegally. This should not change the game state.
+        """
+        atrium, latrine, jack = cm.get_cards(['Atrium', 'Latrine', 'Jack'])
+        self.p1.hand.set_content([atrium, jack])
+        self.p2.hand.set_content([latrine])
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEGIONARY, jack)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
+    def test_demand_non_existent_card(self):
+        """Demand card that we don't have.
+        """
+        atrium, latrine = cm.get_cards(['Atrium', 'Latrine'])
+        self.p1.hand.set_content([atrium])
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEGIONARY, latrine)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
     
 if __name__ == '__main__':
     unittest.main()
