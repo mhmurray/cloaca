@@ -35,9 +35,10 @@ class TestMerchant(unittest.TestCase):
     def test_merchant_one_from_stockpile(self):
         """ Take one card from the stockpile with merchant action.
         """
-        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
+        atrium = cm.get_card('Atrium')
+        self.p1.stockpile.set_content([atrium])
 
-        a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
+        a = message.GameAction(message.MERCHANT, atrium, None, False)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.p1.stockpile)
@@ -52,7 +53,7 @@ class TestMerchant(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
+        a = message.GameAction(message.MERCHANT, cm.get_card('Atrium'), None, False)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -63,13 +64,14 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
-        self.p1.vault.set_content(cm.get_cards(['Insula', 'Dock']))
+        atrium, insula, dock = cm.get_cards(['Atrium', 'Insula', 'Dock'])
+        self.p1.stockpile.set_content([atrium])
+        self.p1.vault.set_content([insula, dock])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
+        a = message.GameAction(message.MERCHANT, atrium, None, False)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -80,14 +82,15 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
-        self.p1.vault.set_content(cm.get_cards(['Insula', 'Dock', 'Palisade']))
+        atrium, insula, dock, palisade = cm.get_cards(['Atrium', 'Insula', 'Dock', 'Palisade'])
+        self.p1.stockpile.set_content([atrium])
+        self.p1.vault.set_content([insula, dock, palisade])
         self.p1.influence.append('Wood')
 
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
+        a = message.GameAction(message.MERCHANT, atrium, None, False)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -98,11 +101,12 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.p1.stockpile.set_content(cm.get_cards(['Atrium']))
-        self.p1.vault.set_content(cm.get_cards(['Insula', 'Dock']))
+        atrium, insula, dock, palisade = cm.get_cards(['Atrium', 'Insula', 'Dock', 'Palisade'])
+        self.p1.stockpile.set_content([atrium])
+        self.p1.vault.set_content([insula, dock])
         self.p1.influence.append('Wood')
 
-        a = message.GameAction(message.MERCHANT, 'Atrium', None, False)
+        a = message.GameAction(message.MERCHANT, atrium, None, False)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.p1.stockpile)

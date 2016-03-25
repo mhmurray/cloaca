@@ -2,44 +2,24 @@ from gtr import Game
 from gamestate import GameState
 from player import Player
 from game_record import GameRecord
-from interfaces import IGTRService
 from message import GameAction
 import message
 
-import message
-import argparse
 import uuid
 import copy
 
-from twisted.internet.protocol import ServerFactory, Protocol
-from twisted.protocols.basic import NetstringReceiver
-from twisted.application import service
-
-from zope.interface import implements
-
 import pickle
 
-import logging
-
-def catch_error(err):
-    return "Internal error in server"
-
-
-class GTRServer(service.Service):
+class GTRServer(object):
     """Contains a list of multiple Game objects and manages all the
     non-game actions related to e.g. connecting players and starting games.
 
-    Keeps a reference to a factory object that implements IGTRFactory.
-    This object is used to communicate with the clients via the method
-    GTRFactory.send_action(user, action).
+    The send_action(user, action) method must be assigned to an appropriate
+    handle when this object is used.
     """
-
-    implements(IGTRService)
-
     def __init__(self, backup_file=None, load_backup_file=None):
         self.games = [] # Games database
         self.users = [] # User database
-        self.factory = None
         self.backup_file = backup_file
         self.load_backup_file = load_backup_file
 
@@ -52,10 +32,7 @@ class GTRServer(service.Service):
         g.add_player('b')
         self.games.append(g)
 
-    def send_action(self, user, action):
-        """Sends a message to the user if the user exists.
-        """
-        self.factory.send_action(user, action)
+        self.send_action = lambda _ : None
 
     def get_game_state(self, user, game_id):
         try:

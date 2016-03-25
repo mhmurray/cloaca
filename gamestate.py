@@ -14,6 +14,7 @@ import logging
 import card_manager
 from collections import Counter
 from zone import Zone
+from card import Card
 
 import stack
 
@@ -90,14 +91,14 @@ class GameState:
 
         This does not hide Jacks in hand.
         """
-        self.library = Card(-1)*len(self.library)
+        self.library.set_content([Card(-1)]*len(self.library))
 
         for p in self.players:
-            p.vault = ['Card']*len(p.vault)
+            p.vault = [Card(-1)]*len(p.vault)
 
             if p.name != player_name:
-                p.hand = [c if c == 'Jack' else 'Card' for c in p.hand ]
-                p.fountain_card = 'Card' if p.fountain_card else None
+                p.hand = [c if c.name == 'Jack' else Card(-1) for c in p.hand ]
+                p.fountain_card = Card(-1) if p.fountain_card else None
 
 
 
@@ -287,7 +288,7 @@ class GameState:
         shuffle. See the SO question
           http://stackoverflow.com/questions/3062741/maximal-length-of-list-to-shuffle-with-python-random-shuffle
         """
-        random.shuffle(self.library)
+        random.shuffle(self.library.cards)
 
     def pass_priority(self):
         self.priority_index += 1;
@@ -322,8 +323,8 @@ class GameState:
 
         # print pool.
         pool_string = 'Pool: '
-        pool_mats = Counter(map(card_manager.get_material_of_card, self.pool))
-        pool_string += '  '.join([mat[:3] + ' x' + str(cnt) for mat,cnt in pool_mats.items()]) + '\n'
+        pool_mats = Counter([c.material for c in self.pool])
+        pool_string += '  '.join([mat[:3] + ' x' + str(cnt) for mat, cnt in pool_mats.items()]) + '\n'
 
         
 

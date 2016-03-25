@@ -1,6 +1,7 @@
 import gtrutils
 import card_manager
 from itertools import izip, izip_longest, count
+from card import Card
 
 THINKERORLEAD   =  0
 USELATRINE      =  1
@@ -95,7 +96,8 @@ class GTRActionSpec(object):
         self.extended_arg_spec = extended_arg_spec
         self.has_extended = bool(extended_arg_spec)
         
-Card = str
+#Card = str
+#Card = int
 _action_args_dict = {
     REQGAMESTATE   : GTRActionSpec('reqgamestate',   (), () ),
     GAMESTATE      : GTRActionSpec('gamestate',      ( (str,  'game_state'), ), () ),
@@ -129,10 +131,10 @@ _action_args_dict = {
 
     ARCHITECT      : GTRActionSpec('architect',
         (   (Card, 'building'), (Card, 'material'),
-            (Card, 'site'), (bool, 'from_pool') ), () ),
+            (str, 'site'), (bool, 'from_pool') ), () ),
 
     CRAFTSMAN      : GTRActionSpec('craftsman',
-        (   (Card, 'building'), (Card, 'material'), (Card, 'site') ), () ),
+        (   (Card, 'building'), (Card, 'material'), (str, 'site') ), () ),
 
     MERCHANT       : GTRActionSpec('merchant',
         (   (Card, 'from_stockpile'), (Card, 'from_hand'), (bool, 'from_deck') ), () ),
@@ -145,7 +147,7 @@ _action_args_dict = {
 
     FOUNTAIN       : GTRActionSpec('fountain',
         (   (bool, 'skip'), (Card, 'building'),
-            (Card, 'material'), (Card, 'site') ), () ),
+            (Card, 'material'), (str, 'site') ), () ),
 
     STAIRWAY       : GTRActionSpec('stairway',
         (   (str, 'player'), (Card, 'building'),
@@ -223,16 +225,23 @@ def parse_action(action_string):
         elif token == 'None':
             arg = None
 
+        elif _type == Card:
+            try:
+                arg = Card(int(token))
+            except ValueError:
+                raise BadGameActionError(
+                    'Error converting "{0}" argument: {1} token: "{2}"'
+                    .format(name, str(_type), token))
+
         else:
             try:
                 arg = _type(token)
             except ValueError:
                 raise BadGameActionError(
-                    'Error converting "{0}" argument: {1}({2})'
+                    'Error converting "{0}" argument: {1} token: "{2}"'
                     .format(name, str(_type), token))
 
         return arg
-
 
 
     req_tokens = arg_tokens[:spec.n_req_args]
@@ -288,6 +297,16 @@ class GameAction:
 
         self.check_type()
         self.check_args()
+        self.convert_cards()
+
+    def convert_cards(self):
+        """Converts any arguments from ints to Cards based on the arg spec.
+        """
+        spec = _action_args_dict[self.action]
+
+        for i,arg, (_type, name) in izip(count(), self.args, spec.required_arg_specs):
+            pass
+
 
     def check_type(self):
         """ Raises an InvalidGameActionError if this is not a valid game
@@ -314,12 +333,13 @@ class GameAction:
 
         # Regular args
         for i, arg, (_type,name) in izip(count(), self.args, spec.required_arg_specs):
+            card_arg_match = _type is Card and type(arg) is int
             bad_arg_match = type(arg) is not _type
             arg_is_none = arg is None
             str_unicode_error = type(arg) is str and _type is unicode \
                     or type(arg) is unicode and _type is str
 
-            if bad_arg_match and not arg_is_none and not str_unicode_error:
+            if bad_arg_match and not arg_is_none and not str_unicode_error and not card_arg_match:
                 raise BadGameActionError(
                     'Argument {0} ("{1}"), {2} doesn\'t match type ({3} != {4})'
                     .format(i, name, str(arg), str(_type), str(type(arg))))
@@ -328,12 +348,13 @@ class GameAction:
         for i, arg in izip(count(spec.n_req_args), self.args[spec.n_req_args:]):
             _type, name = spec.extended_arg_spec
 
+            card_arg_match = _type is Card and type(arg) is int
             bad_arg_match = type(arg) is not _type
             arg_is_none = arg is None
             str_unicode_error = type(arg) is str and _type is unicode \
                     or type(arg) is unicode and _type is str
 
-            if bad_arg_match and not arg_is_none and not str_unicode_error:
+            if bad_arg_match and not arg_is_none and not str_unicode_error and not card_arg_match:
                 raise BadGameActionError(
                     'Argument {0} ("{1}"), {2} doesn\'t match type ({3} != {4})'
                     .format(i, name, str(arg), str(_type), str(type(arg))))

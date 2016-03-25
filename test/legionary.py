@@ -35,10 +35,11 @@ class TestLegionary(unittest.TestCase):
     def test_legionary(self):
         """Take one card from the pool with legionary action.
         """
-        self.p1.hand.set_content(cm.get_cards(['Atrium']))
-        self.game.game_state.pool.set_content(cm.get_cards(['Foundry']))
+        atrium, foundry = cm.get_cards(['Atrium', 'Foundry'])
+        self.p1.hand.set_content([atrium])
+        self.game.game_state.pool.set_content([foundry])
 
-        a = message.GameAction(message.LEGIONARY, 'Atrium')
+        a = message.GameAction(message.LEGIONARY, atrium)
         self.game.handle(a)
 
         self.assertNotIn('Foundry', self.game.game_state.pool)
@@ -52,13 +53,14 @@ class TestLegionary(unittest.TestCase):
     def test_give_cards(self):
         """Take one card from opponent.
         """
-        self.p1.hand.set_content(cm.get_cards(['Atrium']))
-        self.p2.hand.set_content(cm.get_cards(['Foundry']))
+        atrium, foundry = cm.get_cards(['Atrium', 'Foundry'])
+        self.p1.hand.set_content([atrium])
+        self.p2.hand.set_content([foundry])
 
-        a = message.GameAction(message.LEGIONARY, 'Atrium')
+        a = message.GameAction(message.LEGIONARY, atrium)
         self.game.handle(a)
 
-        a = message.GameAction(message.GIVECARDS, 'Foundry')
+        a = message.GameAction(message.GIVECARDS, foundry)
         self.game.handle(a)
 
         self.assertIn('Foundry', self.p1.stockpile)
@@ -71,10 +73,11 @@ class TestLegionary(unittest.TestCase):
     def test_opponent_has_no_match(self):
         """Demand card that opponent doesn't have.
         """
-        self.p1.hand.set_content(cm.get_cards(['Atrium']))
-        self.p2.hand.set_content(cm.get_cards(['Latrine']))
+        atrium, latrine = cm.get_cards(['Atrium', 'Latrine'])
+        self.p1.hand.set_content([atrium])
+        self.p2.hand.set_content([latrine])
 
-        a = message.GameAction(message.LEGIONARY, 'Atrium')
+        a = message.GameAction(message.LEGIONARY, atrium)
         self.game.handle(a)
 
         a = message.GameAction(message.GIVECARDS)

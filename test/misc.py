@@ -5,6 +5,7 @@ from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 from cloaca.zone import Zone
+from cloaca.card import Card
 import cloaca.card_manager as cm
 
 import cloaca.message as message
@@ -68,6 +69,83 @@ class TestInitPool(unittest.TestCase):
                 ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus',
                  'Circus', 'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum']))
         self.assertTrue(z.equal_contents(gs.pool))
+
+
+class TestGameStatePrivatize(unittest.TestCase):
+    """Test hiding the non-public elements of the game state.
+        
+    These are the library, opponents' hands except Jacks, all vaults,
+    and the card drawn with the fountain.
+    """
+
+    def test_privatize_library(self):
+        """Test hiding the library.
+        """
+        gs = GameState(players=['p'+str(i) for i in range(2)])
+
+        gs.library.set_content(cm.get_cards(
+            ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
+             'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum',
+             ]))
+
+        gs.privatize('p0')
+
+        self.assertFalse(gs.library.contains('Circus'))
+        self.assertEqual(gs.library, Zone([Card(-1)]*len(gs.library)))
+
+    def test_privatize_hands(self):
+        """Test hiding opponents' hands.
+        """
+        gs = GameState(players=['p'+str(i) for i in range(2)])
+        p0, p1 = gs.players
+
+        latrine, insula, jack, road = cm.get_cards(['Latrine', 'Insula', 'Jack', 'Road'])
+        p0.hand.set_content([latrine, insula])
+        p1.hand.set_content([jack, road])
+
+        gs.privatize('p0')
+
+        self.assertIn(jack, p1.hand)
+        self.assertIn(Card(-1), p1.hand)
+        self.assertNotIn(road, p1.hand)
+
+        self.assertIn(latrine, p0.hand)
+        self.assertIn(insula, p0.hand)
+
+        self.assertEqual(len(p0.hand), 2)
+        self.assertEqual(len(p1.hand), 2)
+
+    
+    def test_privatize_vaults(self):
+        """Test hiding all vaults.
+        """
+        gs = GameState(players=['p'+str(i) for i in range(2)])
+        p0, p1 = gs.players
+
+        latrine, insula, statue, road = cm.get_cards(['Latrine', 'Insula', 'Statue', 'Road'])
+        p0.vault.set_content([latrine, insula])
+        p1.vault.set_content([statue, road])
+
+        gs.privatize('p1')
+
+        self.assertEqual(p0.vault, [Card(-1)]*2)
+        self.assertEqual(p1.vault, [Card(-1)]*2)
+
+
+    def test_privatize_fountain_card(self):
+        """Test hiding the card revealed with the fountain.
+        """
+        gs = GameState(players=['p'+str(i) for i in range(2)])
+        p0, p1 = gs.players
+
+        latrine, insula, statue, road = cm.get_cards(['Latrine', 'Insula', 'Statue', 'Road'])
+        p0.fountain_card = latrine
+
+        gs.privatize('p1')
+
+        self.assertEqual(p0.fountain_card, Card(-1))
+
+
 
 
 class TestCheckPetitionCombos(unittest.TestCase):
@@ -236,6 +314,8 @@ class TestCheckPetitionCombos(unittest.TestCase):
         self.assertTrue(  f(13, 15, 11, True, True))
         self.assertFalse( f(13, 40,  0, True, True))
         self.assertFalse( f(13, 11,  3, True, True))
+
+
  
 
 if __name__ == '__main__':

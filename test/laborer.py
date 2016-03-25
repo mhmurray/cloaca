@@ -34,9 +34,10 @@ class TestLaborer(unittest.TestCase):
     def test_laborer_one_from_pool(self):
         """ Take one card from the pool with laborer action.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        atrium = cm.get_card('Atrium')
+        self.game.game_state.pool.set_content([atrium])
 
-        a = message.GameAction(message.LABORER, None, 'Atrium')
+        a = message.GameAction(message.LABORER, None, atrium)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.game.game_state.pool)
@@ -53,7 +54,7 @@ class TestLaborer(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.LABORER, None, 'Dock')
+        a = message.GameAction(message.LABORER, None, cm.get_card('Dock'))
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))

@@ -19,7 +19,7 @@ class Card(object):
     Members:
     ident -- unique id number, different for all cards. Negative values
              are for anonymouse cards named 'Card', eg. for your opponent's
-             hand.
+             hand. Card with idents too large are set to -1.
 
     Attributes (read-only):
     name -- name of foundation, or 'Jack'
@@ -30,7 +30,11 @@ class Card(object):
     """
 
     def __init__(self, ident):
+        if type(ident) is not int:
+            raise TypeError('Card.ident must be an integer, received \'{0!s}\''.format(ident))
         self.ident = ident
+        if self.ident >= len(cm.standard_deck()):
+            raise TypeError('Card.ident out of range: {0}'.format(ident))
 
     def get_name(self):
         if self.ident < 0: return 'Card'
@@ -49,22 +53,32 @@ class Card(object):
     def __str__(self):
         return self.name
 
-    def __cmp__(self, card):
-        return cmp(self.ident, card.ident)
+    def __cmp__(self, other):
+        """Custom comparison between cards. Uses the ident attribute.
+        If compared to a non-Card object, the comparison uses
+        cmp(id(self), id(other)).
+        """
+        if not isinstance(other, Card):
+            return cmp(id(self), id(other))
+
+        return cmp(self.ident, other.ident)
 
     def __hash__(self):
         return self.ident
 
     def compare_jacks_first(self, other):
-        c1, c2 = self.name.lower(), card.name.lower()
+        if not isinstance(other, Card):
+            return cmp(id(self), id(other))
+
+        c1, c2 = self.name.lower(), other.name.lower()
         if c1 == c2:
-            return 0
+            return cmp(self.ident, other.ident)
         elif c1 == 'Jack':
             return -1
         elif c2 == 'Jack':
             return 1
         else:
-            return cmp(c1,c2)
+            return cmp(self, other)
 
     def same_name(self, other):
         return self.name == other.name

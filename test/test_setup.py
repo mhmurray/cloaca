@@ -104,10 +104,11 @@ def two_player_lead(role, clientele=[], buildings=[]):
     a = message.GameAction(message.THINKERORLEAD, False)
     g.handle(a)
 
-    p1.hand.set_content(cm.get_cards(['Jack']))
+    jack = cm.get_card('Jack')
+    p1.hand.set_content([jack])
 
     # p1 leads Laborer
-    a = message.GameAction(message.LEADROLE, role, 1, 'Jack')
+    a = message.GameAction(message.LEADROLE, role, 1, jack)
     g.handle(a)
 
     # p2 thinks for a Jack

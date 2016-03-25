@@ -129,30 +129,33 @@ class TestLeadRole(unittest.TestCase):
     def test_handle_lead_role_with_orders(self):
         """ Leading a role sets GameState.role_led, camp actions.
         """
-        self.p1.hand.set_content([cm.get_card('Latrine')])
+        latrine = cm.get_card('Latrine')
+        self.p1.hand.set_content([latrine])
 
-        a = message.GameAction(message.LEADROLE, 'Laborer', 1, 'Latrine')
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, latrine)
         self.game.handle(a)
 
         self.assertEqual(self.game.game_state.role_led, 'Laborer')
         self.assertEqual(self.p1.n_camp_actions, 1)
-        self.assertIn('Latrine', self.p1.camp)
-        self.assertNotIn('Latrine', self.p1.hand)
+        self.assertIn(latrine, self.p1.camp)
+        self.assertNotIn(latrine, self.p1.hand)
         self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
 
 
     def test_handle_lead_latrine_with_jack(self):
         """ Leading a role sets GameState.role_led, camp actions.
         """
-        self.p1.hand.set_content([cm.get_card('Jack')])
+        jack = cm.get_card('Jack')
 
-        a = message.GameAction(message.LEADROLE, 'Laborer', 1, 'Jack')
+        self.p1.hand.set_content([jack])
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, jack)
         self.game.handle(a)
 
         self.assertEqual(self.game.game_state.role_led, 'Laborer')
         self.assertEqual(self.p1.n_camp_actions, 1)
-        self.assertIn('Jack', self.p1.camp)
-        self.assertNotIn('Jack', self.p1.hand)
+        self.assertIn(jack, self.p1.camp)
+        self.assertNotIn(jack, self.p1.hand)
         self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
 
 
@@ -170,10 +173,11 @@ class TestFollow(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, False)
         self.game.handle(a)
 
-        self.p1.hand.set_content([cm.get_card('Jack')])
+        jack = cm.get_card('Jack')
+        self.p1.hand.set_content([jack])
 
         # p1 leads Laborer
-        a = message.GameAction(message.LEADROLE, 'Laborer', 1, 'Jack')
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, jack)
         self.game.handle(a)
 
 
@@ -196,28 +200,30 @@ class TestFollow(unittest.TestCase):
     def test_follow_role_with_jack(self):
         """ Follow Laborer with a Jack.
         """
-        self.p2.hand.set_content([cm.get_card('Jack')])
+        jack = cm.get_card('Jack')
+        self.p2.hand.set_content([jack])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Jack')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, jack)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action(), message.LABORER)
-        self.assertIn('Jack', self.p2.camp)
-        self.assertNotIn('Jack', self.p2.hand)
+        self.assertIn(jack, self.p2.camp)
+        self.assertNotIn(jack, self.p2.hand)
         self.assertEqual(self.p2.n_camp_actions, 1)
 
 
     def test_follow_role_with_orders(self):
         """ Follow Laborer with a Latrine.
         """
-        self.p2.hand.set_content([cm.get_card('Latrine')])
+        latrine = cm.get_card('Latrine')
+        self.p2.hand.set_content([latrine])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, latrine)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action(), message.LABORER)
-        self.assertIn('Latrine', self.p2.camp)
-        self.assertNotIn('Latrine', self.p2.hand)
+        self.assertIn(latrine, self.p2.camp)
+        self.assertNotIn(latrine, self.p2.hand)
         self.assertEqual(self.p2.n_camp_actions, 1)
 
     def test_follow_role_with_nonexistent_card(self):
@@ -225,22 +231,14 @@ class TestFollow(unittest.TestCase):
 
         This bad action should not change anything about the game state.
         """
+        latrine = cm.get_card('Latrine')
         self.p2.hand.set_content([])
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, latrine)
         
         # Monitor the gamestate for any changes
         mon = Monitor()
         mon.modified(self.game.game_state)
-        #print self.game.game_state.__dict__
-
-        #self.game.handle(a)
-        #print self.game.game_state.__dict__
-
-        #from copy import deepcopy
-        #gs2 = deepcopy(self.game.game_state)
-        #print gs2 == self.game.game_state
-        #self.assertEqual(self.game.game_state, gs2)
 
         self.assertFalse(mon.modified(self.game.game_state))
 
@@ -249,9 +247,10 @@ class TestFollow(unittest.TestCase):
 
         This bad action should not change anything about the game state.
         """
-        self.p2.hand.set_content([cm.get_card('Atrium')])
+        atrium = cm.get_card('Atrium')
+        self.p2.hand.set_content([atrium])
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Atrium')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, atrium)
         
         # Monitor the gamestate for any changes
         mon = Monitor()
@@ -264,28 +263,34 @@ class TestFollow(unittest.TestCase):
     def test_follow_role_with_petition_of_different_role(self):
         """ Follow Laborer by petition of non-Laborer role cards.
         """
-        self.p2.hand.set_content(cm.get_cards(['Atrium', 'School', 'School']))
+        cards = atrium, school1, school2 = cm.get_cards(['Atrium', 'School', 'School'])
+        self.p2.hand.set_content(cards)
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Atrium', 'School', 'School')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, *cards)
         
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action(), message.LABORER)
-        self.assertIn('Atrium', self.p2.camp)
+        self.assertIn(atrium, self.p2.camp)
+        self.assertIn(school1, self.p2.camp)
+        self.assertIn(school2, self.p2.camp)
         self.assertEqual(self.p2.camp.count('School'), 2)
         self.assertEqual(len(self.p2.hand), 0)
 
     def test_follow_role_with_petition_of_same_role(self):
         """ Follow Laborer by petition of Laborer role cards.
         """
-        self.p2.hand.set_content(cm.get_cards(['Latrine', 'Insula', 'Insula']))
+        cards = latrine, insula1, insula2 = cm.get_cards(['Latrine', 'Insula', 'Insula'])
+        self.p2.hand.set_content(cards)
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula', 'Insula')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, *cards)
 
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action(), message.LABORER)
-        self.assertIn('Latrine', self.p2.camp)
+        self.assertIn(latrine, self.p2.camp)
+        self.assertIn(insula1, self.p2.camp)
+        self.assertIn(insula2, self.p2.camp)
         self.assertEqual(self.p2.camp.count('Insula'), 2)
         self.assertEqual(len(self.p2.hand), 0)
 
@@ -295,9 +300,10 @@ class TestFollow(unittest.TestCase):
 
         This bad action should not change anything about the game state.
         """
-        self.p2.hand.set_content(cm.get_cards(['Latrine', 'Road', 'Insula']))
+        cards = latrine, road, insula = cm.get_cards(['Latrine', 'Road', 'Insula'])
+        self.p2.hand.set_content(cards)
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, 'Latrine', 'Insula')
+        a = message.GameAction(message.FOLLOWROLE, False, 1, latrine, insula)
 
         self.game.handle(a)
 

@@ -66,17 +66,35 @@ class Zone(object):
             return False
 
 
+    def intersection(self, cards):
+        """Returns the intersection of this zone and the list of card objects as
+        a collections.Counter object (multi-set).
+        """
+
+        return (Counter(cards) & Counter(self.cards))
+
+
     def contains(self, cards):
-        """Checks if the zone contains the specified cards. Repeated cards
-        must be in this zone multiple times.
+        """Checks if the zone contains the specified cards. Repeated card names
+        must be in this zone multiple times. If cards is a list of Card objects,
+        they are compared by Card.ident. If cards is empty, return True.
 
         Args:
-        cards -- list of names of cards
+        cards -- list of names of cards or Card objects. Do not mix.
         """
-        c = Counter(map(lambda x: x.name, self.cards))
-        h = Counter(cards)
+        if len(cards) == 0:
+            return True
+        else:
+            is_obj = type(cards[0]) == Card
 
-        return (c & h) == c # intersection
+        if is_obj:
+            return self.intersection(cards) == Counter(cards)
+
+        else:
+            c = Counter(map(lambda x: x.name, self.cards))
+            h = Counter(cards)
+
+            return (c & h) == c # intersection
 
 
     def equal_contents(self, other):

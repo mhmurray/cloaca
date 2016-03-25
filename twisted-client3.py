@@ -17,6 +17,7 @@ import client3 as client
 from client3 import Choice
 from curses_gui import CursesGUI
 from util import CircularPausingFilter
+from card import Card
 
 from fsm import StateMachine
 
@@ -314,7 +315,10 @@ class ServerProtocol(NetstringReceiver):
         if game_id is None:
             game_id = 0
 
-        cmd = ','.join([user, str(game_id), str(game_action.action)] + map(str, game_action.args))
+        cmd = ','.join([user, str(game_id), str(game_action.action)])
+                #+ map(str, game_action.args))
+        for a in game_action.args:
+            cmd += ',' + (str(a.ident) if isinstance(a, Card) else str(a))
 
         lg.debug('Sending command to server: ' + cmd)
 

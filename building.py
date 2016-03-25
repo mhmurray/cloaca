@@ -57,13 +57,13 @@ class Building:
         
         The return value is of the form ('Marble','Stone')
         """
-        return (site, foundation.material) if site else (foundation.material,)
+        return (self.site, self.foundation.material) if self.site else (self.foundation.material,)
 
     def pop_site(self):
         """Removes and returns this building's site.
         """
-        card = site
-        site = None
+        card = self.site
+        self.site = None
         return card
 
     def add_material(self, card):

@@ -35,9 +35,10 @@ class TestPatron(unittest.TestCase):
     def test_patron_one_from_pool(self):
         """ Take one card from the pool with patron action.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        atrium = cm.get_card('Atrium')
+        self.game.game_state.pool.set_content([atrium])
 
-        a = message.GameAction(message.PATRONFROMPOOL, 'Atrium')
+        a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.game.game_state.pool)
@@ -49,12 +50,13 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        atrium, dock = cm.get_cards(['Atrium', 'Dock'])
+        self.game.game_state.pool.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.PATRONFROMPOOL, 'Dock')
+        a = message.GameAction(message.PATRONFROMPOOL, dock)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -65,13 +67,14 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
-        self.p1.clientele.set_content(cm.get_cards(['Insula', 'Dock']))
+        atrium, insula, dock = cm.get_cards(['Atrium', 'Insula', 'Dock'])
+        self.game.game_state.pool.set_content([atrium])
+        self.p1.clientele.set_content([insula, dock])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.PATRONFROMPOOL, 'Atrium')
+        a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -82,14 +85,15 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
-        self.p1.clientele.set_content(cm.get_cards(['Insula', 'Dock', 'Palisade']))
+        atrium, insula, dock, palisade = cm.get_cards(['Atrium', 'Insula', 'Dock', 'Palisade'])
+        self.game.game_state.pool.set_content([atrium])
+        self.p1.clientele.set_content([insula, dock, palisade])
         self.p1.influence.append('Wood')
 
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.PATRONFROMPOOL, 'Atrium')
+        a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -100,11 +104,12 @@ class TestPatron(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
-        self.p1.clientele.set_content(cm.get_cards(['Insula', 'Dock']))
+        atrium, insula, dock = cm.get_cards(['Atrium', 'Insula', 'Dock'])
+        self.game.game_state.pool.set_content([atrium])
+        self.p1.clientele.set_content([insula, dock])
         self.p1.influence.append('Wood')
 
-        a = message.GameAction(message.PATRONFROMPOOL, 'Atrium')
+        a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.game.game_state.pool)

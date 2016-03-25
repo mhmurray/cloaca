@@ -3,7 +3,7 @@
 import re
 import logging
 import collections
-import card_manager
+import card_manager as cm
 import termcolor
 
 """ Utility functions for GTR.
@@ -42,46 +42,39 @@ def move_card(card, source_zone, dest_zone):
     """
     source_zone.move_card(card, dest_zone)
     return 
-    try:
-        card = get_card_from_zone(card, source_zone)
-    except GTRError:
-        raise GTRError('Failed to move card')
 
-    add_card_to_zone(card, dest_zone)
-
-def get_short_zone_summary(card_list, n_letters=3):
-    """ Return a single-line string with n-letter card abbreviations and numbers
+def get_short_zone_summary(string_list, n_letters=3):
+    """Return a single-line string with n-letter card abbreviations and numbers
     of card instances.
 
     Note that n_letters=3 activates the coloring of the output text. 4-letter
     strings are not colorized.
     """
-    counter = collections.Counter(card_list)
+    counter = collections.Counter(string_list)
     cards_string = ', '.join(
             ['{0}[{1:d}]'.format(card[:n_letters], cnt) for card, cnt in counter.items()])
     return cards_string
 
 def get_detailed_card_summary(card, count=None):
-    """ return a single-line string to describe one card in detail """
+    """Return a single-line string to describe one card in detail.
+    """
 
-    card_string = '{0:<4}'.format(card[:4])
+    card_string = '{0:<4}'.format(card.name[:4])
     if count:
         card_string += '[{0:d}]'.format(count)
-    if card not in ('Jack', 'Card'):
-        material = card_manager.get_material_of_card(card)
-        role = card_manager.get_role_of_card(card)
-        value = card_manager.get_value_of_card(card)
-        function = card_manager.get_function_of_card(card)
-        card_string += ' | {0}'.format(material[:3])
-        card_string += '-{0}'.format(role[:3])
-        card_string += '-{0}'.format(value)
+    if card.name not in ('Jack', 'Card'):
+        function = card.text
+        card_string += ' | {0}'.format(card.material[:3])
+        card_string += '-{0}'.format(card.role[:3])
+        card_string += '-{0}'.format(card.value)
         card_string += ' | ' + (function if len(function)<50 else function[:47] + '...')
     return card_string
 
 def get_detailed_zone_summary(zone):
-    """ return a multi-line description of cards in zone """
+    """Return a multi-line description of cards in zone.
+    """
 
-    counter = collections.Counter(zone)
+    counter = collections.Counter([c.name for c in zone])
     counter_dict = dict(counter)
     cards = counter_dict.keys()
     cards.sort() # alphabetize
@@ -89,7 +82,7 @@ def get_detailed_zone_summary(zone):
     zone_string = ''
     for card in cards:
         count = counter_dict[card]
-        zone_string += '  * ' + get_detailed_card_summary(card, count)
+        zone_string += '  * ' + get_detailed_card_summary(cm.get_card(card), count)
         zone_string += '\n'
     return zone_string
 
@@ -249,16 +242,16 @@ def get_building_info(building):
     if not building.foundation:
         return ''
     title_card = building.foundation
-    function = card_manager.get_function_of_card(title_card)
-    value = card_manager.get_value_of_card(title_card)
-    title_material = card_manager.get_material_of_card(title_card)
+    function = title_card.text
+    value = title_card.value
+    title_material = title_card.material
 
-    info = '  * {0} | {1}-{2} | '.format(title_card, title_material[:3], value)
+    info = '  * {0!s} | {1}-{2:d} | '.format(title_card, title_material[:3], value)
     if building.site:
         info += '{0} site + '.format(building.site)
 
     # Materials : "Concrete site + C_" for a wall with one concrete added.
-    info += ''.join([card_manager.get_material_of_card(m)[0] for m in building.materials])
+    info += ''.join([c.material for c in building.materials])
     info += '_' * (value-len(building.materials))
 
     info += ' | ' + function[:40]

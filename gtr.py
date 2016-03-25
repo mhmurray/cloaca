@@ -1,5 +1,5 @@
 """Provides the Game class, which has little state of its own,
-/ibut provides the methods for game flow control.
+but provides the methods for game flow control.
 """
 
 from player import Player
@@ -7,7 +7,7 @@ from gtrutils import get_card_from_zone
 from gamestate import GameState
 import gtrutils
 from gtrutils import GTRError, check_petition_combos
-import card_manager
+import card_manager as cm
 from building import Building
 from card import Card
 from zone import Zone
@@ -118,14 +118,14 @@ class Game(object):
 
     def init_sites(self, n_players):
         n_out_of_town = 6 - n_players
-        for material in card_manager.get_all_materials():
+        for material in cm.get_all_materials():
             self.game_state.in_town_foundations.extend([material]*n_players)
             self.game_state.out_of_town_foundations.extend([material]*n_out_of_town)
 
     def init_library(self):
         """Initializes the library as a list of Card objects
         """
-        self.game_state.library = card_manager.get_orders_card_set()
+        self.game_state.library = Zone(cm.get_orders_card_set())
         self.game_state.shuffle_library()
 
     def get_player_score(self, player):
@@ -155,7 +155,7 @@ class Game(object):
         for player in self.game_state.players:
             bonuses[player.name] = []
 
-        for material in card_manager.get_materials():
+        for material in cm.get_materials():
             # Set name to None if there's a tie, but maintain maximum
             name, maximum = None, 0
             for player in self.game_state.players:
@@ -496,10 +496,10 @@ class Game(object):
 
         if n_actions > 1:
             self.log('{0} leads {1} for {2} actions using: {3}'
-                    .format(p.name, role, n_actions, ', '.join(cards)))
+                    .format(p.name, role, n_actions, ', '.join(map(str, cards))))
         else:
             self.log('{0} leads {1} using: {2}'
-                    .format(p.name, role, ', '.join(cards)))
+                    .format(p.name, role, ', '.join(map(str, cards))))
 
         self.pump()
 
@@ -552,11 +552,11 @@ class Game(object):
         # Subtract off Jacks and actions one-for-one. Determine number of
         # cards on-role and off-role for the role that was led.
         for c in cards:
-            if c == 'Jack':
+            if c.name == 'Jack':
                 n_left -= 1
-            elif card_manager.get_role_of_card(c) == role_led:
+            elif c.role == role_led:
                 n_on += 1
-            elif card_manager.get_role_of_card(c) != role_led:
+            elif c.role != role_led:
                 n_off += 1
             else:
                 raise GTRError('Invalid card: ' + c)
@@ -564,7 +564,7 @@ class Game(object):
         invalid_combo_error = GTRError(
                 'Invalid n_actions (' + str(n_actions) + \
                 ') for the combination of cards passed (' + \
-                ', '.join(cards) + ')')
+                ', '.join(map(str, cards)) + ')')
 
         # If n_left is < 0 now we have too many Jacks.
         if n_left < 0:
@@ -598,10 +598,10 @@ class Game(object):
 
             if n_actions > 1:
                 self.log('{0} follows for {1} actions using: {2}'
-                        .format(p.name, n_actions, ', '.join(cards)))
+                        .format(p.name, n_actions, ', '.join(map(str, cards))))
             else:
                 self.log('{0} follows using: {1}'
-                        .format(p.name, ', '.join(cards)))
+                        .format(p.name, ', '.join(map(str, cards))))
 
         self.pump()
 
@@ -823,7 +823,7 @@ class Game(object):
             gtrutils.move_card(card, self.game_state.pool, p.clientele)
 
             if self.player_has_active_building(p, 'Bath'):
-                role = card_manager.get_role_of_card(card)
+                role = cm.get_role_of_card(card)
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
                 self.game_state.stack.push_frame('perform_role_action', p, role)
                 self.log(
@@ -853,7 +853,7 @@ class Game(object):
             gtrutils.add_card_to_zone(card, p.clientele)
 
             if self.player_has_active_building(p, 'Bath'):
-                role = card_manager.get_role_of_card(card)
+                role = cm.get_role_of_card(card)
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
                 self.game_state.stack.push_frame('perform_role_action', p, role)
                 self.log(
@@ -882,7 +882,7 @@ class Game(object):
             gtrutils.move_card(card, p.hand, p.clientele)
 
             if self.player_has_active_building(p, 'Bath'):
-                role = card_manager.get_role_of_card(card)
+                role = cm.get_role_of_card(card)
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
                 self.game_state.stack.push_frame('perform_role_action', p, role)
                 self.log(
@@ -904,25 +904,25 @@ class Game(object):
         Raises GTRError if building start is illegal.
         """
         if site is None or building is None:
-            raise GTRError('Illegal building / site (' \
-                           + str(building) + '/' + str(site)+')')
+            raise GTRError('Illegal building / site ({0!s}/{1})'
+                .format(building, site))
+
         if player.owns_building(building):
-            raise GTRError('Player already owns ' + building)
+            raise GTRError('Player already owns {0!s}.'.format(building))
 
         if site not in self.game_state.out_of_town_foundations:
-            raise GTRError('No ' +  site + ' sites left, including out of town')
+            raise GTRError('No {0} sites left, including out of town'
+                .format(site))
 
         if site not in self.game_state.in_town_foundations and \
                 not self.game_state.oot_allowed:
             raise GTRError('Starting an out of town building is not allowed.')
 
-        material = card_manager.get_material_of_card(building)
+        if not (building.material == site or building.name == 'Statue'):
+            raise GTRError('Illegal building/site combination ({0!s}/{1}).'
+                .format(building, site))
 
-        if not (material == site or building == 'Statue'):
-            raise GTRError('Illegal building/site combination (' + \
-                           building+'/'+site+').')
-
-    def check_building_add_legal(self, player, building_name, material_card):
+    def check_building_add_legal(self, player, building, material_card):
         """ Checks if the specified player is allowed to add material
         to building. This accounts for the building material, the
         site material, a player's active Road, Scriptorium, and Tower.
@@ -933,20 +933,20 @@ class Game(object):
 
         Returns if the material add is allowed, and raises GTRError if not.
         """
-        if material_card is None or building_name is None:
-            raise GTRError('Illegal add: material=' + str(material_card) +\
-                           '  building='+ building_name)
+        if material_card is None or building is None:
+            raise GTRError('Illegal add: material={0!s} building={1!s}'
+                .format(material_card, building_card))
 
         has_tower = self.player_has_active_building(player, 'Tower')
         has_road = self.player_has_active_building(player, 'Road')
         has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
 
         # This raises GTRError if building doesn't exist
-        building = player.get_building(building_name)
+        building = player.get_building(building)
 
         # The sites are 'Wood', 'Concrete', etc.
         site_mat = building.site
-        material = card_manager.get_material_of_card(material_card)
+        material = material_card.material
         found_mat = building.foundation.material
 
         if (has_tower and material == 'Rubble') or \
@@ -956,9 +956,9 @@ class Game(object):
            return
         else:
             raise GTRError(
-                    'Illegal add, material ({0}) doesn\'t '.format(material) +
-                    'match building material ({0}) '.format(found_mat) +
-                    'or site material ({0})'.format(site_mat))
+                    'Illegal add, material ({0!s}) doesn\'t match building '
+                    'material ({1!s}) or site material ({2!s})'
+                    .format(material, found_mat, site_mat))
 
 
     def perform_craftsman_action(self, player):
@@ -1060,20 +1060,21 @@ class Game(object):
             is_oot = site not in self.game_state.in_town_foundations
 
             if player.owns_building(foundation):
-                raise GTRError(player.name + ' already has a ' + foundation)
+                raise GTRError('{0} already has a {1!s}'
+                    .format(player.name, foundation))
 
             if is_oot:
                 sites = self.game_state.out_of_town_foundations
                 if site not in sites:
-                    raise GTRError(site + ' not available out of town.')
+                    raise GTRError('{0} not available out of town.'.format(site))
             else:
                 sites = self.game_state.in_town_foundations
                 if site not in sites:
-                    raise GTRError(site + ' not available in town.')
+                    raise GTRError('{0} not available in town.'.format(site))
 
             if foundation not in player.hand:
-                raise GTRError(foundation + ' card not in ' + player.name + \
-                               '\'s hand.')
+                raise GTRError('{0!s} card not in {1}\'s hand.'
+                    .format(foundation, player.name))
 
             site_card = gtrutils.get_card_from_zone(site, sites)
             foundation_card = player.hand.pop(player.hand.index(foundation))
@@ -1094,8 +1095,8 @@ class Game(object):
             # Both these raise if the card/building isn't found
             b = player.get_building(foundation)
             if b.complete:
-                raise GTRError('Cannot add to ' + foundation + \
-                               ' because it is already complete.')
+                raise GTRError('Cannot add to {0!s} because it is already complete.'
+                    .format(foundation))
 
             # Raises if material doesn't exist
             #m = gtrutils.get_card_from_zone(material, material_zone)
@@ -1106,11 +1107,11 @@ class Game(object):
             has_scriptorium = self.player_has_active_building(player, 'Scriptorium')
 
             complete = False
-            if has_scriptorium and card_manager.get_material_of_card(m) == 'Marble':
+            if has_scriptorium and cm.get_material_of_card(m) == 'Marble':
                 self.log('Player {} completed building {} using Scriptorium'.format(
                   player.name, str(b)))
                 complete = True
-            elif len(b.materials) == card_manager.get_value_of_material(b.site):
+            elif len(b.materials) == cm.get_value_of_material(b.site):
                 self.log('Player {} completed building {}'.format(player.name, str(b)))
                 complete = True
 
@@ -1262,16 +1263,15 @@ class Game(object):
 
         revealed_materials = [c.material for c in  p.revealed]
 
-        self.log('{0} demands {1}! (revealing {2})'
-            .format(p.name, ', '.join(revealed_materials), 
+        self.log('Rome demands {0}! (revealing {1})'
+            .format(', '.join(revealed_materials), 
                 ', '.join(map(str,p.revealed))))
 
         # Get cards from pool
         pool_cards = []
         for card in cards:
-            mat = card_manager.get_material_of_card(card)
             for _c in self.game_state.pool:
-                if _c.material == mat:
+                if _c.material == card.material:
                     gtrutils.move_card(_c, self.game_state.pool, p.stockpile)
                     pool_cards.append(_c)
 
@@ -1304,7 +1304,7 @@ class Game(object):
 
     def handle_givecards(self, a):
         cards = a.args
-        lg.debug('Received GIVECARDS(' + ','.join(cards)+')')
+        lg.debug('Received GIVECARDS(' + ','.join(map(str, cards))+')')
 
         p = self.game_state.active_player
 
@@ -1345,7 +1345,7 @@ class Game(object):
         """
         rev_cards = leg_p.revealed
         given_cards = list(cards)
-        c2m = card_manager.get_material_of_card
+        c2m = cm.get_material_of_card
 
         lg.debug('Moving cards for legionary. Revealed: ' + str(rev_cards) +
                 ' Given: ' + str(given_cards))
@@ -1354,7 +1354,7 @@ class Game(object):
 
         # Check that all required cards were offered.
         revealed = Counter([c.material for c in rev_cards])
-        given = Counter(map(c2m, given_cards))
+        given = Counter([c.material for c in given_cards])
         hand = Counter([c.material for c in p.hand])
 
         unmatched = revealed - given
@@ -1371,7 +1371,7 @@ class Game(object):
             gtrutils.move_card(c, p.hand, leg_p.stockpile)
 
         self.log('{0} gives cards from their hand: {1}'
-            .format(p.name, ', '.join(given_cards)))
+            .format(p.name, ', '.join(map(str, given_cards))))
 
         stockpile_copy = list(p.stockpile)
         cards_moved_from_stockpile = []
@@ -1417,12 +1417,12 @@ class Game(object):
         p = self.game_state.active_player
 
         if stockpile_card and stockpile_card not in p.stockpile:
-            raise GTRError('Card ' + stockpile_card + ' not found in ' \
-                    + p.name + '\'s stockpile.')
+            raise GTRError('Card {0!s} not found in {1}\'s stockpile.'
+                .format(stockpile_card, p.name))
 
         if hand_card and hand_card not in p.hand:
-            raise GTRError('Card ' + hand_card + ' not found in ' \
-                    + p.name + '\'s hand.')
+            raise GTRError('Card {0!s} not found in {1}\'s hand.'
+                .format(hand_card, p.name))
 
         if stockpile_card and from_deck:
             raise GTRError('Can\'t merchant from deck and from stockpile.')
@@ -1432,8 +1432,8 @@ class Game(object):
                   int(from_deck)
 
         if n_cards + len(p.vault) > self.get_vault_limit(p):
-            raise GTRError('Not enough room in ' + p.name + '\'s vault for ' + \
-                    str(n_cards) + ' cards.')
+            raise GTRError('Not enough room in {0}\'s vault for {1:d} cards.'
+                .format(p.name, n_cards))
 
         if stockpile_card:
             gtrutils.move_card(stockpile_card, p.stockpile, p.vault)
@@ -1446,7 +1446,7 @@ class Game(object):
 
         # Logging
         if stockpile_card:
-            self.log(('{0} performs Merchant, selling a {1} from the stockpile'
+            self.log(('{0} performs Merchant, selling a {1!s} from the stockpile'
                       + ' and a card from their hand.' if hand_card else '.')
                       .format(p.name, stockpile_card))
         elif from_deck:

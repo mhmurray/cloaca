@@ -75,10 +75,10 @@ class Player:
         return get_card_from_zone(card, self.camp)
 
     def owns_building(self, building):
-        """ Whether this player owns a building, complete or otherwise.
+        """Whether this player owns a building, complete or otherwise.
         The parameter building is a string.
         """
-        return building in self.get_owned_building_names()
+        return building.name in self.get_owned_building_names()
 
     def get_owned_buildings(self):
         """ Returns a list of all Building objects this player owns,
@@ -113,15 +113,26 @@ class Player:
         """
         return [b for b in self.buildings if not b.complete]
 
-    def get_building(self, building_name):
-        """ Gets the Building object from the name of the building.
+    def get_building(self, foundation):
+        """Gets the Building object from foundation card of the building.
         """
-        matches = [b for b in self.buildings if b.foundation.name == building_name]
+        matches = [b for b in self.buildings if b.foundation == foundation]
         try:
             b = matches[0]
         except IndexError:
-            raise GTRError('Player ' + self.name + ' doesn\'t own a '\
-                           + building_name)
+            raise GTRError('{0} doesn\'t own a {1!s}.'
+                .format(self.name, foundation))
+        return b
+
+    def get_building_by_name(self, foundation_name):
+        """Gets the Building object from the foundation card name.
+        """
+        matches = [b for b in self.buildings if b.foundation.name == foundation_name]
+        try:
+            b = matches[0]
+        except IndexError:
+            raise GTRError('{0} doesn\'t own a {1}.'
+                .format(self.name, foundation_name))
         return b
 
     def get_active_buildings(self):
@@ -239,7 +250,7 @@ class Player:
         #print 'Describe clientele:'
         for card in self.clientele:
             #print str(card)
-            roles.append(card_manager.get_role_of_card(card))
+            roles.append(card.role)
         cards_string = 'Clientele : ' + get_short_zone_summary(roles)
         return cards_string
 
@@ -248,7 +259,7 @@ class Player:
         """
         materials = []
         for card in self.stockpile:
-            materials.append(card_manager.get_material_of_card(card))
+            materials.append(card.material)
         cards_string = 'Stockpile : ' + get_short_zone_summary(materials)
         return cards_string
 

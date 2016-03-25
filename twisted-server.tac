@@ -5,7 +5,7 @@ from twisted.protocols.basic import NetstringReceiver
 from twisted.python import components
 from zope.interface import Interface, implements
 
-from twisted.internet import defer
+from twisted.internet.protocol import ServerFactory, Protocol
 
 from gamestate import GameState
 from message import GameAction
@@ -14,9 +14,6 @@ from server import GTRServer
 from pickle import dumps
 
 from interfaces import IGTRService, IGTRFactory
-
-def catch_error(err):
-    return "Internal error in server"
 
 class GTRProtocol(NetstringReceiver):
 
@@ -51,9 +48,33 @@ class GTRProtocol(NetstringReceiver):
                 [str(action.action)] + map(str, action.args)))
 
 
+class GTRService(service.Service):
+    """Service to handle one instance of a GTRServer.
+    """
+    implements(IGTRService)
+
+    def __init__(self, backup_file=None, load_backup_file=None):
+        self.server = GTRServer(backup_file, load_backup_file)
+
+        self.factory = None
+        self.server.send_action = lambda user, action : self.send_action(user, action)
+
+    def send_action(self, user, action):
+        """Sends a message to the user if the user exists.
+        """
+        if self.factory is not None:
+            self.factory.send_action(user, action)
+
+    def handle_action(self, user, game_id, a):
+        return self.server.handle_action(user, game_id, a)
+
 
 class GTRFactoryFromService(protocol.ServerFactory):
     """Handles the connections to clients via GTRProtocol intances.
+
+    Keeps a reference to a factory object that implements IGTRFactory.
+    This object is used to communicate with the clients via the method
+    GTRFactory.send_action(user, action).
     """
 
     implements(IGTRFactory)
@@ -91,8 +112,8 @@ components.registerAdapter(GTRFactoryFromService, IGTRService, IGTRFactory)
 
 
 application = service.Application('gtr')
-#s = GTRServer('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
-s = GTRServer('tmp/twistd_backup.dat', None)
+#s = GTRService('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
+s = GTRService('tmp/twistd_backup.dat', None)
 serviceCollection = service.IServiceCollection(application)
 internet.TCPServer(5000, IGTRFactory(s)).setServiceParent(serviceCollection)
 

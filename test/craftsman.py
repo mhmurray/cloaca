@@ -48,12 +48,11 @@ class TestCraftsman(unittest.TestCase):
         latrine = cm.get_card('Latrine')
         self.p1.hand.set_content([latrine])
 
-        a = message.GameAction(message.CRAFTSMAN, 'Latrine', None, 'Rubble')
+        a = message.GameAction(message.CRAFTSMAN, latrine, None, 'Rubble')
         self.game.handle(a)
 
         self.assertNotIn(latrine, self.p1.hand)
 
-        self.assertTrue(self.p1.owns_building('Latrine'))
         self.assertEqual(self.p1.buildings[0], Building(latrine, 'Rubble'))
 
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Latrine'))
@@ -67,7 +66,7 @@ class TestCraftsman(unittest.TestCase):
 
         self.p1.buildings = [Building(foundry, 'Brick')]
 
-        a = message.GameAction(message.CRAFTSMAN, 'Foundry', 'Atrium', None)
+        a = message.GameAction(message.CRAFTSMAN, foundry, atrium, None)
         self.game.handle(a)
 
         self.assertNotIn(atrium, self.p1.hand)
@@ -88,7 +87,7 @@ class TestCraftsman(unittest.TestCase):
 
         self.p1.buildings = [Building(temple, 'Marble', materials=[fountain])]
 
-        a = message.GameAction(message.CRAFTSMAN, 'Temple', 'Statue', None)
+        a = message.GameAction(message.CRAFTSMAN, temple, statue, None)
         self.game.handle(a)
 
         self.assertNotIn(statue, self.p1.hand)
@@ -108,7 +107,7 @@ class TestCraftsman(unittest.TestCase):
 
         self.p1.buildings = [Building(temple, 'Marble', materials=[fountain, stairway])]
 
-        a = message.GameAction(message.CRAFTSMAN, 'Temple', 'Statue', None)
+        a = message.GameAction(message.CRAFTSMAN, temple, statue, None)
         self.game.handle(a)
 
         self.assertNotIn(statue, self.p1.hand)
@@ -127,13 +126,13 @@ class TestCraftsman(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        atrium = cm.get_card('Atrium')
+        atrium, latrine = cm.get_cards(['Atrium', 'Latrine'])
         self.p1.hand.set_content([atrium])
 
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.CRAFTSMAN, 'Latrine', None, 'Rubble')
+        a = message.GameAction(message.CRAFTSMAN, latrine, None, 'Rubble')
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -150,7 +149,7 @@ class TestCraftsman(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.CRAFTSMAN, 'Atrium', None, 'Rubble')
+        a = message.GameAction(message.CRAFTSMAN, atrium, None, 'Rubble')
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -169,7 +168,7 @@ class TestCraftsman(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.CRAFTSMAN, 'Atrium', None, 'Brick')
+        a = message.GameAction(message.CRAFTSMAN, atrium, None, 'Brick')
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -186,7 +185,7 @@ class TestCraftsman(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.CRAFTSMAN, 'Foundry', 'Atrium', None)
+        a = message.GameAction(message.CRAFTSMAN, foundry, atrium, None)
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -203,7 +202,7 @@ class TestCraftsman(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game.game_state)
 
-        a = message.GameAction(message.CRAFTSMAN, 'Foundry', 'Atrium', 'Brick')
+        a = message.GameAction(message.CRAFTSMAN, foundry, atrium, 'Brick')
         self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game.game_state))
@@ -226,7 +225,7 @@ class TestFountain(unittest.TestCase):
         drawing the card.
         """
         bath = cm.get_card('Bath')
-        self.game.game_state.library.append(bath)
+        self.game.game_state.library.cards.insert(0,bath)
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
@@ -246,7 +245,7 @@ class TestFountain(unittest.TestCase):
         building with it.
         """
         bath = cm.get_card('Bath')
-        self.game.game_state.library.append(bath)
+        self.game.game_state.library.cards.insert(0,bath)
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
@@ -254,13 +253,13 @@ class TestFountain(unittest.TestCase):
         self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, False, 'Bath', None, 'Brick')
+        a = message.GameAction(message.FOUNTAIN, False, bath, None, 'Brick')
         self.game.handle(a)
 
         self.assertNotIn(bath, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
 
-        self.assertTrue(self.p1.owns_building('Bath'))
+        self.assertIn('Bath', self.p1.get_owned_building_names())
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Bath'))
 
         self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
@@ -271,7 +270,7 @@ class TestFountain(unittest.TestCase):
         a material to a building, completing it.
         """
         bath, atrium, foundry = cm.get_cards(['Bath', 'Atrium', 'Foundry'])
-        self.game.game_state.library.append(bath)
+        self.game.game_state.library.cards.insert(0,bath)
 
         self.p1.buildings.append(Building(atrium, 'Brick', materials=[foundry]))
 
@@ -281,7 +280,7 @@ class TestFountain(unittest.TestCase):
         self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, False, 'Atrium', 'Bath', None)
+        a = message.GameAction(message.FOUNTAIN, False, atrium, bath, None)
         self.game.handle(a)
 
         self.assertNotIn(bath, self.p1.hand)

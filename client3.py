@@ -32,13 +32,14 @@ shared.
 import gtrutils
 from card_manager import get_role_of_card as card2role
 from card_manager import get_material_of_card as card2mat
-import card_manager
+import card_manager as cm
 from gtrutils import get_detailed_card_summary as card2summary
 import gtr
 from building import Building
 from gamestate import GameState
 import message
 from fsm import StateMachine
+from card import Card
 
 import collections
 from collections import Counter
@@ -152,8 +153,8 @@ class LaborerActionBuilder(FSMActionBuilder):
     def __init__(self, pool, hand, has_dock=False):
         FSMActionBuilder.__init__(self)
 
-        self.hand = sorted(hand, card_manager.cmp_jacks_first)
-        self.pool = sorted(pool, card_manager.cmp_jacks_first)
+        self.hand = sorted(hand, cm.cmp_jacks_first)
+        self.pool = sorted(pool, cm.cmp_jacks_first)
 
         self.has_dock = has_dock
 
@@ -211,7 +212,7 @@ class LegionaryActionBuilder(FSMActionBuilder):
         FSMActionBuilder.__init__(self)
 
         self.hand = [Choice(c, card2summary(c)) for c in \
-                     sorted(hand, card_manager.cmp_jacks_first) \
+                     sorted(hand, cm.cmp_jacks_first) \
                      if c != 'Jack']
 
         self.cards = []
@@ -295,8 +296,8 @@ class GiveCardsActionBuilder(FSMActionBuilder):
 
         FSMActionBuilder.__init__(self)
         self.hand = [Choice(c, card2summary(c)) for c in \
-                     sorted(hand, card_manager.cmp_jacks_first) \
-                     if c != 'Jack']
+                     sorted(hand, cm.cmp_jacks_first) \
+                     if c.name != 'Jack']
         self.stockpile = list(stockpile)
         self.clientele = list(clientele)
 
@@ -350,7 +351,7 @@ class GiveCardsActionBuilder(FSMActionBuilder):
                 mats.remove(m)
 
         for choice in self.choices:
-            choice.selectable = card2mat(choice.item) in mats
+            choice.selectable = choice.item.material in mats
 
         if len(self.cards) > 1:
             self.choices.append(Choice('Undo', 'Undo'))
@@ -367,14 +368,14 @@ class GiveCardsActionBuilder(FSMActionBuilder):
         leg_mats = Counter(self.mats)
         
         # Subtract selected cards to get the remaining required materials
-        leg_mats.subtract(map(card2mat, self.cards))
+        leg_mats.subtract([c.material for c in self.cards])
 
         # Compare required materials with hand. There should be no overlap
         materials = list(leg_mats.elements())
 
         # If there's no overlap with remaining cards in hand, this subtraction
         # shouldn't do anything to leg_mats
-        leg_mats.subtract([card2mat(c.item) for c in self.hand if c.selectable])
+        leg_mats.subtract([c.item.material for c in self.hand if c.selectable])
         remaining_mats = list(leg_mats.elements())
 
         return len(materials) == len(remaining_mats)
@@ -441,8 +442,8 @@ class MerchantActionBuilder(FSMActionBuilder):
     def __init__(self, stockpile, hand, has_atrium, has_basilica):
         FSMActionBuilder.__init__(self)
 
-        self.hand = sorted(hand, card_manager.cmp_jacks_first)
-        self.stockpile_cards = sorted(stockpile, card_manager.cmp_jacks_first)
+        self.hand = sorted(hand, cm.cmp_jacks_first)
+        self.stockpile_cards = sorted(stockpile, cm.cmp_jacks_first)
 
         self.has_basilica = has_basilica
         self.has_atrium = has_atrium
@@ -530,7 +531,7 @@ class RoleActionBuilder(FSMActionBuilder):
         FSMActionBuilder.__init__(self)
         # A list of cards in the hand and whether they've been used.
         self.hand = [Choice(c, card2summary(c), True) for c in \
-                           sorted(hand, card_manager.cmp_jacks_first)]
+                           sorted(hand, Card.compare_jacks_first)]
 
         self.role = role
         self.following = role is not None
@@ -564,20 +565,21 @@ class RoleActionBuilder(FSMActionBuilder):
         self.fsm.pump(None)
 
     def get_hand_card(self, card):
-        """Gets the Choice object corresponding to an unselected card.
+        """Gets the Choice object corresponding to an unselected card name.
 
         If the selectable card does not exist, raises InvalidChoiceException.
         """
         for choice in self.hand:
-            if choice.item == card and choice.selectable:
+            if isinstance(choice.item, Card) and choice.item.name == card and choice.selectable:
                 return choice
 
         raise InvalidChoiceException()
 
 
     def select_card_action(self, card):
-        """Finds the choice corresponding to card in the list of card
-        in hand, and marks it as selected. Appends card to action_unit list.
+        """Finds the choice corresponding to card name in the list of cards in
+        hand, and marks it as selected. Appends card object to action_unit
+        list.
 
         Raises InvalidChoiceException if the card is not in hand or is
         not selectable.
@@ -585,7 +587,7 @@ class RoleActionBuilder(FSMActionBuilder):
         choice = self.get_hand_card(card)
 
         choice.selectable = False
-        self.action_units.append([card])
+        self.action_units.append([choice.item])
 
 
     def finish_petition(self):
@@ -654,14 +656,14 @@ class RoleActionBuilder(FSMActionBuilder):
             new_state = 'FIRST_PETITION'
 
         else:
-            if self.role is None and card == 'Jack':
+            if self.role is None and card.name == 'Jack':
                 new_state = 'JACK_ROLE'
 
             else:
-                if self.role is None and card != 'Jack':
-                    self.role = card2role(card)
+                if self.role is None and card.name != 'Jack':
+                    self.role = card.role
 
-                self.select_card_action(card)
+                self.select_card_action(card.name)
 
                 new_state = 'PALACE_CARDS' if self.has_palace else 'FINISHED'
 
@@ -669,7 +671,7 @@ class RoleActionBuilder(FSMActionBuilder):
 
 
     def jack_role_arrival(self):
-        self.choices = [Choice(r, r, True) for r in card_manager.get_all_roles()]
+        self.choices = [Choice(r, r, True) for r in cm.get_all_roles()]
         self.prompt = 'Select role for Jack'
 
 
@@ -683,7 +685,7 @@ class RoleActionBuilder(FSMActionBuilder):
 
 
     def petition_role_arrival(self):
-        self.choices = [Choice(r, r, True) for r in card_manager.get_all_roles()]
+        self.choices = [Choice(r, r, True) for r in cm.get_all_roles()]
         self.prompt = 'Select role for Petition'
 
 
@@ -858,13 +860,13 @@ class ArchitectActionBuilder(FSMActionBuilder):
 
         self.stockpile = sorted(stockpile)
         self.pool = sorted(pool)
-        self.hand = sorted(hand, card_manager.cmp_jacks_first)
+        self.hand = sorted(hand, cm.cmp_jacks_first)
         self.sites_allowed = set(in_town_sites)
         if oot_allowed:
             self.sites_allowed.update(out_of_town_sites)
 
-        self.complete_buildings = [b for b in buildings if b.completed]
-        self.incomplete_buildings = [b for b in buildings if not b.completed]
+        self.complete_buildings = [b for b in buildings if b.complete]
+        self.incomplete_buildings = [b for b in buildings if not b.complete]
 
         self.has_archway = has_archway
         self.has_road = has_road
@@ -898,8 +900,8 @@ class ArchitectActionBuilder(FSMActionBuilder):
 
 
     def building_arrival(self):
-        stockpile_materials = map(card2mat, self.stockpile)
-        pool_materials = map(card2mat, self.pool)
+        stockpile_materials = [c.material for c in self.stockpile]
+        pool_materials = [c.material for c in self.pool]
 
         available_materials = list(stockpile_materials)
         if self.has_archway:
@@ -907,15 +909,23 @@ class ArchitectActionBuilder(FSMActionBuilder):
 
 
         self.choices = []
+
+        #game_lg.info(self.incomplete_buildings)
         
         for b in self.incomplete_buildings:
-            material = card2mat(b.foundation)
+            material = b.foundation.material
             site_material = b.site
 
-            can_add = self.has_road and 'Stone' in (material, site_material) and len(available_materials) or \
-                      self.has_tower and 'Rubble' in available_materials or \
-                      material in available_materials or site_material in available_materials or \
-                      self.has_scriptorium and 'Marble' in available_materials
+            stone = (self.has_road and 'Stone' in (material, site_material)
+                            and len(available_materials))
+            tower = self.has_tower and 'Rubble' in available_materials
+            matches = (material in available_materials or
+                                site_material in available_materials)
+            scriptorium = self.has_scriptorium and 'Marble' in available_materials
+
+            #game_lg.info(str([b.foundation.name, stone, tower, matches, scriptorium]))
+
+            can_add = stone or tower or matches or scriptorium
 
             self.choices.append(Choice(b, str(b), can_add))
 
@@ -950,19 +960,21 @@ class ArchitectActionBuilder(FSMActionBuilder):
         if self.has_scriptorium:
             okay_mats.add('Marble')
 
-        materials = card2mat(self.building.foundation), self.building.site
+        materials = self.building.foundation.material, self.building.site
         okay_mats.update(materials)
 
         if self.has_road and 'Stone' in materials:
-            okay_mats = set(card_manager.get_materials())
+            okay_mats = set(cm.get_materials())
 
-        self.choices = [Choice(c, card2summary(c), card2mat(c) in okay_mats)
+        # Choices list items are (bool, Card) where the boolean indicates if the 
+        # Card is in the pool.
+        self.choices = [Choice((False,c), card2summary(c), c.material in okay_mats)
                         for c in self.stockpile]
 
         if self.has_archway:
             self.choices.extend(
-                    [Choice('[POOL]'+c, '[POOL] '+ card2summary(c),
-                        card2mat(c) in okay_mats) for c in self.pool])
+                    [Choice((True,c), '[POOL] '+ card2summary(c),
+                        c.material in okay_mats) for c in self.pool])
 
             self.prompt = 'Select material from stockpile or pool to add to building ' + str(self.building)
         else:
@@ -976,9 +988,9 @@ class ArchitectActionBuilder(FSMActionBuilder):
             self.building = None
             return 'BUILDING'
 
-        elif choice.startswith('[POOL]'):
-            self.from_pool = True
-            choice = choice[6:]
+        else:
+            self.from_pool = choice[0]
+            choice = choice[1]
 
         self.material = choice
 
@@ -987,9 +999,10 @@ class ArchitectActionBuilder(FSMActionBuilder):
 
     def foundation_arrival(self):
 
-        card_okay = lambda c: c != 'Jack' and card2mat(c) in self.sites_allowed and \
-                c not in map(str, self.complete_buildings+self.incomplete_buildings) \
-                or c == 'Statue'
+        def card_okay(c):
+            return c.name != 'Jack' and c.material in self.sites_allowed and \
+                c.name not in map(str, self.complete_buildings+self.incomplete_buildings) \
+                or c.name == 'Statue'
 
         self.choices = [Choice(c, card2summary(c)) for c in self.hand if card_okay(c)]
         self.choices.append(Choice('Cancel', 'Cancel'))
@@ -1008,7 +1021,7 @@ class ArchitectActionBuilder(FSMActionBuilder):
                 new_state = 'SITE'
 
             else:
-                self.site = card2mat(self.building.foundation)
+                self.site = self.building.foundation.material
                 new_state = 'FINISHED'
 
         return new_state
@@ -1016,7 +1029,7 @@ class ArchitectActionBuilder(FSMActionBuilder):
 
     def site_arrival(self):
         self.choices = [Choice(c, c+' Site', c in self.sites_allowed) for c in \
-                        card_manager.get_materials()]
+                        cm.get_materials()]
 
         self.prompt = 'Select a site to start the Statue on'
 
@@ -1030,7 +1043,7 @@ class ArchitectActionBuilder(FSMActionBuilder):
         self.done = True
         self.action = message.GameAction(
                 message.ARCHITECT,
-                str(self.building),
+                self.building.foundation if self.building else None,
                 self.material,
                 self.site,
                 self.from_pool)
@@ -1048,14 +1061,14 @@ class CraftsmanActionBuilder(FSMActionBuilder):
         FSMActionBuilder.__init__(self)
 
 
-        self.hand = sorted(hand, card_manager.cmp_jacks_first)
+        self.hand = sorted(hand, cm.cmp_jacks_first)
 
         self.sites_allowed = set(in_town_sites)
         if oot_allowed:
             self.sites_allowed.update(out_of_town_sites)
 
-        self.complete_buildings = [b for b in buildings if b.completed]
-        self.incomplete_buildings = [b for b in buildings if not b.completed]
+        self.complete_buildings = [b for b in buildings if b.complete]
+        self.incomplete_buildings = [b for b in buildings if not b.complete]
 
         self.has_road = has_road
         self.has_tower = has_tower
@@ -1085,14 +1098,14 @@ class CraftsmanActionBuilder(FSMActionBuilder):
 
     
     def building_arrival(self):
-        materials = [card2mat(c) for c in self.hand if c != 'Jack']
+        materials = [c.material for c in self.hand if c != 'Jack']
 
         available_materials = list(materials)
 
         self.choices = []
         
         for b in self.incomplete_buildings:
-            material = card2mat(b.foundation)
+            material = b.foundation.material
             site_material = b.site
 
             can_add = self.has_road and 'Stone' in (material, site_material) and len(available_materials) or \
@@ -1132,13 +1145,13 @@ class CraftsmanActionBuilder(FSMActionBuilder):
         if self.has_scriptorium:
             okay_mats.add('Marble')
 
-        materials = card2mat(self.building.foundation), self.building.site
+        materials = self.building.foundation.material, self.building.site
         okay_mats.update(materials)
 
         if self.has_road and 'Stone' in materials:
-            okay_mats = set(card_manager.get_materials())
+            okay_mats = set(cm.get_materials())
 
-        self.choices = [Choice(c, card2summary(c), c != 'Jack' and card2mat(c) in okay_mats)
+        self.choices = [Choice(c, card2summary(c), c != 'Jack' and c.material in okay_mats)
                         for c in self.hand]
 
         self.choices.append(Choice('Cancel', 'Cancel'))
@@ -1158,9 +1171,10 @@ class CraftsmanActionBuilder(FSMActionBuilder):
 
     def foundation_arrival(self):
 
-        card_okay = lambda c: c != 'Jack' and card2mat(c) in self.sites_allowed and \
-                c not in map(str, self.complete_buildings+self.incomplete_buildings) \
-                or c == 'Statue'
+        def card_okay(c): 
+            return c.name != 'Jack' and c.material in self.sites_allowed and \
+                c.name not in map(str, self.complete_buildings+self.incomplete_buildings) \
+                or c.name == 'Statue'
 
         self.choices = [Choice(c, card2summary(c)) for c in self.hand if card_okay(c)]
         self.choices.append(Choice('Cancel', 'Cancel'))
@@ -1179,7 +1193,7 @@ class CraftsmanActionBuilder(FSMActionBuilder):
                 new_state = 'SITE'
 
             else:
-                self.site = card2mat(self.building.foundation)
+                self.site = self.building.foundation.material
                 new_state = 'FINISHED'
 
         return new_state
@@ -1187,7 +1201,7 @@ class CraftsmanActionBuilder(FSMActionBuilder):
 
     def site_arrival(self):
         self.choices = [Choice(c, c+' Site', c in self.sites_allowed) for c in \
-                        card_manager.get_materials()]
+                        cm.get_materials()]
 
         self.prompt = 'Select a site to start the Statue on'
 
@@ -1201,7 +1215,7 @@ class CraftsmanActionBuilder(FSMActionBuilder):
         self.done = True
         self.action = message.GameAction(
                 message.CRAFTSMAN,
-                str(self.building),
+                self.building.foundation if self.building else None,
                 self.material,
                 self.site)
 
@@ -1458,7 +1472,7 @@ class Client(object):
             building = p.fountain_card
 
             if building == 'Statue':
-                sites = card_manager.get_materials()
+                sites = cm.get_materials()
                 site_index = self.choices_dialog(sites)
                 site = sites[site_index]
             else:
@@ -1542,7 +1556,7 @@ class Client(object):
         #The logic needs to be converted into an action builder
         p = self.get_player()
         possible_buildings = [(pl, b) for pl in self.game.game_state.players
-                              for b in pl.get_completed_buildings()
+                              for b in pl.get_complete_buildings()
                               if pl is not p
                               ]
         possible_buildings = sorted(possible_buildings, None, lambda x: x[0].name.lower() + str(x[1]).lower())
@@ -1606,7 +1620,7 @@ class Client(object):
         immune = has_wall or (has_palisade and not has_bridge)
 
         self.builder = GiveCardsActionBuilder(
-                map(card2mat, legionary_cards),
+                map(lambda x: x.material, legionary_cards),
                 p.hand,
                 p.stockpile,
                 p.clientele,
