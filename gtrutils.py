@@ -100,9 +100,13 @@ def check_petition_combos(
     was led, and there are 3 Merchant cards used to lead/follow, this would
     be 3.
 
-    n_off_role is the number of cards not of the role that was led. If
-    Merchant was led, and 5 Laborers were used for petitions, this
-    would be 5.
+    n_off_role is a list with entries for the number of cards of roles other
+    than the one that was led. If Merchant was led, and 5 Laborers were used
+    for petitions, this would be (5,). If Merchant was led, and 3 Laborers and
+    2 Craftsmen were supplied as petitions, this would be (3,2). Note that the
+    order doesn't matter, since we don't care about the role of the petition
+    cards, just that they match. If no off-role cards are provided, this should
+    be an empty list.
 
     The flags two_card and three_card change the number of cards allowed in a
     petition. In a normal (Imperium) game, the default petition size is 3. With
@@ -211,29 +215,52 @@ def check_petition_combos(
     # the number of actions is n_off/2. The maximum number of on-role
     # actions is n_on and the minimum is (n_on+1)/2. Anything in between is also
     # allowed
+    
+    # Check that n_off_role are in bounds (0, or >1)
+    for i in n_off_role:
+        if i < 0 or i == 1: return False
 
-    if n_off_role == 1 or n_off_role<0 or n_on_role<0 or n_actions<0:
+    n_off_role = [i for i in n_off_role if i != 0]
+
+    if n_on_role<0 or n_actions<0:
         return False
 
-    elif not two_card and not three_card:
-        return (n_off_role == 0 and n_actions == n_on_role)
+    if not two_card and not three_card:
+        return (len(n_off_role) == 0 and n_actions == n_on_role)
 
     elif two_card and not three_card:
-        c1 = (n_off_role%2 == 0)
-        c2 = (n_on_role+1)/2 + n_off_role/2 <= n_actions
-        c3 = n_actions <= n_on_role + n_off_role/2
-        return c1 and c2 and c3
+        # Number of off-role actions must be n_off_role[i]/2
+        n_off_role_actions = 0
+        for i in n_off_role:
+            if i%2 != 0: return False
+            n_off_role_actions += i/2
+
+        c1 = (n_on_role+1)/2 + n_off_role_actions <= n_actions
+        c2 = n_actions <= n_on_role + n_off_role_actions
+        return c1 and c2
 
     elif not two_card and three_card:
-        c1 = n_off_role/3 + n_on_role/3 + n_on_role%3 <= n_actions
-        c2 = n_actions <= n_on_role + n_off_role/3
-        c3 = (n_actions - n_off_role/3 - n_on_role/3 - n_on_role%3) % 2 == 0
-        c4 = n_off_role%3 == 0
-        return c1 and c2 and c3 and c4
+        # Number of off-role actions must be n_off_role[i]/3
+        n_off_role_actions = 0
+        for i in n_off_role:
+            if i%3 != 0: return False
+            n_off_role_actions += i/3
+
+        c1 = n_off_role_actions + n_on_role/3 + n_on_role%3 <= n_actions
+        c2 = n_actions <= n_on_role + n_off_role_actions
+        c3 = (n_actions - n_off_role_actions - n_on_role/3 - n_on_role%3) % 2 == 0
+        return c1 and c2 and c3
 
     else: #two_card and three_card:
-        c1 = (n_off_role+2)/3 + (n_on_role+2)/3 <= n_actions
-        c2 = n_actions <= (n_on_role + n_off_role/2)
+        # n_off_role_actions_min = (n_off+2)/3, max = n_off/2
+        n_off_role_actions_min = 0
+        n_off_role_actions_max = 0
+        for i in n_off_role:
+            n_off_role_actions_min += (i+2)/3
+            n_off_role_actions_max += i/2
+
+        c1 = n_off_role_actions_min + (n_on_role+2)/3 <= n_actions
+        c2 = n_actions <= (n_on_role + n_off_role_actions_max)
         return c1 and c2
 
 

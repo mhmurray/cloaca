@@ -159,6 +159,257 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
 
 
+    def test_petition(self):
+        """Tests petition with 3 orders cards.
+        """
+        cards = cm.get_cards(['Road']*3)
+        self.p1.hand.set_content(cards)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.p1.n_camp_actions, 1)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertNotIn('Road', self.p1.hand)
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+
+    def test_petition_for_same_role(self):
+        """Tests petition with 3 orders cards that match the role
+        selected for the Petition. eg. 3 Road cards to Petition for Laborer.
+        """
+        cards = cm.get_cards(['Road']*3)
+        self.p1.hand.set_content(cards)
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Laborer')
+        self.assertEqual(self.p1.n_camp_actions, 1)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertNotIn('Road', self.p1.hand)
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+
+    def test_petition_with_circus_and_two_cards(self):
+        """Tests petition with 2 orders cards using a Circus.
+        """
+        circus, dock = cm.get_cards(['Circus', 'Dock'])
+        self.p1.buildings = [Building(circus, 'Wood', materials=[dock], complete=True)]
+
+        cards = cm.get_cards(['Road']*2)
+        self.p1.hand.set_content(cards)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.p1.n_camp_actions, 1)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertNotIn('Road', self.p1.hand)
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+
+    def test_petition_with_circus_and_three_cards(self):
+        """Tests petition with 3 orders cards despiting having a Circus.
+        """
+        circus, dock = cm.get_cards(['Circus', 'Dock'])
+        self.p1.buildings = [Building(circus, 'Wood', materials=[dock], complete=True)]
+
+        cards = cm.get_cards(['Road']*3)
+        self.p1.hand.set_content(cards)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.p1.n_camp_actions, 1)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertNotIn('Road', self.p1.hand)
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+
+    def test_petition_with_too_few_cards(self):
+        """Tests petition with 2 orders cards without a circus. This illegal
+        action should leave the game state unchanged.
+        """
+        cards = cm.get_cards(['Road']*2)
+        self.p1.hand.set_content(cards)
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
+    def test_petition_with_nonmatching_cards(self):
+        """Tests petition with 3 orders cards of different roles. This illegal
+        action should leave the game state unchanged.
+        """
+        cards = cm.get_cards(['Road', 'Insula', 'Atrium'])
+        self.p1.hand.set_content(cards)
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
+    def test_petition_with_too_many_cards(self):
+        """Tests petition with 4 orders cards. This illegal
+        action should leave the game state unchanged.
+        """
+        cards = cm.get_cards(['Road', 'Insula', 'Road', 'Road'])
+        self.p1.hand.set_content(cards)
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
+    def test_petition_with_nonexistent_cards(self):
+        """Tests petition with cards not in players hand. This illegal
+        action should leave the game state unchanged.
+        """
+        cards = cm.get_cards(['Road', 'Road', 'Road'])
+        #self.p1.hand.set_content(cards)
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+class TestPalace(unittest.TestCase):
+    """Test leading multiple actions with Palace.
+    """
+
+    def setUp(self):
+        """ This is run prior to every test.
+        """
+        self.game = test_setup.simple_two_player()
+        self.p1, self.p2 = self.game.game_state.players
+
+        palace, statue = cm.get_cards(['Palace', 'Statue'])
+        self.p1.buildings = [Building(palace, 'Marble', materials=[statue], complete=True)]
+        
+        # Indicate that we want to lead
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+
+    def test_petition_with_palace_3_actions(self):
+        """Tests petition with multiple lead actions using Palace.
+
+        Using 6 Docks and 3 Roads allows 3, 5, or 7 actions.
+        """
+        cards = cm.get_cards(['Road']*3 + ['Dock']*6)
+        self.p1.hand.set_content(cards)
+
+        n_actions = 3
+        a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.p1.n_camp_actions, n_actions)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertFalse(self.p1.hand.contains(['Road','Dock']))
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+    def test_petition_with_palace_5_actions(self):
+        """Tests petition with multiple lead actions using Palace.
+
+        Using 6 Docks and 3 Roads allows 3, 5, or 7 actions.
+        """
+        cards = cm.get_cards(['Road']*3 + ['Dock']*6)
+        self.p1.hand.set_content(cards)
+
+        n_actions = 5
+        a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.p1.n_camp_actions, n_actions)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertFalse(self.p1.hand.contains(['Road','Dock']))
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+    def test_petition_with_palace_7_actions(self):
+        """Tests petition with multiple lead actions using Palace.
+
+        Using 6 Docks and 3 Roads allows 3, 5, or 7 actions.
+        """
+        cards = cm.get_cards(['Road']*3 + ['Dock']*6)
+        self.p1.hand.set_content(cards)
+
+        n_actions = 7
+        a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.p1.n_camp_actions, n_actions)
+        self.assertTrue(self.p1.camp.contains(cards))
+        self.assertFalse(self.p1.hand.contains(['Road','Dock']))
+        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+
+    def test_petition_with_illegal_n_actions(self):
+        """Tests petition with multiple lead actions using Palace.
+
+        Using 6 Docks and 3 Roads allows 3, 5, or 7 actions.
+        """
+        cards = cm.get_cards(['Road']*3 + ['Dock']*6)
+        self.p1.hand.set_content(cards)
+
+        n_actions = 6
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
+    def test_petition_with_illegal_petition_size(self):
+        """Tests petition with multiple lead actions using Palace.
+
+        Using 6 Docks and 3 Roads allows 3, 5, or 7 actions.
+        """
+        cards = cm.get_cards(['Road']*3 + ['Dock']*4)
+        self.p1.hand.set_content(cards)
+
+        mon = Monitor()
+        mon.modified(self.game.game_state)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 2, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 4, *cards)
+        self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game.game_state))
+
+
 class TestFollow(unittest.TestCase):
     """ Test handling following mechanics
     """

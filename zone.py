@@ -84,15 +84,13 @@ class Zone(object):
         """
         if len(cards) == 0:
             return True
-        else:
-            is_obj = type(cards[0]) == Card
 
-        if is_obj:
+        if type(cards[0]) is Card:
             return self.intersection(cards) == Counter(cards)
 
         else:
-            c = Counter(map(lambda x: x.name, self.cards))
-            h = Counter(cards)
+            h = Counter(map(lambda x: x.name, self.cards))
+            c = Counter(cards)
 
             return (c & h) == c # intersection
 

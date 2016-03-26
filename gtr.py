@@ -489,6 +489,13 @@ class Game(object):
         role, n_actions = a.args[0:2]
         cards = a.args[2:]
 
+        # This will raise GTRError if the cards don't check out.
+        self.check_action_units(p, role, n_actions, cards)
+
+        if not p.hand.contains(cards):
+            raise GTRError('Cards specified to lead role not in hand: {0}.'
+                .format(', '.join(map(str, cards))))
+
         self.game_state.role_led = role
         p.n_camp_actions = n_actions
         for c in cards:
@@ -541,25 +548,27 @@ class Game(object):
         if n_actions <= 0:
             raise GTRError('Cannot follow with 0 actions.')
 
-        if has_palace and n_actions > 1:
+        if not has_palace and n_actions > 1:
             raise GTRError(
                     'Cannot follow with more than 1 action without a Palace.')
 
         n_left = n_actions
-        n_on = 0
-        n_off = 0
+        n_jacks = 0
+        for c in cards:
+            if c.name == 'Jack': n_jacks += 1
+
+        role_counter = Counter([c.role for c in cards if c.name != 'Jack'])
         
         # Subtract off Jacks and actions one-for-one. Determine number of
         # cards on-role and off-role for the role that was led.
-        for c in cards:
-            if c.name == 'Jack':
-                n_left -= 1
-            elif c.role == role_led:
-                n_on += 1
-            elif c.role != role_led:
-                n_off += 1
-            else:
-                raise GTRError('Invalid card: ' + c)
+        n_left -= n_jacks
+
+        n_on = role_counter[role_led]
+
+        n_off_list = []
+        for role in cm.get_all_roles():
+            if role != role_led:
+                n_off_list.append(role_counter[role])
 
         invalid_combo_error = GTRError(
                 'Invalid n_actions (' + str(n_actions) + \
@@ -570,8 +579,8 @@ class Game(object):
         if n_left < 0:
             raise invalid_combo_error
 
-        # This will allow n_left = n_on = n_off = 0
-        if not check_petition_combos(n_left, n_on, n_off, has_circus, True):
+        # This will allow n_left = n_on = 0 and n_off = []
+        if not check_petition_combos(n_left, n_on, n_off_list, has_circus, True):
             raise invalid_combo_error
         
 
@@ -594,7 +603,7 @@ class Game(object):
 
             p.n_camp_actions = n_actions
             for c in cards:
-                gtrutils.move_card(c, p.hand, p.camp)
+                p.hand.move_card(c, p.camp)
 
             if n_actions > 1:
                 self.log('{0} follows for {1} actions using: {2}'
