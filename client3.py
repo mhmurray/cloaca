@@ -188,7 +188,7 @@ class LaborerActionBuilder(FSMActionBuilder):
 
 
     def from_hand_arrival(self):
-        self.choices = [Choice(c, card2summary(c), c != 'Jack') for c in self.hand]
+        self.choices = [Choice(c, card2summary(c), c.name != 'Jack') for c in self.hand]
         self.choices.append(Choice(None, 'Skip card from hand', True))
         self.prompt = 'Performing Laborer. Select card from hand'
 
@@ -213,7 +213,7 @@ class LegionaryActionBuilder(FSMActionBuilder):
 
         self.hand = [Choice(c, card2summary(c)) for c in \
                      sorted(hand, cm.cmp_jacks_first) \
-                     if c != 'Jack']
+                     if c.name != 'Jack']
 
         self.cards = []
         self.n_max = n_legionary_actions
@@ -486,7 +486,7 @@ class MerchantActionBuilder(FSMActionBuilder):
 
 
     def from_hand_arrival(self):
-        self.choices = [Choice(c, card2summary(c), c != 'Jack') for c in self.hand]
+        self.choices = [Choice(c, card2summary(c), c.name != 'Jack') for c in self.hand]
         self.choices.append(Choice(None, 'Skip card from hand'))
         self.prompt = 'Select card from hand for Merchant action (Basilica)'
 
@@ -818,7 +818,7 @@ class RoleActionBuilder(FSMActionBuilder):
         """
         petition_cpy = list(self.petition_cards)
         if self.petition_cards:
-            petition_role = card2role(self.petition_cards[0])
+            petition_role = self.petition_cards[0].role
         else:
             petition_role = None
 
@@ -828,10 +828,10 @@ class RoleActionBuilder(FSMActionBuilder):
             card = choice.item
             selectable = choice.selectable
 
-            role_mismatch = petition_role is not None and card != 'Jack' and \
-                petition_role != card2role(card)
+            role_mismatch = petition_role is not None and card.name != 'Jack' and \
+                petition_role != card.role
 
-            if card == 'Jack':
+            if card.name == 'Jack':
                 choices.append(Choice(card, 'Jack', False))
 
             elif role_mismatch or not selectable:
@@ -1098,7 +1098,7 @@ class CraftsmanActionBuilder(FSMActionBuilder):
 
     
     def building_arrival(self):
-        materials = [c.material for c in self.hand if c != 'Jack']
+        materials = [c.material for c in self.hand if c.name != 'Jack']
 
         available_materials = list(materials)
 
@@ -1151,7 +1151,7 @@ class CraftsmanActionBuilder(FSMActionBuilder):
         if self.has_road and 'Stone' in materials:
             okay_mats = set(cm.get_materials())
 
-        self.choices = [Choice(c, card2summary(c), c != 'Jack' and c.material in okay_mats)
+        self.choices = [Choice(c, card2summary(c), c.name != 'Jack' and c.material in okay_mats)
                         for c in self.hand]
 
         self.choices.append(Choice('Cancel', 'Cancel'))
@@ -1311,8 +1311,13 @@ class Client(object):
         """Asks whether the player wants to think or lead at the start of their
         turn.
         """
-        self.builder = SingleChoiceActionBuilder(message.THINKERORLEAD,
-                         [Choice(True, 'Thinker'), Choice(False, 'Lead a role')])
+        p = self.get_player()
+        if len(p.hand) == 0:
+            choices = [Choice(True, 'Thinker'), Choice(False, 'Lead a role', False)]
+        else:
+            choices = [Choice(True, 'Thinker'), Choice(False, 'Lead a role')]
+
+        self.builder = SingleChoiceActionBuilder(message.THINKERORLEAD, choices)
 
 
     def action_usesenate(self):
@@ -1385,8 +1390,11 @@ class Client(object):
 
     def action_patronfrompool(self):
         p = self.get_player()
+        limit = self.game.get_clientele_limit(p)
+        clientele_full = len(p.clientele) >= limit
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMPOOL,
-            [ Choice(c, card2summary(c)) for c in sorted(self.game.game_state.pool) ] + \
+            [ Choice(c, card2summary(c), not clientele_full) for c\
+                    in sorted(self.game.game_state.pool) ] + \
             [ Choice(None, 'Skip Patron from pool') ])
 
         self.builder.prompt = \
@@ -1396,8 +1404,10 @@ class Client(object):
 
     def action_patronfromdeck(self):
         p = self.get_player()
+        limit = self.game.get_clientele_limit(p)
+        clientele_full = len(p.clientele) >= limit
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMDECK,
-            [ Choice(True, 'Patron from the deck'),
+            [ Choice(True, 'Patron from the deck', not clientele_full),
               Choice(False, 'Skip Patron from deck') ])
 
         self.builder.prompt = \
@@ -1407,9 +1417,11 @@ class Client(object):
 
     def action_patronfromhand(self):
         p = self.get_player()
-        cards = sorted([c for c in hand if c != 'Jack'])
+        limit = self.game.get_clientele_limit(p)
+        clientele_full = len(p.clientele) >= limit
+        cards = sorted([c for c in hand if c.name != 'Jack'])
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMHAND,
-            [ Choice(c, card2summary(c)) for c in cards ] +
+            [ Choice(c, card2summary(c), not clientele_full) for c in cards ] +
             [ Choice(None, 'Skip Patron from hand') ])
 
         self.builder.prompt = \
