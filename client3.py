@@ -1250,7 +1250,7 @@ class Client(object):
 
         self.game.game_state = gs
 
-        ap = self.game.game_state.get_active_player_index()
+        ap = self.game.game_state.active_player_index
         if self.player_id == ap:
             game_lg.debug('It\'s your turn')
 
@@ -1272,7 +1272,7 @@ class Client(object):
         game_lg.debug('Making selection for client: ' + str(choice))
 
         # The GUI uses lists indexed from 1, but we need 0-indexed
-        if self.player_id != self.game.game_state.get_active_player_index():
+        if self.player_id != self.game.game_state.active_player_index:
             game_lg.info('It\'s not your turn')
             return
 
@@ -1337,7 +1337,7 @@ class Client(object):
         """
         p = self.get_player()
 
-        n_cards = max(self.game.get_max_hand_size(p) - len(p.hand), 1)
+        n_cards = max(self.game.max_hand_size(p) - len(p.hand), 1)
         cards_str = '{0:d} card{1}'.format(n_cards, 's' if n_cards==1 else '')
 
         self.builder = SingleChoiceActionBuilder(message.THINKERTYPE,
@@ -1390,7 +1390,7 @@ class Client(object):
 
     def action_patronfrompool(self):
         p = self.get_player()
-        limit = self.game.get_clientele_limit(p)
+        limit = self.game.clientele_limit(p)
         clientele_full = len(p.clientele) >= limit
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMPOOL,
             [ Choice(c, card2summary(c), not clientele_full) for c\
@@ -1399,12 +1399,12 @@ class Client(object):
 
         self.builder.prompt = \
             'Performing Patron, choose a client from pool (Clientele {}/{})'.format(
-                str(p.get_n_clients()), str(self.game.get_clientele_limit(p)))
+                str(p.n_clients()), str(self.game.clientele_limit(p)))
 
 
     def action_patronfromdeck(self):
         p = self.get_player()
-        limit = self.game.get_clientele_limit(p)
+        limit = self.game.clientele_limit(p)
         clientele_full = len(p.clientele) >= limit
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMDECK,
             [ Choice(True, 'Patron from the deck', not clientele_full),
@@ -1412,12 +1412,12 @@ class Client(object):
 
         self.builder.prompt = \
             'Performing Patron, take a card from the deck? (Clientele {}/{})'.format(
-                str(p.get_n_clients()), str(self.game.get_clientele_limit(p)))
+                str(p.n_clients()), str(self.game.clientele_limit(p)))
 
 
     def action_patronfromhand(self):
         p = self.get_player()
-        limit = self.game.get_clientele_limit(p)
+        limit = self.game.clientele_limit(p)
         clientele_full = len(p.clientele) >= limit
         cards = sorted([c for c in hand if c.name != 'Jack'])
         self.builder = SingleChoiceActionBuilder(message.PATRONFROMHAND,
@@ -1426,7 +1426,7 @@ class Client(object):
 
         self.builder.prompt = \
             'Performing Patron, choose a client from pool (Clientele {}/{})'.format(
-                str(p.get_n_clients()), str(self.game.get_clientele_limit(p)))
+                str(p.n_clients()), str(self.game.clientele_limit(p)))
 
 
     def action_usefountain(self):
@@ -1458,7 +1458,7 @@ class Client(object):
         material_of_card = card2mat(p.fountain_card)
 
         card_choices = \
-          [str(b) for b in p.get_incomplete_buildings()
+          [str(b) for b in p.incomplete_buildings
           if self.game.check_building_add_legal(p, str(b), p.fountain_card)]
 
         if not p.owns_building(p.fountain_card):
@@ -1568,7 +1568,7 @@ class Client(object):
         #The logic needs to be converted into an action builder
         p = self.get_player()
         possible_buildings = [(pl, b) for pl in self.game.game_state.players
-                              for b in pl.get_complete_buildings()
+                              for b in pl.complete_buildings
                               if pl is not p
                               ]
         possible_buildings = sorted(possible_buildings, None, lambda x: x[0].name.lower() + str(x[1]).lower())

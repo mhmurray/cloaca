@@ -18,6 +18,7 @@ from client3 import Choice
 from curses_gui import CursesGUI
 from util import CircularPausingFilter
 from card import Card
+from display import GameStateTextDisplay
 
 from fsm import StateMachine
 
@@ -237,10 +238,12 @@ class TerminalGUI(object):
         if game_state is None:
             return
 
+        player_index = None
         for p in game_state.players:
             if p.name == self.username:
                 player_index = game_state.players.index(p)
                 self.client.player_id = player_index
+                break
 
         if self._waiting_for_start or game_state.is_started:
             self._waiting_for_start = False
@@ -258,7 +261,8 @@ class TerminalGUI(object):
                 self.send_command(action)
             else:
                 lg.debug('Action requires user input. Displaying game state.')
-                self._gui.update_state('\n'.join(game_state.get_public_game_state(self.username)))
+                display = GameStateTextDisplay(game_state, game_state.players[player_index])
+                self._gui.update_state('\n'.join(display.public_text_string()))
                 self._gui.update_game_log('\n'.join(game_state.game_log))
                 self.update_choices()
 

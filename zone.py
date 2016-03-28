@@ -4,21 +4,29 @@ from gtrutils import GTRError
 from collections import Counter
 
 class Zone(object):
-    """A zone is a container for Cards objects.
+    """An iterable container for Card objects.
     """
 
     def __init__(self, cards=[], **kwargs):
+        """Initialize an instance with an iterable of Card objects.
+
+        Additionally the "name" keyword argument is used as the name
+        attribute (defaults to "zone"). 
+        """
         self.cards = list(cards)
         self.name = 'zone'
-        if 'name' in kwargs:
+        try:
             self.name = kwargs['name']
+        except KeyError:
+            pass
 
     def set_content(self, cards):
-        """Sets the content of this zone to the specified cards.
+        """Set the content of this zone to the specified cards.
+
         The cards currently in this zone are lost.
 
         Args:
-        cards -- sequence of Card objects.
+            cards -- iterable of Card objects.
         """
         if not hasattr(cards, '__iter__'):
             raise TypeError('An iterable object is required for Zone.set_content(). '
@@ -33,12 +41,14 @@ class Zone(object):
 
 
     def move_card(self, card, target_zone):
-        """Moves the card from this zone to the target_zone. The card
-        can be specified by name or as a Card object.
+        """Move the card from this zone to the target_zone.
+        
+        The card can be specified by name (string) or as a Card object.
+        Raise GTRError if hte card does not exist in this zone.
 
         Args:
-        card -- Either a Card object or a card name (string).
-        target_zone -- Zone object.
+            card -- Either a Card object or a card name (string).
+            target_zone -- Zone object.
         """
         try:
             i = self.index(card)
@@ -50,7 +60,8 @@ class Zone(object):
         target_zone.append(self.pop(i))
 
 
-    def pop(self, index=0):
+    def pop(self, index=-1):
+        """Pop a card at given index (default last), just like a list."""
         return self.cards.pop(index)
         
 
@@ -67,20 +78,22 @@ class Zone(object):
 
 
     def intersection(self, cards):
-        """Returns the intersection of this zone and the list of card objects as
-        a collections.Counter object (multi-set).
+        """Return the intersection of this zone and the iterable of Card objects as
+        a collections.Counter object.
         """
-
         return (Counter(cards) & Counter(self.cards))
 
 
     def contains(self, cards):
-        """Checks if the zone contains the specified cards. Repeated card names
-        must be in this zone multiple times. If cards is a list of Card objects,
-        they are compared by Card.ident. If cards is empty, return True.
+        """Return True if this contains all cards in the sequence.
+        
+        Repeated card names must be in this zone multiple times.
+        If cards is a sequence of Card objects, they are compared by Card.ident.
+        If cards is empty, return True.
 
         Args:
-        cards -- list of names of cards or Card objects. Do not mix.
+            cards -- sequence of names of cards or Card objects. Do not mix strings
+                and Card objects.
         """
         if len(cards) == 0:
             return True
@@ -96,6 +109,11 @@ class Zone(object):
 
 
     def equal_contents(self, other):
+        """Return True if other contains exactly the same cards.
+
+        Args:
+            other -- iterable of Card objects.
+        """
         return len(Counter(self.cards) - Counter(other.cards)) == 0
 
     
@@ -116,19 +134,12 @@ class Zone(object):
 
 
     def extend(self, cards):
-        """Adds the list of Card objects to the zone.
-
-        Args:
-        cards -- list of Card objects, or Zone object.
+        """Add the sequence of Card objects.
         """
-        if isinstance(cards, Zone):
-            l = cards.cards
-        else:
-            l = cards
-            for c in l:
-                if not isinstance(c, Card):
-                    raise GTRError( 'Tried to add an object to \'{0}\' '
-                        'that isn\'t of class Card.'.format(self.name))
+        for c in cards:
+            if not isinstance(c, Card):
+                raise GTRError( 'Tried to add an object to \'{0}\' '
+                    'that isn\'t of class Card.'.format(self.name))
 
         self.cards.extend(cards)
 
@@ -142,15 +153,16 @@ class Zone(object):
 
 
     def count(self, card_name):
-        """Counts the number of cards with the card name.
+        """Return the count of cards with the card name.
         """
         return len(filter(lambda c:c.name == card_name, self.cards))
 
     def get_cards(self, card_names):
-        """Gets Card objects corresponding to the strings in the cards list.
-        Does not remove the cards from this zone.
+        """Return Card objects corresponding to the strings in the cards list.
 
-        Raises ValueError if the cards aren't in this zone.
+        Do not remove the cards from this zone.
+
+        Raises ValueError if any of the cards aren't in this zone.
         """
         out = []
         cards = Zone(list(self.cards))

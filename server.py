@@ -9,6 +9,12 @@ import uuid
 import copy
 
 import pickle
+import logging
+
+lg = logging.getLogger('server')
+logging.basicConfig()
+lg.setLevel(logging.INFO)
+#lg.setLevel(logging.DEBUG)
 
 class GTRServer(object):
     """Contains a list of multiple Game objects and manages all the
@@ -26,24 +32,18 @@ class GTRServer(object):
         if self.load_backup_file:
             self.load_backup()
 
-        # for testing
-        g = Game()
-        g.add_player('a')
-        g.add_player('b')
-        self.games.append(g)
-
         self.send_action = lambda _ : None
 
     def get_game_state(self, user, game_id):
         try:
             game = self.games[game_id]
         except IndexError as e:
-            print e.message
+            lg.warning(e.message)
             return None
 
         player_index = game.game_state.find_player_index(user)
         if player_index is None:
-            print 'User {0:s} is not part of game {1:d}'.format(user, game_id)
+            lg.warning('User {0:s} is not part of game {1:d}'.format(user, game_id))
             return None
 
         if game.game_state.is_started:
@@ -94,35 +94,32 @@ class GTRServer(object):
             try:
                 game = self.games[game_id]
             except IndexError as e:
-                print e.message
+                lg.warning(e.message)
                 return
 
             player_index = game.game_state.find_player_index(user)
             if player_index is None:
-                print 'User {0:s} is not part of game {1:d}'.format(user, game_id)
+                lg.warning('User {0:s} is not part of game {1:d}'.format(user, game_id))
                 return
 
-            print 'submit_action(), Expected action: ' + str(game.expected_action())
-            print str(message._action_args_dict[game.expected_action()])
-            print 'submit_action(), Got action: ' + repr(a)
+            lg.debug('Expected action: {0}'.format(str(game.expected_action())))
+            lg.debug('Got action: {0}'.format(repr(a)))
+            lg.debug('Handling action: {0}'.format(repr(a)))
 
-            print 'Handling action:'
-            print '  ' + repr(a)
-
-            i_active_p = game.game_state.get_active_player_index()
+            i_active_p = game.game_state.active_player_index
 
             if i_active_p == player_index:
-                print 'Game handling action: ' + str(a)
                 game.handle(a)
                 self.save_backup()
 
             else:
-                print 'Received action for player {0!s}, but waiting on player {1!s}'.format(
-                        player, i_active_p)
+                lg.warning('Received action for player {0!s}, but waiting on player {1!s}'
+                    .format(player, i_active_p))
 
             for u in [p.name for p in game.game_state.players]:
                 gs = self.get_game_state(u, game_id)
                 self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+
 
     def find_or_add_user(self, username):
         """Finds a user by username, returning the User object
@@ -148,12 +145,9 @@ class GTRServer(object):
             game = Game()
             self.games.append(game)
             game_id = self.games.index(game)
-            print 'Creating new game {0:d}'.format(game_id)
+            lg.info('Creating new game {0:d}'.format(game_id))
 
         player_index = game.add_player(user)
-        #if user.game == game_id and game.game_state.players[user.player_index] == user.name:
-        #    print 'User already in this game'
-        #    return
 
         return game_id
 
@@ -176,11 +170,11 @@ class GTRServer(object):
         try:
             game = self.games[game_id]
         except IndexError:
-            print 'Tried to start non-existent game {0:d}'.format(game)
+            lg.warning('Tried to start non-existent game {0:d}'.format(game))
             return None
 
         if game.game_state.is_started:
-            print 'Game already started'
+            lg.warning('Game already started')
             return None
 
         game.start_game()
@@ -192,20 +186,20 @@ class GTRServer(object):
         """ Loads backup from JSON-encoded constructed file.
         """
         if self.games:
-            print 'Error! Can\'t load backup file if games already exist'
+            lg.warning('Error! Can\'t load backup file if games already exist')
             return
 
         try:
             f = open(self.load_backup_file, 'r')
         except IOError:
-            print 'Can\'t open backup file: ' + self.load_backup_file
+            lg.warning('Can\'t open backup file: ' + self.load_backup_file)
             return
 
         with f:
             try:
                 game_states = pickle.load(f)
             except pickle.PickleError:
-                print 'Error! Couldn\'t load games from backup file: ' + self.load_backup_file
+                lg.warning('Error! Couldn\'t load games from backup file: ' + self.load_backup_file)
                 return
 
             self.games = [Game(gs) for gs in game_states]
@@ -220,13 +214,13 @@ class GTRServer(object):
             try:
                 f = open(self.backup_file, 'w')
             except IOError:
-                print 'Can\'t write to file ' + self.backup_file
+                lg.warning('Can\'t write to file ' + self.backup_file)
                 return
             
             with f:
                 try:
                     pickle.dump(game_states, f)
                 except pickle.PickleError:
-                    print 'Error writing backup: ' + self.backup_file
+                    lg.warning('Error writing backup: ' + self.backup_file)
                     return
 

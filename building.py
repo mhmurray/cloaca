@@ -1,20 +1,29 @@
-import card_manager
-from gtrutils import GTRError
 from zone import Zone
 
 class Building:
-    """ A container that represents buildings in GtR. The primary
-    data members are the building foundation, site, and materials.
+    """A container that represents buildings.
+    
+    The primary data members are the building foundation, site, and materials.
 
     Once the building is complete, the site is NOT removed. The materials
     remain as well. A complete building must retain a memory of its site
     so that we know the material composition in the future.
+
+    Attributes:
+        foundation -- (Card) foundation of the building.
+        site -- (str) site the building is built on, eg. 'Wood'.
+        materials -- (Zone) material cards added to the building.
+        stairway_materials -- (Zone) material cardss added to the buildling
+            with Stairway.
+        complete -- (bool) True if the building is complete.
     """
 
     def __init__(self, foundation=None, site=None, materials=None,
                  stairway_materials=None, complete=False):
-        """ The parameter materials is a list of cards that are used 
-        as building materials.
+        """Initialize an instance with specified properties.
+
+        The args are the same type as the attributes except that
+        any iterable can be provided for the materials and stairway_materials.
         """
         self.foundation = foundation
         self.site = site
@@ -23,8 +32,7 @@ class Building:
         self.complete = complete
 
     def __str__(self):
-        """ The building name is the name of the foundation card.
-        """
+        """Return the name of the foundation card."""
         return str(self.foundation.name)
 
     def __repr__(self):
@@ -35,39 +43,30 @@ class Building:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
+    @property
     def is_stairwayed(self):
-        """ True if a material has been added by the Stairway.
-        """
+        """Return True if a material has been added by the Stairway."""
         return len(self.stairway_materials) > 0
 
     def is_composed_of(self, material):
-        """ Returns True if the building is composed of the specified material.
-        That is, if you would be allowed to add that material to this building
-        to complete it. For most buildings this is just the Site or Foundation
+        """Return True if the building is composed of the specified material.
+
+        That is, this material is allowed to be added to complete it.
+        For most buildings this is just the Site or Foundation
         material, but the Statue can be built on any site and counts as that
         site's material and Marble.
         """
-        return material in self.get_material_composition()
-
-    def get_material_composition(self):
-        """Returns a tuple of materials that make up this building.
-        This is determined by the site and foundation. If the site
-        is missing (because the building is complete), its material
-        doesn't count.
-        
-        The return value is of the form ('Marble','Stone')
-        """
-        return (self.site, self.foundation.material) if self.site else (self.foundation.material,)
+        return material == self.site or material == self.foundation.material
 
     def pop_site(self):
-        """Removes and returns this building's site.
-        """
+        """Remove and return this building's site."""
         card = self.site
         self.site = None
         return card
 
     def add_material(self, card):
-        """ Adds the material to the building materials. Does not
-        check legality.
+        """Add the card to the building materials Zone.
+        
+        Does not check legality.
         """
         self.materials.append(card)

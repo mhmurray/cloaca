@@ -259,7 +259,7 @@ class TestFountain(unittest.TestCase):
         self.assertNotIn(bath, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
 
-        self.assertIn('Bath', self.p1.get_owned_building_names())
+        self.assertIn('Bath', self.p1.building_names)
         self.assertFalse(self.game.player_has_active_building(self.p1, 'Bath'))
 
         self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
