@@ -1,0 +1,394 @@
+define(['jquery', 'jqueryui'],
+function($){
+    var util = {
+        _cardDictionary: {},
+        _cardList: [],
+
+        Action: {}
+    };
+
+    util.cardName = function(ident) {
+        if(ident < 0) {
+            return 'Orders';
+        } else {
+            return util._cardList[ident];
+        }
+    };
+
+    // Return card properties dictionary for key (card name or ident)
+    util.cardProperties = function(card) {
+        if(typeof(card) === 'string') {
+            return util._cardDictionary[card];
+        } else {
+            return util._cardDictionary[util.cardName(card)];
+        }
+    };
+
+    // Return a jQuery object representing a card-zone.
+    util.makeCardZone = function (id_, title) {
+        var $container = $('<div />', {
+            id: id_,
+            class: 'card-container'
+        });
+        var $zone = $('<div />', {
+            class: 'card-zone',
+            text: title
+        });
+        $zone.append($container);
+        return $zone;
+    };
+
+    // Return a jQuery object representing a card.
+    util.makeCard = function(ident) {
+        if(ident < 0) {
+            return $('<div />', {text: 'Card', class: 'card orders'});
+        } else if(ident < 6) {
+            return $('<div />', {id: 'card'+ident, text: 'Jack', class: 'card jack'});
+        }
+        var name = util.cardName(ident);
+        var material = util.cardProperties(name).material.toLowerCase();
+        return $('<div />', {
+            id: 'card'+ident,
+            text: name,
+            class: 'card ' + material,
+        });
+    };
+
+    util.Action = {
+        THINKERORLEAD   :  0,
+        USELATRINE      :  1,
+        USEVOMITORIUM   :  2,
+        PATRONFROMPOOL  :  3,
+        BARORAQUEDUCT   :  4,
+        PATRONFROMDECK  :  5,
+        PATRONFHAND     :  6,
+        USEFOUNTAIN     :  7,
+        FOUNTAIN        :  8,
+        LEGIONARY       :  9,
+        GIVECARDS       : 10,
+        THINKERTYPE     : 11,
+        SKIPTHINKER     : 12,
+        USESEWER        : 13,
+        USESENATE       : 14,
+        LABORER         : 15,
+        STAIRWAY        : 16,
+        ARCHITECT       : 17,
+        CRAFTSMAN       : 18,
+        MERCHANT        : 19,
+        LEADROLE        : 20,
+        FOLLOWROLE      : 21,
+        REQGAMESTATE    : 22,
+        GAMESTATE       : 23,
+        SETPLAYERID     : 24,
+        REQJOINGAME     : 25,
+        JOINGAME        : 26,
+        REQCREATEGAME   : 27,
+        CREATEGAME      : 28,
+        LOGIN           : 29,
+        REQSTARTGAME    : 30,
+        STARTGAME       : 31,
+        REQGAMELIST     : 32,
+        GAMELIST        : 33
+    };
+
+    util._cardDictionary = {
+        Orders: {
+            text: '',
+            material: null,
+            value: 0,
+            role: null
+        },
+        Jack: {
+            text: 'May be used as any role.',
+            material: null,
+            value: 0,
+            role: null
+        },
+        Academy: {
+            text: 'May perform one THINKER action after turn during which you performed CRAFTSMAN action', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Amphitheatre: {
+            text: 'May perform one CRAFTSMAN action for each INFLUENCE', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Aqueduct: {
+            text: 'When performing PATRON action may take client from HAND.  Maximum CLIENTELE x 2', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Archway: {
+            text: 'When performing ARCHITECT action may take material from POOL', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Atrium: {
+            text: 'When performing MERCHANT action may take from DECK (do not look at card)', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Bar: {
+            text: 'When performing PATRON action may take card from DECK', 
+            material: 'Rubble',
+            value: 1,
+            role: 'Laborer'
+        }, 
+        Basilica: {
+            text: 'When performing MERCHANT action may take material from HAND', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Bath: {
+            text: 'When performing PATRON action each client you hire may perform its action once as it enters CLIENTELE', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Bridge: {
+            text: 'When performing LEGIONARY action may take material from STOCKPILE.  Ignore Palisades.  May take from all opponents', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Catacomb: {
+            text: 'Game ends immediately.  Score as usual', 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Circus: {
+            text: 'May play two cards of same role as JACK', 
+            material: 'Wood',
+            value: 1,
+            role: 'Craftsman'
+        }, 
+        'Circus Maximus': {
+            text: 'Each client may perform its action twice when you lead or follow its role', 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Coliseum: {
+            text: "When performing LEGIONARY action may take opponent's client and place in VAULT as material",
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Dock: {
+            text: 'When performing LABORER action may take material from HAND', 
+            material: 'Wood',
+            value: 1,
+            role: 'Craftsman'
+        }, 
+        Forum: {
+            text: 'One client of each role wins game', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Foundry: {
+            text: 'May perform one LABORER action for each INFLUENCE', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Fountain: {
+            text: 'When performing CRAFTSMAN action may use cards from DECK.  Retain any unused cards in HAND', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Garden: {
+            text: 'May perform one PATRON action for each INFLUENCE', 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Gate: {
+            text: 'Incomplete MARBLE structures provide FUNCTION', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Insula: {
+            text: 'Maximum CLIENTELE + 2', 
+            material: 'Rubble',
+            value: 1,
+            role: 'Laborer'
+        }, 
+        Latrine: {
+            text: 'Before performing THINKER action may discard one card to POOL', 
+            material: 'Rubble',
+            value: 1,
+            role: 'Laborer'
+        }, 
+        'Ludus Magna': {
+            text: 'Each MERCHANT client counts as any role', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Market: {
+            text: 'Maximum VAULT + 2', 
+            material: 'Wood',
+            value: 1,
+            role: 'Craftsman'
+        }, 
+        Palace: {
+            text: 'May play multiple cards of same role in order to perform additional actions', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Palisade: {
+            text: 'Immune to LEGIONARY', 
+            material: 'Wood',
+            value: 1,
+            role: 'Craftsman'
+        }, 
+        Prison: {
+            text: "May exchange INFLUENCE for opponent's completed structure", 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Road: {
+            text: 'When adding to STONE structure may use any material', 
+            material: 'Rubble',
+            value: 1,
+            role: 'Laborer'
+        }, 
+        School: {
+            text: 'May perform one THINKER action for each INFLUENCE', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Scriptorium: {
+            text: 'May use one MARBLE material to complete any structure', 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Senate: {
+            text: "May take opponent's JACK into HAND at end of turn in which it is played", 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Sewer: {
+            text: 'May place Orders cards used to lead or follow into STOCKPILE at end of turn', 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Shrine: {
+            text: 'Maximum HAND + 2', 
+            material: 'Brick',
+            value: 2,
+            role: 'Legionary'
+        }, 
+        Stairway: {
+            text: "When performing ARCHITECT action may add material to opponent's completed STRUCTURE to make function available to all players", 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Statue: {
+            text: '+ 3 VP. May place Statue on any SITE', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Storeroom: {
+            text: 'All clients count as LABORERS', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Temple: {
+            text: 'Maximum HAND + 4', 
+            material: 'Marble',
+            value: 3,
+            role: 'Patron'
+        }, 
+        Tower: {
+            text: 'May use RUBBLE in any STRUCTURE.  May lay foundation onto any out of town SITE at no extra cost', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Villa: {
+            text: 'When performing ARCHITECT action may complete Villa with one material', 
+            material: 'Stone',
+            value: 3,
+            role: 'Merchant'
+        }, 
+        Vomitorium: {
+            text: 'Before performing THINKER action may discard all cards to POOL', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }, 
+        Wall: {
+            text: 'Immune to LEGIONARY.  + 1 VP for every two materials in STOCKPILE', 
+            material: 'Concrete',
+            value: 2,
+            role: 'Architect'
+        }
+    };
+
+    util._cardList = [
+        'Jack', 'Jack', 'Jack', 'Jack', 'Jack', 'Jack',
+        'Academy', 'Academy', 'Academy',
+        'Amphitheatre', 'Amphitheatre', 'Amphitheatre',
+        'Aqueduct', 'Aqueduct', 'Aqueduct',
+        'Archway', 'Archway', 'Archway',
+        'Atrium', 'Atrium', 'Atrium',
+        'Bar', 'Bar', 'Bar', 'Bar', 'Bar', 'Bar',
+        'Basilica', 'Basilica', 'Basilica',
+        'Bath', 'Bath', 'Bath',
+        'Bridge', 'Bridge', 'Bridge',
+        'Catacomb', 'Catacomb', 'Catacomb',
+        'Circus', 'Circus', 'Circus', 'Circus', 'Circus', 'Circus',
+        'Circus Maximus', 'Circus Maximus', 'Circus Maximus',
+        'Coliseum', 'Coliseum', 'Coliseum',
+        'Dock', 'Dock', 'Dock', 'Dock', 'Dock', 'Dock',
+        'Forum', 'Forum', 'Forum',
+        'Foundry', 'Foundry', 'Foundry',
+        'Fountain', 'Fountain', 'Fountain',
+        'Garden', 'Garden', 'Garden',
+        'Gate', 'Gate', 'Gate',
+        'Insula', 'Insula', 'Insula', 'Insula', 'Insula', 'Insula',
+        'Latrine', 'Latrine', 'Latrine', 'Latrine', 'Latrine', 'Latrine',
+        'Ludus Magna', 'Ludus Magna', 'Ludus Magna',
+        'Market', 'Market', 'Market', 'Market', 'Market', 'Market',
+        'Palace', 'Palace', 'Palace',
+        'Palisade', 'Palisade', 'Palisade', 'Palisade', 'Palisade', 'Palisade',
+        'Prison', 'Prison', 'Prison',
+        'Road', 'Road', 'Road', 'Road', 'Road', 'Road',
+        'School', 'School', 'School',
+        'Scriptorium', 'Scriptorium', 'Scriptorium',
+        'Senate', 'Senate', 'Senate',
+        'Sewer', 'Sewer', 'Sewer',
+        'Shrine', 'Shrine', 'Shrine',
+        'Stairway', 'Stairway', 'Stairway',
+        'Statue', 'Statue', 'Statue',
+        'Storeroom', 'Storeroom', 'Storeroom',
+        'Temple', 'Temple', 'Temple',
+        'Tower', 'Tower', 'Tower',
+        'Villa', 'Villa', 'Villa',
+        'Vomitorium', 'Vomitorium', 'Vomitorium',
+        'Wall', 'Wall', 'Wall'
+    ];
+
+    return util;
+});

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>GtR</title>
+
+    <!-- This doesn't work in Chrome. Don't know why. -->
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+
+    <link rel="stylesheet" href="style.css">
+    <!--
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.js"></script>
+    <script src="util.js"></script>
+    <script src="app.js"></script>-->
+    <script data-main="js/main" src="js/libs/require/require.js"></script>
+</head>
+<body>
+    <div id="page-wrapper">
+        <h1>Glory to Rome</h1>
+
+        <div id="status">Connecting...</div>
+
+        <select id='player-select'>
+            <option value="a">Player a</option>
+            <option value="b">Player b</option>
+            <option value="c">Player c</option>
+            <option value="d">Player d</option>
+        </select>
+
+        <!--<div id="gamestate-wrapper" style="display:none;">-->
+        <div id="gamestate-wrapper">
+            <h2>Game State</h2>
+            <ul id="gamestate-list"></ul>
+
+            <div id=player-info>
+            </div>
+
+            <div id="dialog-wrapper">
+                <div id="dialog"></div>
+                <div id='ok-cancel-btns'>
+                    <button id='ok-btn'>OK</button>
+                    <button id='cancel-btn'>Cancel</button>
+                    <button id='skip-btn'>Skip</button>
+                </div>
+            </div>
+
+            <div class="game-commands">
+                <div id="thinker-commands" class='button-row'>
+                    <button id='think-jack'>Think for Jack</button>
+                    <button id='think-orders'>Think for Orders</button>
+                    <button id='lead-role'>Lead a Role</button>
+                </div>
+                <div id="role-select" class='button-row'>
+                    <button id='select-patron' class='marble'>Patron</button>
+                    <button id='select-laborer' class='rubble'>Laborer</button>
+                    <button id='select-architect' class='concrete'>Architect</button>
+                    <button id='select-craftsman' class='wood'>Craftsman</button>
+                    <button id='select-legionary' class='brick'>Legionary</button>
+                    <button id='select-merchant' class='stone'>Merchant</button>
+                </div>
+            </div>
+
+            <div class="game-control" class='button-row'>
+                <button id='game-refresh-btn'>Refresh</button>
+                <button id='game-exit-btn'>Close Game</button>
+            </div>
+
+            <h2>Game Log</h2>
+            <div id="game-log" class="log"></div>
+        </div>
+
+
+        <div id="gamelist-wrapper">
+            <h3>Game List</h3>
+            <ul id="gamelist"></ul>
+        </div>
+
+        <button id="refresh">Refresh</button>
+        <button id="creategame">New Game</button>
+        <button id="close">Close Connection</button>
+
+        <div id="devtools">
+            <h3>Development tools</h3>
+            <form id="message-form" action="#" method="post">
+                <textarea id="custom-action" 
+                    placeholder='Custom action (eg. {"user":"a", "game":0, "action":2, "args":["False"]} )'
+                    required>{"user":"a", "game":0, "action":2, "args":["False"]}</textarea>
+                <button type="submit">Send Custom Action</button>
+            </form>
+        </div>
+    </div>
+
+</body>
+</html>
