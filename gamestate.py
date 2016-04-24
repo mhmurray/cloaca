@@ -89,10 +89,10 @@ class GameState(object):
         self.library.set_content([Card(-1)]*len(self.library))
 
         for p in self.players:
-            p.vault = [Card(-1)]*len(p.vault)
+            p.vault.set_content([Card(-1)]*len(p.vault))
 
             if p.name != player_name:
-                p.hand = [c if c.name == 'Jack' else Card(-1) for c in p.hand ]
+                p.hand.set_content([c if c.name == 'Jack' else Card(-1) for c in p.hand ])
                 p.fountain_card = Card(-1) if p.fountain_card else None
 
     def increment_leader_index(self):

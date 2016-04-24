@@ -2,6 +2,7 @@ import gtrutils
 import card_manager
 from itertools import izip, izip_longest, count
 from card import Card
+import json
 
 THINKERORLEAD   =  0
 USELATRINE      =  1
@@ -154,7 +155,7 @@ _action_args_dict = {
             (Card, 'material'), (bool, 'from_pool') ), () ),
     }
 
-def parse_action(action_string):
+def parse_action_(action_string):
     """ Parses the action string into a valid action or
     raises a BadGameActionError.
     It should be formatted like this:
@@ -217,10 +218,10 @@ def parse_action(action_string):
     def parse_arg(_type, token, name):
         """Converts token to type _type."""
         if _type == bool:
-            if token == 'True': arg = True
-            elif token == 'False': arg = False
+            if token in ('True', 'true', 'TRUE', True): arg = True
+            elif token in ('False', 'false', 'FALSE', False): arg = False
             else:
-                raise BadGameActionError('Boolean argument expected. Received' + token)
+                raise BadGameActionError('Boolean argument expected. Received ' + str(token))
 
         elif token == 'None':
             arg = None
@@ -273,6 +274,95 @@ def parse_action(action_string):
         extended_args.append(arg)
 
     return GameAction(action_type, *(req_args + extended_args))
+
+def parse_action(action, args):
+    """Parse the action and return a valid GameAction object or raises a
+    BadGameActionError.
+
+    Args:
+    action -- int, with symbolic representation found in message.py.
+    args -- sequence, with type of items found in message.py
+    """
+    try:
+        spec = _action_args_dict[action]
+    except KeyError:
+        raise Exception('Invalid action: ' + str(action))
+
+    if len(args) < spec.n_req_args:
+        raise BadGameActionError(
+            'Not enough arguments ({0} required) for action: {1}: {2}'
+            .format(spec.n_req_args, spec.name, str(args)))
+
+    if len(args) > spec.n_req_args and not spec.has_extended:
+        raise BadGameActionError(
+                'Received extra arguments ({0:d} required, {1:d} received)'
+                'for action: {1}: {2}'
+            .format(spec.n_req_args, len(args), spec.name, str(args)))
+
+
+    def parse_arg(type_, token, name):
+        """Converts token to type type_.
+        
+        This includes special cases for some argument types,
+        such as Card, bool, and NoneType.
+        """
+        if type_ is bool:
+            if token in ('True', 'true', 'TRUE', True): arg = True
+            elif token in ('False', 'false', 'FALSE', False): arg = False
+            else:
+                raise BadGameActionError('Boolean argument expected. Received' + str(token))
+
+        elif token == 'None':
+            arg = None
+
+        elif type_ == Card:
+            try:
+                arg = Card(int(token))
+            except ValueError:
+                raise BadGameActionError(
+                    'Error converting "{0}" argument: {1} token: "{2}"'
+                    .format(name, str(type_), token))
+
+        else:
+            try:
+                arg = type_(token)
+            except ValueError:
+                raise BadGameActionError(
+                    'Error converting "{0}" argument: {1} token: "{2}"'
+                    .format(name, str(type_), token))
+
+        return arg
+
+
+    req_tokens = args[:spec.n_req_args]
+    req_args = []
+
+    for i, tok, (typ, name) in izip(count(), req_tokens, spec.required_arg_specs):
+        try:
+            arg = parse_arg(typ, tok, name)
+        except BadGameActionError, e:
+            # If we failed in parse_arg, message can be appended for details
+            raise BadGameActionError(
+                'Could not convert argument {0}. '.format(i) + e.message)
+
+        req_args.append(arg)
+
+
+    extended_tokens = args[spec.n_req_args:]
+    extended_args = []
+    
+    for i, tok in izip(count(spec.n_req_args), extended_tokens):
+        typ, name = spec.extended_arg_spec
+        try:
+            arg = parse_arg(typ, tok, name)
+        except BadGameActionError, e:
+            # If we failed in parse_arg, message can be appended for details
+            raise BadGameActionError(
+                'Could not convert argument {0}. '.format(i) + e.message)
+
+        extended_args.append(arg)
+
+    return GameAction(action, *(req_args + extended_args))
 
 
 def get_action_name(action):

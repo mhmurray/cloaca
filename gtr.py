@@ -725,6 +725,9 @@ class Game(object):
             raise GTRError('Tried to move non-existent card {0} from hand'
                        .format(hand_c))
 
+        if hand_c and not self.player_has_active_building(p, 'Dock'):
+            raise GTRError('Tried to Laborer from hand without Dock.');
+
         if pool_c:
             self.game_state.pool.move_card(pool_c, p.stockpile)
         if hand_c:
@@ -1499,13 +1502,13 @@ class Game(object):
         if cards[0] is not None:
             for c in cards:
                 if c == 'Jack':
-                    raise Exception('Can\'t move Jacks with Sewer')
+                    raise GTRError('Can\'t move Jacks with Sewer')
                 p.camp.move_card(c, p.stockpile)
 
             self.log('{0} flushes cards down the Sewer: {1}'
                 .format(p.name, ', '.join(cards)))
 
-        for c in p.camp:
+        for c in p.camp.cards[:]: # Copy since we're removing
             if c.name == 'Jack':
                 p.camp.move_card(c, self.game_state.jack_pile)
             else:
@@ -1613,7 +1616,7 @@ class Game(object):
         """
         lg.debug('Handling action: ' + repr(a))
         if a.action != self.expected_action():
-            raise Exception('Expected GameAction type: ' + str(self.expected_action())
+            raise GTRError('Expected GameAction type: ' + str(self.expected_action())
                 + ', got: ' + repr(a))
 
         method_name = 'handle_' + str(a)
@@ -1621,7 +1624,7 @@ class Game(object):
         try:
             method = getattr(self, method_name)
         except AttributeError:
-            raise Exception('Unhandled GameAction type: ' + str(a.action))
+            raise GTRError('Unhandled GameAction type: ' + str(a.action))
         else:
             # TODO: We should catch this in GTRServer where it calls this.
             # The server class can decide what to do with illegal actions.
@@ -1631,5 +1634,3 @@ class Game(object):
                 lg.debug('Error handling action')
                 lg.debug(str(e))
                 return
-
-            self.game_state.game_id += 1

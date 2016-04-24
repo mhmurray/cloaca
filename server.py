@@ -4,15 +4,17 @@ from player import Player
 from game_record import GameRecord
 from message import GameAction
 import message
+from gtrutils import GTRError
 
 import uuid
 import copy
 
+import json
 import pickle
 import logging
 
 lg = logging.getLogger('server')
-logging.basicConfig()
+#logging.basicConfig()
 lg.setLevel(logging.INFO)
 #lg.setLevel(logging.DEBUG)
 
@@ -60,12 +62,17 @@ class GTRServer(object):
 
         if a.action == message.REQGAMESTATE:
             gs = self.get_game_state(user, game_id)
-            resp = GameAction(message.GAMESTATE, pickle.dumps(gs))
+            #resp = GameAction(message.GAMESTATE, pickle.dumps(gs))
+            lg.info('Sending GameState');
+            lg.info(str(gs));
+            resp = GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__))
             self.send_action(user, resp)
 
         elif a.action == message.REQGAMELIST:
             gl = self.get_game_list()
-            self.send_action(user, GameAction(message.GAMELIST, pickle.dumps(gl)))
+            #self.send_action(user, GameAction(message.GAMELIST, pickle.dumps(gl)))
+            json_list = json.dumps(gl, default=lambda o:o.__dict__)
+            self.send_action(user, GameAction(message.GAMELIST, json_list))
 
         elif a.action == message.REQJOINGAME:
             # Game id is the argument here, not the game part of the request
@@ -76,7 +83,9 @@ class GTRServer(object):
                 
             # If the game is started, we need the game state
             gs = self.get_game_state(user, game_id)
-            self.send_action(user, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+            if gs is not None and gs.is_started:
+                #self.send_action(user, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+                self.send_action(user, GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__)))
 
         elif a.action == message.REQSTARTGAME:
             self.start_game(user, game_id)
@@ -84,7 +93,8 @@ class GTRServer(object):
             gs = self.get_game_state(user, game_id)
             for u in [p.name for p in gs.players]:
                 gs = self.get_game_state(u, game_id)
-                self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+                #self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+                self.send_action(u, GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__)))
 
         elif a.action == message.REQCREATEGAME:
             game_id = self.create_game(user)
@@ -109,16 +119,22 @@ class GTRServer(object):
             i_active_p = game.game_state.active_player_index
 
             if i_active_p == player_index:
-                game.handle(a)
+                try:
+                    game.handle(a)
+                except GTRError, e:
+                    lg.warning('Error handling action.\n' + e.message)
+                    return
+
                 self.save_backup()
 
             else:
                 lg.warning('Received action for player {0!s}, but waiting on player {1!s}'
-                    .format(player, i_active_p))
+                    .format(player_index, i_active_p))
 
             for u in [p.name for p in game.game_state.players]:
                 gs = self.get_game_state(u, game_id)
-                self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+                #self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
+                self.send_action(u, GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__)))
 
 
     def find_or_add_user(self, username):
@@ -146,6 +162,7 @@ class GTRServer(object):
             self.games.append(game)
             game_id = self.games.index(game)
             lg.info('Creating new game {0:d}'.format(game_id))
+            game.game_state.game_id = game_id
 
         player_index = game.add_player(user)
 
