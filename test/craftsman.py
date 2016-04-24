@@ -163,7 +163,7 @@ class TestCraftsman(unittest.TestCase):
         atrium = cm.get_card('Atrium')
         self.p1.hand.set_content([atrium])
 
-        self.game.game_state.in_town_foundations = ['Rubble']
+        self.game.game_state.in_town_sites = ['Rubble']
 
         mon = Monitor()
         mon.modified(self.game.game_state)

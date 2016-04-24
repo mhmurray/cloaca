@@ -101,8 +101,8 @@ class Game(object):
     def init_sites(self, n_players):
         n_out_of_town = 6 - n_players
         for material in cm.get_all_materials():
-            self.game_state.in_town_foundations.extend([material]*n_players)
-            self.game_state.out_of_town_foundations.extend([material]*n_out_of_town)
+            self.game_state.in_town_sites.extend([material]*n_players)
+            self.game_state.out_of_town_sites.extend([material]*n_out_of_town)
 
     def init_library(self):
         """Initializes the library as a list of Card objects
@@ -879,11 +879,11 @@ class Game(object):
         if player.owns_building(building):
             raise GTRError('Player already owns {0!s}.'.format(building))
 
-        if site not in self.game_state.out_of_town_foundations:
+        if site not in self.game_state.out_of_town_sites:
             raise GTRError('No {0} sites left, including out of town'
                 .format(site))
 
-        if site not in self.game_state.in_town_foundations and \
+        if site not in self.game_state.in_town_sites and \
                 not self.game_state.oot_allowed:
             raise GTRError('Starting an out of town building is not allowed.')
 
@@ -1026,18 +1026,18 @@ class Game(object):
             # raises if start is illegal
             self.check_building_start_legal(player, foundation, site)
 
-            is_oot = site not in self.game_state.in_town_foundations
+            is_oot = site not in self.game_state.in_town_sites
 
             if player.owns_building(foundation):
                 raise GTRError('{0} already has a {1!s}'
                     .format(player.name, foundation))
 
             if is_oot:
-                sites = self.game_state.out_of_town_foundations
+                sites = self.game_state.out_of_town_sites
                 if site not in sites:
                     raise GTRError('{0} not available out of town.'.format(site))
             else:
-                sites = self.game_state.in_town_foundations
+                sites = self.game_state.in_town_sites
                 if site not in sites:
                     raise GTRError('{0} not available in town.'.format(site))
 
@@ -1052,7 +1052,7 @@ class Game(object):
 
             self.game_state.used_oot = is_oot
 
-            if len(self.game_state.in_town_foundations) == 0:
+            if len(self.game_state.in_town_sites) == 0:
                 self.end_game()
 
             return b

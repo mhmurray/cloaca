@@ -27,7 +27,7 @@ class GameState(object):
     """
 
     def __init__(self, players=None, jack_pile=None, library=None, pool=None,
-                 in_town_foundations=None, out_of_town_foundations=None,
+                 in_town_sites=None, out_of_town_sites=None,
                  stack_=None):
         self.players = []
         if players:
@@ -42,8 +42,8 @@ class GameState(object):
         self.jack_pile = jack_pile or Zone()
         self.library = library or Zone()
         self.pool = pool or Zone()
-        self.in_town_foundations = in_town_foundations or []
-        self.out_of_town_foundations = out_of_town_foundations or []
+        self.in_town_sites = in_town_sites or []
+        self.out_of_town_sites = out_of_town_sites or []
         self.oot_allowed = False
         self.used_oot = False
         self.is_started = False
@@ -66,8 +66,8 @@ class GameState(object):
         rep = ('GameState(players={players!r}, leader={leader!r}, '
                'priority={priority!r}, jack_pile={jack_pile!r}, '
                'library={library!r}, '
-               'in_town_foundations={in_town_foundations!r},'
-               'out_of_town_foundations={out_of_town_foundations!r})'
+               'in_town_sites={in_town_sites!r},'
+               'out_of_town_sites={out_of_town_sites!r})'
                )
         return rep.format(
             players=self.players,
@@ -75,8 +75,8 @@ class GameState(object):
             priority= self.priority_index,
             jack_pile=self.jack_pile,
             library=self.library,
-            in_town_foundations=self.in_town_foundations,
-            out_of_town_foundations=self.out_of_town_foundations,
+            in_town_sites=self.in_town_sites,
+            out_of_town_sites=self.out_of_town_sites,
         )
 
     def privatize(self, player_name):

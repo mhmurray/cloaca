@@ -53,8 +53,8 @@ class GameStateTextDisplay(object):
                 .format(len(gs.library), len(gs.jack_pile)))
 
         sites_string = ' '.join(
-                [mat[:3]+'[{0:d}/{1:d}]'.format(gs.in_town_foundations.count(mat),
-                                                gs.out_of_town_foundations.count(mat)) 
+                [mat[:3]+'[{0:d}/{1:d}]'.format(gs.in_town_sites.count(mat),
+                                                gs.out_of_town_sites.count(mat)) 
                 for mat in cm.get_materials()]
                 ) + '   Sites [in/out]'
 

@@ -212,7 +212,7 @@ class TestArchitect(unittest.TestCase):
         self.p1.hand.set_content([bridge])
 
         # Empty the in-town sites of Concrete
-        self.game.game_state.in_town_foundations = ['Rubble']
+        self.game.game_state.in_town_sites = ['Rubble']
 
         mon = Monitor()
         mon.modified(self.game.game_state)
@@ -308,7 +308,7 @@ class TestArchitectClientele(unittest.TestCase):
                 Building(bridge, 'Concrete'))
 
         self.assertEqual(len(self.p1.hand), 0)
-        self.assertNotIn('Concrete', self.game.game_state.in_town_foundations)
+        self.assertNotIn('Concrete', self.game.game_state.in_town_sites)
 
         self.assertEqual(self.game.game_state.active_player, self.p2)
 
@@ -320,7 +320,7 @@ class TestArchitectClientele(unittest.TestCase):
         self.p1.hand.set_content([bridge])
 
         # Empty the in-town sites
-        self.game.game_state.in_town_foundations = ['Rubble']
+        self.game.game_state.in_town_sites = ['Rubble']
 
         self.game.game_state.oot_allowed = True
 
@@ -328,7 +328,7 @@ class TestArchitectClientele(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0], Building(bridge, 'Concrete'))
-        self.assertEqual(3, self.game.game_state.out_of_town_foundations.count('Concrete'))
+        self.assertEqual(3, self.game.game_state.out_of_town_sites.count('Concrete'))
 
         self.assertNotIn(bridge, self.p1.hand)
         self.assertEqual(self.game.expected_action(), message.ARCHITECT)
