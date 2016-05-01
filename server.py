@@ -65,7 +65,7 @@ class GTRServer(object):
             #resp = GameAction(message.GAMESTATE, pickle.dumps(gs))
             lg.info('Sending GameState');
             lg.info(str(gs));
-            resp = GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__))
+            resp = GameAction(message.GAMESTATE, game_id, json.dumps(gs, default=lambda o:o.__dict__))
             self.send_action(user, resp)
 
         elif a.action == message.REQGAMELIST:
@@ -85,7 +85,7 @@ class GTRServer(object):
             gs = self.get_game_state(user, game_id)
             if gs is not None and gs.is_started:
                 #self.send_action(user, GameAction(message.GAMESTATE, pickle.dumps(gs)))
-                self.send_action(user, GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__)))
+                self.send_action(user, GameAction(message.GAMESTATE, game_id, json.dumps(gs, default=lambda o:o.__dict__)))
 
         elif a.action == message.REQSTARTGAME:
             self.start_game(user, game_id)
@@ -94,7 +94,8 @@ class GTRServer(object):
             for u in [p.name for p in gs.players]:
                 gs = self.get_game_state(u, game_id)
                 #self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
-                self.send_action(u, GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__)))
+                self.send_action(u, GameAction(message.STARTGAME, game_id))
+                self.send_action(u, GameAction(message.GAMESTATE, game_id, json.dumps(gs, default=lambda o:o.__dict__)))
 
         elif a.action == message.REQCREATEGAME:
             game_id = self.create_game(user)
@@ -134,7 +135,7 @@ class GTRServer(object):
             for u in [p.name for p in game.game_state.players]:
                 gs = self.get_game_state(u, game_id)
                 #self.send_action(u, GameAction(message.GAMESTATE, pickle.dumps(gs)))
-                self.send_action(u, GameAction(message.GAMESTATE, json.dumps(gs, default=lambda o:o.__dict__)))
+                self.send_action(u, GameAction(message.GAMESTATE, game_id, json.dumps(gs, default=lambda o:o.__dict__)))
 
 
     def find_or_add_user(self, username):

@@ -37,7 +37,6 @@ class GameState(object):
         self.is_role_led = False
         self.role_led = None
         self.active_player = None
-        self.priority_index = None
         self.turn_index = 0
         self.jack_pile = jack_pile or Zone()
         self.library = library or Zone()
@@ -64,7 +63,7 @@ class GameState(object):
 
     def __repr__(self):
         rep = ('GameState(players={players!r}, leader={leader!r}, '
-               'priority={priority!r}, jack_pile={jack_pile!r}, '
+               'jack_pile={jack_pile!r}, '
                'library={library!r}, '
                'in_town_sites={in_town_sites!r},'
                'out_of_town_sites={out_of_town_sites!r})'
@@ -72,7 +71,6 @@ class GameState(object):
         return rep.format(
             players=self.players,
             leader=self.leader_index,
-            priority= self.priority_index,
             jack_pile=self.jack_pile,
             library=self.library,
             in_town_sites=self.in_town_sites,

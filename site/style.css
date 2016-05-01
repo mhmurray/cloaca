@@ -11,21 +11,66 @@ html {
 }
 
 #page-wrapper {
-  width: 650px;
   background: #98A098;
   color: black;
-  padding: 1em;
-  margin: 1em auto;
 }
 
-h1 {
-  margin-top: 0;
+#gamelist-canvas {
+  background: #98A098;
+  display: table;
 }
 
 .log {
   border: 2px solid black;
-  height: 200px;
-  overflow: auto;
+  max-height: 400px;
+  overflow-y:scroll;
+}
+
+#heading {
+  background: #333;
+  color: #98A098;
+  min-height: 23px;
+}
+
+#heading .title {
+  float: left;
+}
+
+#heading .status {
+  /*float: right;*/
+}
+
+.ui-tabs-nav {
+  background: #333;
+  padding-left: 5px;
+  margin: 0 0 0 0;
+  float:left;
+  width: 70%
+}
+
+.ui-tabs-nav li {
+  display: inline-block;
+  background: #98A098;
+  margin-top: 5px;
+  white-space: nowrap;
+}
+
+.ui-tabs-nav li a {
+  color: black;
+  text-decoration: none;
+  padding: 2px 6px 0 6px;
+  background-color: #ccc;
+  border: 1px solid blue;
+  border-bottom: 1px solid #ccc;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+li.ui-tabs-active a {
+  border: 2px solid green;
+  border-bottom: 1px solid #98A098;
+  background-color: #98A098;
+  font-weight: bold;
 }
 
 .card-zone { 
@@ -42,6 +87,42 @@ h1 {
 .card-container > * {
   display: inline-block;
 }
+.influence {
+  border: 2px solid #888;
+  padding: 2px;
+  min-height: 20px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.influence > * {
+  display: inline-block
+}
+
+.building-container {
+  border: 2px solid #888;
+  padding: 2px;
+  min-height: 20px;
+}
+
+.building-container > * {
+  display: inline-block;
+}
+
+.building {
+  border: 2px solid #888;
+  padding: 2px;
+  min-height: 20px;
+}
+  
+.building.selectable {
+  border: 3px solid #4F4;
+}
+  
+.building.selected {
+  border: 3px solid #F22;
+}
+
 
 .player-box {
   border: 6px double black;
@@ -50,15 +131,47 @@ h1 {
   margin-bottom: 2px;
 }
 
-#dialog-wrapper {
+.dialog-wrapper {
   border: 1px solid black;
   padding: 2px;
   margin-top: 2px;
   margin-bottom: 2px;
+  background: #DDD;
 }
 
-#dialog {
+.dialog {
   height: 50px;
+}
+
+.deck-container {
+  min-height: 150px;
+}
+
+.deck-container > * {
+  display:table;
+}
+
+.pile {
+  width: 100px;
+  height: 145px;
+  border-radius: 6px;
+  position:relative;
+  float: left;
+}
+
+.pile-title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 20px;
+}
+
+.pile-count {
+  text-align: center;
+  vertical-align: middle;
+  font-size: 40px;
+  z-index: 1;
+  display: table-cell;
 }
 
 .card {
@@ -69,21 +182,35 @@ h1 {
   height: 40px;
   border-radius: 6px;
   padding-top: 5px;
+  overflow: hidden;
 }
 
 .card:hover {
   opacity: 0.7;
 }
 
+.sites-container .site {
+  display: inline-block;
+}
+
+.sites-container {
+  border: 2px solid #888;
+  padding: 2px;
+  min-height: 20px;
+  height: 130px;
+  width: 208px;
+}
+
+
 .orders {
   border-color: #000;
   color: black;
   background: repeating-linear-gradient(
       45deg,
-      #A0A0A0,
-      #A0A0A0 10px,
-      #50FF50 10px,
-      #50FF50 20px
+      #AAA,
+      #AAA 10px,
+      #5F5 10px,
+      #5F5 20px
   );
 }
 
@@ -108,7 +235,7 @@ h1 {
 }
 
 .rubble {
-  background: #FF0;
+  background: #FD4;
   color: #000;
 }
 
@@ -116,7 +243,68 @@ h1 {
   background: #000;
   color: #FFF;
 }
+
+.site {
+  width: 100px;
+  border-width: 1px;
+  border-style: solid;
+  text-align: center;
+  height: 40px;
+  border-radius: 6px;
+  padding-top: 5px;
+  background: #EEE;
+  /* This limits the strips to the bottom part of the site
+  background-size: 100% 40%;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  */
+}
+
+.site-title,.site-count {
+  background: #EEE;
+  border-radius: 2px;
+  padding: 0 2px 0 2px;
+}
+
+.site:hover {
+  opacity: 0.7;
+}
   
+.site.rubble {
+  background-image: repeating-linear-gradient(
+      45deg, #EEE, #EEE 10px, #FD4 10px, #FD4 20px);
+}
+
+.site.wood {
+  background-image: repeating-linear-gradient(
+      45deg, #EEE, #EEE 10px, #A63 10px, #A63 20px
+  );
+}
+
+.site.concrete {
+  background-image: repeating-linear-gradient(
+      45deg, #EEE, #EEE 10px, #AAA 10px, #AAA 20px
+  );
+}
+
+.site.brick {
+  background-image: repeating-linear-gradient(
+      45deg, #EEE, #EEE 10px, #D44 10px, #D44 20px
+  );
+}
+
+.site.stone{
+  background-image: repeating-linear-gradient(
+      45deg, #EEE, #EEE 10px, #5BC 10px, #5BC 20px
+  );
+}
+
+.site.marble {
+  background-image: repeating-linear-gradient(
+      45deg, #EEE, #EEE 10px, #B5B 10px, #B5B 20px
+  );
+}
+
 .card.selectable {
   border: 3px solid #4F4;
 }
@@ -124,9 +312,21 @@ h1 {
 .card.selected {
   border: 3px solid #F22;
 }
+  
+.site.selectable {
+  border: 3px solid #4F4;
+}
+  
+.site.selected {
+  border: 3px solid #F22;
+}
+  
+.pile.selectable {
+  border: 3px solid #4F4;
+}
+  
 
-
-#status {
+.status {
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
@@ -140,44 +340,54 @@ h1 {
 }
 
 #devtools {
-  margin-top: 3cm;
+  margin: 0 0 0 0;
+  display: table;
 }
 
-ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 0.95rem;
+#message-form {
+  margin-left: 10px;
 }
 
-ul li {
+#title {
+  font-weight: bold;
+}
+
+#gamelist li span {
+  display: inline-block;
+  width: 80px;
+  font-weight: bold;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background-color: #CCC;
+  margin-right: 10px;
+}
+
+#gamelist li {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid #EEE;
 }
 
-ul li:first-child {
+#gamelist li:first-child {
   border-top: 1px solid #EEE;
 }
 
-ul li span {
-  display: inline-block;
-  width: 90px;
-  font-weight: bold;
-  color: #999;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+.game-wrapper {
+  display:table;
 }
 
-.sent {
-  background-color: #F7F7F7;
+.cards-panel {
+  display: table-cell;
+  width: 70%;
+  padding: 1px;
 }
 
-.received {}
-
-#message-form {
-  margin-top: 1.5rem;
+#gamestate-copy {
+  width: 100%;
+  height: 500px;
+  margin-left: 10px;
 }
+
 
 textarea {
   width: 100%;
@@ -187,7 +397,6 @@ textarea {
   border-radius: 3px;
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.1);
   min-height: 100px;
-  margin-bottom: 1rem;
 }
 
 button {
@@ -202,14 +411,14 @@ button {
   background: #86b32d;
 }
 
+button.selectable {
+  border: 3px solid #4F4;
+}
+  
+
 button:hover {
   opacity: 0.75;
   cursor: pointer;
-}
-
-.button-row {
-  margin-top: 2px;
-  margin-bottom: 2px;
 }
 
 button[disabled]:hover {

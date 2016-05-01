@@ -15,19 +15,54 @@ import cloaca.test.test_setup as test_setup
 
 import unittest
 
-class TestLegionary(unittest.TestCase):
-    """ Test handling legionary responses.
+class TestMultiLegionary(unittest.TestCase):
+    """Test handling legionary responses with multiple legionary
+    actions.
     """
 
     def setUp(self):
-        """ This is run prior to every test.
+        """This is run prior to every test.
+        """
+        clientele = [['Atrium'], []]
+        self.game = test_setup.two_player_lead('Legionary', clientele)
+        self.p1, self.p2 = self.game.game_state.players
+
+
+    def test_opponent_has_some_match(self):
+        """Demand cards that opponent has only some of.
+        """
+        atrium, shrine, foundry = cm.get_cards(['Atrium', 'Shrine', 'Foundry'])
+        self.p1.hand.set_content([atrium, shrine])
+        self.p2.hand.set_content([foundry])
+
+        a = message.GameAction(message.LEGIONARY, atrium, shrine)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS, foundry)
+        self.game.handle(a)
+
+        self.assertNotIn('Foundry', self.p2.hand)
+        self.assertIn('Foundry', self.p1.stockpile)
+        self.assertEqual(len(self.p2.hand), 0)
+
+        # It should be p2's turn now
+        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+
+
+
+class TestLegionary(unittest.TestCase):
+    """Test handling legionary responses.
+    """
+
+    def setUp(self):
+        """This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Legionary')
         self.p1, self.p2 = self.game.game_state.players
 
 
     def test_expects_legionary(self):
-        """ The Game should expect a LEGIONARY action.
+        """The Game should expect a LEGIONARY action.
         """
         self.assertEqual(self.game.expected_action(), message.LEGIONARY)
 

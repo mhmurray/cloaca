@@ -101,7 +101,7 @@ class GTRActionSpec(object):
 #Card = int
 _action_args_dict = {
     REQGAMESTATE   : GTRActionSpec('reqgamestate',   (), () ),
-    GAMESTATE      : GTRActionSpec('gamestate',      ( (str,  'game_state'), ), () ),
+    GAMESTATE      : GTRActionSpec('gamestate',      ( (int, 'game_id'), (str,  'game_state'), ), () ),
     SETPLAYERID    : GTRActionSpec('setplayerid',    ( (int,  'id'), ), () ),
     REQJOINGAME    : GTRActionSpec('reqjoingame',    ( (int, 'game_id'), ), () ),
     JOINGAME       : GTRActionSpec('joingame',       ( (int, 'game_id'), ), () ),
@@ -109,7 +109,7 @@ _action_args_dict = {
     CREATEGAME     : GTRActionSpec('creategame',     (), () ),
     LOGIN          : GTRActionSpec('login',          ( (str, 'user_name'), ), () ),
     REQSTARTGAME   : GTRActionSpec('reqstartgame',   (), () ),
-    STARTGAME      : GTRActionSpec('startgame',      (), () ),
+    STARTGAME      : GTRActionSpec('startgame',      ( (int, 'game_id'), ), () ),
     REQGAMELIST    : GTRActionSpec('reqgamelist',    (), () ),
     GAMELIST       : GTRActionSpec('gamelist',       ( (str, 'game_list'), ), () ),
 

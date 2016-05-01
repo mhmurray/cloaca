@@ -1,6 +1,6 @@
 from twisted.application import internet, service
 from twisted.internet import protocol
-from twisted.web import resource, server
+from twisted.web import resource, server, static
 from twisted.protocols.basic import NetstringReceiver
 from twisted.python import components
 from zope.interface import Interface, implements
@@ -15,7 +15,48 @@ from pickle import dumps
 
 from interfaces import IGTRService, IGTRFactory
 
+# For websocket test
+import sys
+sys.path.append("sockjs-twisted")
+from txsockjs.factory import SockJSFactory
+
+import json
+
 class GTRProtocol(NetstringReceiver):
+
+    @staticmethod
+    def game_action_to_json(user, game_id, action):
+        """Convert a username, game_id, and GameAction to a JSON string."""
+
+        d = {'user': user, 'game': game_id,
+            'action': action.action, 'args': action.args}
+
+        return json.dumps(d)
+
+    @staticmethod
+    def game_action_from_json(j):
+        """Convert json string and return (user, game_id, game_action).
+
+        Returns:
+        user -- string, username
+        game_id -- int
+        game_action -- list [<action>, <args>]
+        """
+        try:
+            d = json.loads(j)
+        except ValueError:
+            print 'Failed to parse JSON: ' + str(j)
+            return None
+
+        try:
+            user, game = d['user'], d['game']
+            action, args = d['action'], d['args']
+        except KeyError:
+            print 'JSON object does not represent a GameAction: ', d
+            return None
+
+        return user, game, action, args
+
 
     def connectionMade(self):
         print 'client connected'
@@ -29,23 +70,23 @@ class GTRProtocol(NetstringReceiver):
         Converts the game_id to an integer and tries to parse the
         action.
         """
-        user, game, action = request.split(',', 2)
-
-        game_id = int(game)
+        print 'string received ', request
+        user, game, action, args = self.game_action_from_json(request)
 
         try:
-            a = message.parse_action(action)
+            a = message.parse_action(action, args)
         except message.BadGameActionError as e:
             print e.message
             return
 
         self.factory.register(self, user)
-        self.factory.handle_action(user, game_id, a)
+        self.factory.handle_action(user, game, a)
 
     def send_action(self, action):
-        """Sends a GameAction to the client"""
-        self.sendString(','.join(
-                [str(action.action)] + map(str, action.args)))
+        """Send a GameAction to the client."""
+        #self.sendString(','.join(
+        #        [str(action.action)] + map(str, action.args)))
+        self.sendString(json.dumps(action, default = lambda o: o.__dict__))
 
 
 class GTRService(service.Service):
@@ -115,7 +156,49 @@ application = service.Application('gtr')
 #s = GTRService('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
 s = GTRService('tmp/twistd_backup.dat', None)
 serviceCollection = service.IServiceCollection(application)
-internet.TCPServer(5000, IGTRFactory(s)).setServiceParent(serviceCollection)
+
+root = resource.Resource()
+
+class FormPage(static.File):
+    #def render_GET(self, request):
+    #    return static.File('./index.html')
+    
+    def render_POST(self, request):
+        return '<html><body>You submitted: %s</body></html>' % (cgi.escape(str(request.args)),)
+
+class DisableCache(static.File):
+    """Static file resource that sets the header to disable caching.
+    """
+
+    def render_GET(self, request):
+        print request.responseHeaders
+        request.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+        request.setHeader('Pragma', 'no-cache')
+        request.setHeader('Expires', '0')
+        print request.responseHeaders
+        size = self.getFileSize()
+        return static.File.render_GET(self, request)
+
+class Test(resource.Resource):
+    def render_GET(self, request):
+        print request
+        print 'TEstint'
+        return 'stuff'
+
+root.putChild('hello', SockJSFactory(IGTRFactory(s)))
+root.putChild("index", static.File('site/index.html'))
+root.putChild("style.css", static.File('site/style.css'))
+root.putChild("favicon.ico", static.File('site/favicon.ico'))
+root.putChild("js", static.File('site/js'))
+site = server.Site(root)
+
+#reactor.listenTCP(5050, site)
+#reactor.run()
+
+
+internet.TCPServer(5000, site).setServiceParent(serviceCollection)
+#internet.TCPServer(5000, SockJSFactory(IGTRFactory(s))).setServiceParent(serviceCollection)
+#internet.TCPServer(5000, IGTRFactory(s)).setServiceParent(serviceCollection)
 
 
 # vim: set filetype=python:

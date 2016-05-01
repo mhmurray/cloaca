@@ -7,6 +7,76 @@ function($){
         Action: {}
     };
 
+    /* "Turn off" the jQuery objects provided.
+     * For Buttons, this is .prop('disabled', true), and
+     * for all elements it's .off('click').
+     */
+    util.off = function() {
+        for(var i=0; i<arguments.length; i++) {
+            var o = arguments[i];
+            if(o.prop('tagName') === 'BUTTON') {
+                o.prop('disabled', true);
+            }
+            o.off('click');
+        }
+    };
+
+    /* Taking a jQuery Object of card elements with
+     * ids corresponding to eg. 'card15', return
+     * an array of ids as integers.
+     */
+    util.extractCardIds = function($cards) {
+        return $.map($cards, function(item) {
+            return $(item).data('ident');
+        });
+    };
+
+    /* Taking a jQuery Object of card elements with
+     * ids corresponding to eg. 'card15', return
+     * an array of card names as strings.
+     */
+    util.extractCardNames = function($cards) {
+        return $.map($cards, function(item) {
+            return $(item).data('name');
+        });
+    };
+
+    /* Taking a jQuery Object of card elements with
+     * ids corresponding to eg. 'card15', return
+     * an array of card properties dictionaries.
+     */
+    util.extractCardProperties = function($cards) {
+        console.dir($cards);
+        return $.map($cards, function(item) {
+            console.log(item);
+            return util.cardProperties($(item).data('name'));
+        });
+    };
+
+    util.roleToMaterial = function(role) {
+        return {
+            Laborer: 'Rubble',
+            Craftsman: 'Wood',
+            Architect: 'Concrete',
+            Legionary: 'Brick',
+            Merchant: 'Stone',
+            Patron: 'Marble'
+        }[role];
+    }
+
+    util.materialToRole = function(material) {
+        return {
+            Rubble: 'Laborer',
+            Wood: 'Craftsman',
+            Concrete: 'Architect',
+            Brick: 'Legionary',
+            Stone: 'Merchant',
+            Marble: 'Patron'
+        }[material];
+    }
+
+    /* Return the card name corresponding to this ident number.
+     */
     util.cardName = function(ident) {
         if(ident < 0) {
             return 'Orders';
@@ -38,20 +108,85 @@ function($){
         return $zone;
     };
 
+    util.makeSite = function(material) {
+        return $('<div />', {
+            class: 'site ' + material.toLowerCase(),
+        }).text(material[0].toUpperCase() + material.slice(1));
+    };
+
+    // Cards are passed by ident as integers.
+    util.makeBuilding = function(
+        id_, foundation, site, materials, stairwayMaterials, complete) {
+
+        var $container = $('<div />', {
+            id: id_,
+            class: 'building',
+        });
+
+        var cardName = util.cardName(foundation);
+        var $foundationCard = util.makeCard(foundation);
+        $container.append($foundationCard);
+
+        var foundationMaterial = util.cardProperties(foundation).material;
+        var siteMaterial = site;
+
+        $container.data({
+            ident: foundation,
+            materials: [foundationMaterial, siteMaterial],
+            complete: complete
+        });
+
+        $container.append(util.makeSite(siteMaterial));
+
+        if(typeof(materials) !== 'undefined') {
+            $.each(materials, function(i, card) {
+                $container.append($('<div />', {
+                    class: 'material',
+                }).text(util.cardName(card.ident)));
+            });
+        }
+        
+        if(typeof(stairwayMaterials) !== 'undefined') {
+            $.each(stairwayMaterials, function(i, card) {
+                $container.append($('<div />', {
+                    class: 'material stairway',
+                }).text(util.cardName(card.ident)));
+            });
+        }
+        
+        return $container;
+    };
+
+    util.makeSitesStack = function(material, nInTown, nOutOfTown) {
+        var material_lower = material.toLowerCase();
+        return $('<div />', {
+                id: 'sites-'+material_lower,
+                class: 'site ' + material_lower,
+                data: {material: material, inTown : nInTown, outOfTown: nOutOfTown}
+        }).append($('<span/>').text(material).addClass('site-title'),
+                  $('<span/>').text(nInTown+'/'+nOutOfTown).addClass('site-count'));
+    };
+
     // Return a jQuery object representing a card.
     util.makeCard = function(ident) {
-        if(ident < 0) {
-            return $('<div />', {text: 'Card', class: 'card orders'});
-        } else if(ident < 6) {
-            return $('<div />', {id: 'card'+ident, text: 'Jack', class: 'card jack'});
-        }
+        var $card;
         var name = util.cardName(ident);
-        var material = util.cardProperties(name).material.toLowerCase();
-        return $('<div />', {
-            id: 'card'+ident,
-            text: name,
-            class: 'card ' + material,
-        });
+        if(ident < 0) {
+            $card = $('<div />', {text: 'Card', class: 'card orders'});
+        } else if(ident < 6) {
+            $card = $('<div />', {id: 'card'+ident, text: 'Jack', class: 'card jack'});
+        } else {
+            var material = util.cardProperties(name).material.toLowerCase();
+            $card = $('<div />', {
+                id: 'card'+ident,
+                text: name,
+                class: 'card ' + material,
+            });
+        }
+
+        $card.data({ident: ident, name: name})
+
+        return $card;
     };
 
     util.Action = {

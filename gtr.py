@@ -14,8 +14,8 @@ from datetime import datetime
 
 lg = logging.getLogger('gtr')
 logging.basicConfig()
-lg.setLevel(logging.INFO)
-#lg.setLevel(logging.DEBUG)
+#lg.setLevel(logging.INFO)
+lg.setLevel(logging.DEBUG)
 
 class Game(object):
     """Controls the operation of a single game.
@@ -66,7 +66,6 @@ class Game(object):
 
         self.game_state.active_player = self.game_state.players[first_player_index]
         self.game_state.leader_index = first_player_index
-        self.game_state.priority_index = first_player_index
         self.game_state.jack_pile = Zone([Card(i) for i in range(Game.initial_jack_count)])
         self.init_sites(n_players)
 
@@ -788,10 +787,11 @@ class Game(object):
         card = a.args[0]
 
         p = self.game_state.active_player
-        if len(p.clientele) >= self.clientele_limit(p):
-            raise GTRError('Player ' + p.name + ' has no room in clientele')
 
         if card:
+            if len(p.clientele) >= self.clientele_limit(p):
+                raise GTRError('Player ' + p.name + ' has no room in clientele')
+
             self.game_state.pool.move_card(card, p.clientele)
 
             if self.player_has_active_building(p, 'Bath'):
@@ -1332,19 +1332,25 @@ class Game(object):
 
         unmatched = revealed - given
         extras = given - revealed
-        ungiven = unmatched & hand # Set intersection
+        remaining = hand - given
+        ungiven = unmatched & remaining # Set intersection
 
         if len(extras):
+            lg.debug('Too many cards given : ' + str(extras))
             raise GTRError('Extra cards given for legionary.')
 
         if len(ungiven):
+            lg.debug('Require more cards : ' + str(ungiven))
             raise GTRError('Not enough cards given for legionary.')
 
         for c in given_cards:
             p.hand.move_card(c, leg_p.stockpile)
 
-        self.log('{0} gives cards from their hand: {1}'
-            .format(p.name, ', '.join(map(str, given_cards))))
+        if len(given_cards):
+            self.log('{0} gives cards from their hand: {1}'
+                .format(p.name, ', '.join(map(str, given_cards))))
+        else:
+            self.log('{0}: "Glory to Rome!"'.format(p.name))
 
         stockpile_copy = list(p.stockpile)
         cards_moved_from_stockpile = []
@@ -1501,12 +1507,12 @@ class Game(object):
 
         if cards[0] is not None:
             for c in cards:
-                if c == 'Jack':
+                if c.name == 'Jack':
                     raise GTRError('Can\'t move Jacks with Sewer')
                 p.camp.move_card(c, p.stockpile)
 
             self.log('{0} flushes cards down the Sewer: {1}'
-                .format(p.name, ', '.join(cards)))
+                    .format(p.name, ', '.join(map(lambda x: x.name, cards))))
 
         for c in p.camp.cards[:]: # Copy since we're removing
             if c.name == 'Jack':
