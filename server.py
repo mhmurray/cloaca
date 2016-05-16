@@ -1,5 +1,4 @@
 from gtr import Game
-from gamestate import GameState
 from player import Player
 from game_record import GameRecord
 from message import GameAction, Command
@@ -233,7 +232,7 @@ class GTRServer(object):
             if player_index is None:
                 msg = ('User {0} is not part of game {1:d}, players: {2!s}'
                         ).format(name, game_id,
-                            [p.name for p in game.game_state.players])
+                            [p.name for p in game.players])
 
                 lg.warning(msg)
                 self._send_error(user, msg)
@@ -261,7 +260,7 @@ class GTRServer(object):
                 lg.warning(msg)
                 self._send_error(user, msg)
 
-            for u in [p.uid for p in game.game_state.players]:
+            for u in [p.uid for p in game.players]:
                 gs = self._get_game_state(u, game_id)
                 self._send_gamestate(u, game_id)
 
@@ -360,8 +359,8 @@ class GTRServer(object):
         self.games.append(game)
         game_id = len(self.games)-1
         lg.info('Creating new game {0:d}'.format(game_id))
-        game.game_state.game_id = game_id
-        game.game_state.host = user
+        game.game_id = game_id
+        game.host = user
 
         username = self._userinfo(user)['name']
         player_index = game.add_player(user, username)
@@ -372,9 +371,9 @@ class GTRServer(object):
         """Return list of games"""
         game_list = []
         for i, game in enumerate(self.games):
-            players = [p.name for p in game.game_state.players]
+            players = [p.name for p in game.players]
             started = game.is_started
-            host = game.game_state.host
+            host = game.host
             game_list.append(GameRecord(i, players, started, host))
         
         return game_list
@@ -396,9 +395,9 @@ class GTRServer(object):
             raise GTRError('Player {0} cannot start game {1} that they haven\'t joined.'
                     .format(name, game_id))
 
-        if user != game.game_state.host:
+        if user != game.host:
             raise GTRError('Player {0} cannot start game {1} if they are not the host ({2}).'
-                    .format(name, game_id, game.game_state.host))
+                    .format(name, game_id, game.host))
 
         game.start()
         self._save_backup()
@@ -425,14 +424,14 @@ class GTRServer(object):
                 lg.warning('Error! Couldn\'t load games from backup file: ' + self._load_backup_file)
                 return
 
-            self.games = [Game(gs) for gs in game_states]
+            self.games = [gs for gs in game_states]
 
     def _save_backup(self):
         """ Writes pickled list of game states to backup file.
         """
         if self._backup_file:
 
-            game_states = [g.game_state for g in self.games]
+            game_states = [g for g in self.games]
 
             try:
                 f = open(self._backup_file, 'w')

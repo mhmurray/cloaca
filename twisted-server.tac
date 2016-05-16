@@ -7,7 +7,6 @@ from twisted.internet.protocol import ServerFactory, Protocol
 from zope.interface import Interface, implements
 
 from bidict import bidict
-from gamestate import GameState
 from message import GameAction, Command
 import message
 from server import GTRServer

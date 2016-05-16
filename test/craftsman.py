@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
@@ -23,7 +22,7 @@ class TestCraftsman(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Craftsman')
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
 
     def test_expects_craftsman(self):
@@ -38,7 +37,7 @@ class TestCraftsman(unittest.TestCase):
         a = message.GameAction(message.CRAFTSMAN, None, None, None)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.leader_index, 1)
+        self.assertEqual(self.game.leader_index, 1)
         self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
@@ -130,12 +129,12 @@ class TestCraftsman(unittest.TestCase):
         self.p1.hand.set_content([atrium])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.CRAFTSMAN, latrine, None, 'Rubble')
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
     
     def test_wrong_site(self):
@@ -147,12 +146,12 @@ class TestCraftsman(unittest.TestCase):
         self.p1.hand.set_content([atrium])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.CRAFTSMAN, atrium, None, 'Rubble')
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_illegal_out_of_town(self):
@@ -163,15 +162,15 @@ class TestCraftsman(unittest.TestCase):
         atrium = cm.get_card('Atrium')
         self.p1.hand.set_content([atrium])
 
-        self.game.game_state.in_town_sites = ['Rubble']
+        self.game.in_town_sites = ['Rubble']
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.CRAFTSMAN, atrium, None, 'Brick')
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_add_to_nonexistent_building(self):
@@ -183,12 +182,12 @@ class TestCraftsman(unittest.TestCase):
         self.p1.hand.set_content([atrium])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.CRAFTSMAN, foundry, atrium, None)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_specifying_material_and_site(self):
@@ -200,12 +199,12 @@ class TestCraftsman(unittest.TestCase):
         self.p1.hand.set_content([atrium])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.CRAFTSMAN, foundry, atrium, 'Brick')
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
 class TestFountain(unittest.TestCase):
@@ -218,14 +217,14 @@ class TestFountain(unittest.TestCase):
         clientele = []
         buildings = (['Fountain'],[])
         self.game = test_setup.two_player_lead('Craftsman', clientele, buildings)
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
     def test_fountain_skip(self):
         """Test using a fountain to look at the top card and then skip the action,
         drawing the card.
         """
         bath = cm.get_card('Bath')
-        self.game.game_state.library.cards.insert(0,bath)
+        self.game.library.cards.insert(0,bath)
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
@@ -245,7 +244,7 @@ class TestFountain(unittest.TestCase):
         building with it.
         """
         bath = cm.get_card('Bath')
-        self.game.game_state.library.cards.insert(0,bath)
+        self.game.library.cards.insert(0,bath)
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
@@ -270,7 +269,7 @@ class TestFountain(unittest.TestCase):
         a material to a building, completing it.
         """
         bath, atrium, foundry = cm.get_cards(['Bath', 'Atrium', 'Foundry'])
-        self.game.game_state.library.cards.insert(0,bath)
+        self.game.library.cards.insert(0,bath)
 
         self.p1.buildings.append(Building(atrium, 'Brick', materials=[foundry]))
 

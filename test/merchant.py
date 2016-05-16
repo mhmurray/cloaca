@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
@@ -23,7 +22,7 @@ class TestMerchant(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Merchant')
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
 
     def test_expects_merchant(self):
@@ -51,12 +50,12 @@ class TestMerchant(unittest.TestCase):
         This invalid game action should leave the game state unchanged.
         """
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.MERCHANT, cm.get_card('Atrium'), None, False)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
     
     def test_merchant_at_vault_limit(self):
@@ -69,12 +68,12 @@ class TestMerchant(unittest.TestCase):
         self.p1.vault.set_content([insula, dock])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.MERCHANT, atrium, None, False)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_merchant_past_higher_vault_limit(self):
@@ -88,12 +87,12 @@ class TestMerchant(unittest.TestCase):
         self.p1.influence.append('Wood')
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.MERCHANT, atrium, None, False)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_merchant_at_higher_vault_limit(self):

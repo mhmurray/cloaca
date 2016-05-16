@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 from cloaca.zone import Zone
@@ -29,7 +28,7 @@ class TestInitPool(unittest.TestCase):
         g.add_player(uuid4(), 'p1')
         g.add_player(uuid4(), 'p2')
 
-        gs = g.game_state
+        gs = g
         gs.library.set_content(cm.get_cards(['Bar', 'Circus']))
 
         first = g._init_pool(len(gs.players))
@@ -46,7 +45,7 @@ class TestInitPool(unittest.TestCase):
         g.add_player(uuid4(), 'p4')
         g.add_player(uuid4(), 'p5')
 
-        gs = g.game_state
+        gs = g
         gs.library.set_content(cm.get_cards(['Statue', 'Circus', 'Dock', 'Dock', 'Ludus Magna']))
 
         first = g._init_pool(len(gs.players))
@@ -63,7 +62,7 @@ class TestInitPool(unittest.TestCase):
         g.add_player(uuid4(), 'p2')
         g.add_player(uuid4(), 'p3')
 
-        gs = g.game_state
+        gs = g
         gs.library.set_content(cm.get_cards(
             ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
              'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum',
@@ -92,7 +91,7 @@ class TestGameStatePrivatize(unittest.TestCase):
         g = Game()
         g.add_player(uuid4(), 'p1')
         g.add_player(uuid4(), 'p2')
-        gs = g.game_state
+        gs = g
 
         gs.library.set_content(cm.get_cards(
             ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
@@ -110,7 +109,7 @@ class TestGameStatePrivatize(unittest.TestCase):
         g = Game()
         g.add_player(uuid4(), 'p0')
         g.add_player(uuid4(), 'p1')
-        gs = g.game_state
+        gs = g
 
         p0, p1 = gs.players
 
@@ -138,7 +137,7 @@ class TestGameStatePrivatize(unittest.TestCase):
         g = Game()
         g.add_player(uuid4(), 'p0')
         g.add_player(uuid4(), 'p1')
-        gs = g.game_state
+        gs = g
 
         p0, p1 = gs.players
 
@@ -160,7 +159,7 @@ class TestGameStatePrivatize(unittest.TestCase):
         g.add_player(uuid4(), 'p0')
         g.add_player(uuid4(), 'p1')
 
-        gs = g.game_state
+        gs = g
         p0, p1 = gs.players
 
         latrine, insula, statue, road = cm.get_cards(['Latrine', 'Insula', 'Statue', 'Road'])

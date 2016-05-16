@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
@@ -22,7 +21,7 @@ class TestLaborer(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Laborer')
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
 
     def test_expects_laborer(self):
@@ -35,12 +34,12 @@ class TestLaborer(unittest.TestCase):
         """ Take one card from the pool with laborer action.
         """
         atrium = cm.get_card('Atrium')
-        self.game.game_state.pool.set_content([atrium])
+        self.game.pool.set_content([atrium])
 
         a = message.GameAction(message.LABORER, None, atrium)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.game.game_state.pool)
+        self.assertNotIn('Atrium', self.game.pool)
         self.assertIn('Atrium', self.p1.stockpile)
 
     
@@ -49,15 +48,15 @@ class TestLaborer(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.game_state.pool.set_content(cm.get_cards(['Atrium']))
+        self.game.pool.set_content(cm.get_cards(['Atrium']))
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LABORER, None, cm.get_card('Dock'))
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
 if __name__ == '__main__':

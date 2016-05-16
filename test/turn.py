@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 from cloaca.zone import Zone
@@ -23,7 +22,7 @@ class TestThinkerOrLead(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.simple_two_player()
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
     def test_expects_thinker_or_lead(self):
         """ The Game should expect a THINKERORLEAD action.
@@ -65,8 +64,8 @@ class TestThinkerOrLead(unittest.TestCase):
             self.game.handle(a)
             self.game.handle(b)
 
-        self.assertEqual(len(self.game.game_state.players[0].hand), 14)
-        self.assertEqual(len(self.game.game_state.players[1].hand), 14)
+        self.assertEqual(len(self.game.players[0].hand), 14)
+        self.assertEqual(len(self.game.players[1].hand), 14)
 
     def test_thinker_for_jacks_many_times(self):
         """ Thinker several times in a row for both players.
@@ -86,8 +85,8 @@ class TestThinkerOrLead(unittest.TestCase):
             self.game.handle(a)
             self.game.handle(b)
 
-        self.assertEqual(len(self.game.game_state.players[0].hand), 3)
-        self.assertEqual(len(self.game.game_state.players[1].hand), 3)
+        self.assertEqual(len(self.game.players[0].hand), 3)
+        self.assertEqual(len(self.game.players[1].hand), 3)
 
     def test_thinker_for_too_many_jacks(self):
         """ Thinker for a Jack with an empty Jack pile
@@ -97,18 +96,18 @@ class TestThinkerOrLead(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, True)
         b = message.GameAction(message.THINKERTYPE, True)
 
-        self.game.game_state.jacks.set_content([])
+        self.game.jacks.set_content([])
 
         self.game.handle(a)
 
         # Monitor the gamestate for any changes
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         # Player 1
         self.game.handle(b)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
 class TestLeadRole(unittest.TestCase):
@@ -119,7 +118,7 @@ class TestLeadRole(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.simple_two_player()
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
         
         # Indicate that we want to lead
         a = message.GameAction(message.THINKERORLEAD, False)
@@ -135,7 +134,7 @@ class TestLeadRole(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, latrine)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Laborer')
+        self.assertEqual(self.game.role_led, 'Laborer')
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertIn(latrine, self.p1.camp)
         self.assertNotIn(latrine, self.p1.hand)
@@ -152,7 +151,7 @@ class TestLeadRole(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, jack)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Laborer')
+        self.assertEqual(self.game.role_led, 'Laborer')
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertIn(jack, self.p1.camp)
         self.assertNotIn(jack, self.p1.hand)
@@ -168,7 +167,7 @@ class TestLeadRole(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.game.role_led, 'Craftsman')
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
@@ -185,7 +184,7 @@ class TestLeadRole(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Laborer')
+        self.assertEqual(self.game.role_led, 'Laborer')
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
@@ -204,7 +203,7 @@ class TestLeadRole(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.game.role_led, 'Craftsman')
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
@@ -223,7 +222,7 @@ class TestLeadRole(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.game.role_led, 'Craftsman')
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
@@ -238,12 +237,12 @@ class TestLeadRole(unittest.TestCase):
         self.p1.hand.set_content(cards)
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_petition_with_nonmatching_cards(self):
@@ -254,12 +253,12 @@ class TestLeadRole(unittest.TestCase):
         self.p1.hand.set_content(cards)
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_petition_with_too_many_cards(self):
@@ -270,12 +269,12 @@ class TestLeadRole(unittest.TestCase):
         self.p1.hand.set_content(cards)
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_petition_with_nonexistent_cards(self):
@@ -286,12 +285,12 @@ class TestLeadRole(unittest.TestCase):
         #self.p1.hand.set_content(cards)
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 class TestPalace(unittest.TestCase):
     """Test leading multiple actions with Palace.
@@ -301,7 +300,7 @@ class TestPalace(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.simple_two_player()
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
         palace, statue = cm.get_cards(['Palace', 'Statue'])
         self.p1.buildings = [Building(palace, 'Marble', materials=[statue], complete=True)]
@@ -322,7 +321,7 @@ class TestPalace(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.game.role_led, 'Craftsman')
         self.assertEqual(self.p1.n_camp_actions, n_actions)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertFalse(self.p1.hand.contains(['Road','Dock']))
@@ -340,7 +339,7 @@ class TestPalace(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.game.role_led, 'Craftsman')
         self.assertEqual(self.p1.n_camp_actions, n_actions)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertFalse(self.p1.hand.contains(['Road','Dock']))
@@ -358,7 +357,7 @@ class TestPalace(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
         self.game.handle(a)
 
-        self.assertEqual(self.game.game_state.role_led, 'Craftsman')
+        self.assertEqual(self.game.role_led, 'Craftsman')
         self.assertEqual(self.p1.n_camp_actions, n_actions)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertFalse(self.p1.hand.contains(['Road','Dock']))
@@ -375,12 +374,12 @@ class TestPalace(unittest.TestCase):
         n_actions = 6
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_petition_with_illegal_petition_size(self):
@@ -392,22 +391,22 @@ class TestPalace(unittest.TestCase):
         self.p1.hand.set_content(cards)
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 2, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 4, *cards)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
 class TestFollow(unittest.TestCase):
@@ -418,7 +417,7 @@ class TestFollow(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.simple_two_player()
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
         
         # Indicate that p1 will lead
         a = message.GameAction(message.THINKERORLEAD, False)
@@ -489,9 +488,9 @@ class TestFollow(unittest.TestCase):
         
         # Monitor the gamestate for any changes
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
     def test_follow_role_with_card_of_different_role(self):
         """ Follow Laborer specifying a card of the wrong role.
@@ -505,11 +504,11 @@ class TestFollow(unittest.TestCase):
         
         # Monitor the gamestate for any changes
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
     def test_follow_role_with_petition_of_different_role(self):
         """ Follow Laborer by petition of non-Laborer role cards.
@@ -560,11 +559,11 @@ class TestFollow(unittest.TestCase):
 
         # Monitor the gamestate for any changes
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
 if __name__ == '__main__':

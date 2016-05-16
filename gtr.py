@@ -1,5 +1,4 @@
 from player import Player
-from gamestate import GameState
 import gtrutils
 from gtrutils import check_petition_combos, get_card_from_zone
 import card_manager as cm
@@ -7,6 +6,7 @@ from building import Building
 from card import Card
 from zone import Zone
 from error import GTRError
+import stack
 
 import random
 import copy
@@ -41,31 +41,49 @@ class Game(object):
     """
     _initial_jack_count = 6
 
-    expected_action = property(lambda self : self.game_state.expected_action)
+    active_player_index = property(lambda self : self.players.index(self.active_player))
+    leader = property(lambda self : self.players[self.leader_index])
+    is_started = property(lambda self : self.turn_number > 0)
 
-    def __init__(self, game_state=None):
-        self.game_state = game_state if game_state is not None else GameState()
+    def __init__(self):
+        self.players = []
+        self.leader_index = None
+        self.turn_number = 0
+        self.is_role_led = False
+        self.role_led = None
+        self.active_player = None
+        self.turn_index = 0
+        self.jacks = Zone()
+        self.library = Zone()
+        self.pool = Zone()
+        self.in_town_sites = []
+        self.out_of_town_sites = []
+        self.oot_allowed = False
+        self.used_oot = False
+        self.stack = stack.Stack()
+        self.legionary_count = 0
+        self.legionary_index = 0
+        self.legionary_resp_indices = []
+        self.kip_index = 0
+        self.senate_resp_indices = []
+        self.expected_action = None
+        self.game_id = 0
+        self.host = None
 
-    active_player_index = property(lambda self : self.game_state.players.index(self.game_state.active_player))
-    leader = property(lambda self : self.game_state.players[self.game_state.leader_index])
-    is_started = property(lambda self : self.game_state.turn_number > 0)
-
-    def __repr__(self):
-        rep=('Game(game_state={game_state!r})')
-        return rep.format(game_state = self.game_state)
+        self.game_log = []
 
     def start(self):
         if self.is_started:
             raise GTRError('Game has already started.')
 
-        self._init_common_piles(len(self.game_state.players))
+        self._init_common_piles(len(self.players))
         self._init_player_hands()
-        self.game_state.stack.push_frame('_take_turn_stacked', self.game_state.active_player)
-        self.game_state.turn_number = 1
+        self.stack.push_frame('_take_turn_stacked', self.active_player)
+        self.turn_number = 1
 
         self._log('Starting game.')
         self._log('Turn {0}: {1}'
-            .format(self.game_state.turn_number,
+            .format(self.turn_number,
                     self.leader.name))
 
         self._pump()
@@ -83,18 +101,18 @@ class Game(object):
 
         self._init_library()
 
-        self.game_state.active_player = self.game_state.players[0]
-        self.game_state.leader_index = 0
+        self.active_player = self.players[0]
+        self.leader_index = 0
 
-        self.game_state.jacks = Zone([Card(i) for i in range(Game._initial_jack_count)])
-        self._init_sites(len(self.game_state.players))
+        self.jacks = Zone([Card(i) for i in range(Game._initial_jack_count)])
+        self._init_sites(len(self.players))
 
-        self.game_state.stack.push_frame('_take_turn_stacked', self.game_state.active_player)
-        self.game_state.turn_number = 1
+        self.stack.push_frame('_take_turn_stacked', self.active_player)
+        self.turn_number = 1
 
         self._log('Starting game.')
         self._log('Turn {0}: {1}'
-            .format(self.game_state.turn_number,
+            .format(self.turn_number,
                     self.leader.name))
 
         self._pump()
@@ -111,14 +129,14 @@ class Game(object):
         if self.is_started:
             raise GTRError('Cannot add player after game start.')
 
-        n = len(self.game_state.players)
+        n = len(self.players)
         if n >= 5:
             raise GTRError('Maximum players reached for this game {0}/{0}'
                     .format(n))
 
         lg.debug('Adding player {0}.'.format(name))
 
-        self.game_state.players.append(Player(uid, name))
+        self.players.append(Player(uid, name))
         self._log('{0} has joined the game.'.format(name))
 
     def handle(self, a):
@@ -155,7 +173,7 @@ class Game(object):
 
         Return a new game state object
         """
-        gs = copy.deepcopy(self.game_state)
+        gs = copy.deepcopy(self)
 
         gs.library.set_content([Card(-1)]*len(gs.library))
 
@@ -171,7 +189,7 @@ class Game(object):
     def find_player_index(self, player_name):
         """Finds the index of a named player.
         """
-        players_match = [i for i,p in enumerate(self.game_state.players)
+        players_match = [i for i,p in enumerate(self.players)
                          if p.name==player_name]
         return players_match[0] if len(players_match) else None
 
@@ -179,17 +197,17 @@ class Game(object):
         """Return the Player object with the specified name or None if no
         such player is in the game.
         """
-        players_match = filter(lambda x : x.name == name, self.game_state.players)
+        players_match = filter(lambda x : x.name == name, self.players)
         return players_match[0] if len(players_match) else None
 
     def _increment_leader_index(self):
-        prev_index = self.game_state.leader_index
-        self.game_state.leader_index = self.game_state.leader_index + 1
-        if self.game_state.leader_index >= len(self.game_state.players):
-            self.game_state.leader_index = 0
-            self.game_state.turn_index = self.game_state.turn_index + 1
+        prev_index = self.leader_index
+        self.leader_index = self.leader_index + 1
+        if self.leader_index >= len(self.players):
+            self.leader_index = 0
+            self.turn_index = self.turn_index + 1
         lg.debug('Leader index changed from {0} to {1}'.format(prev_index,
-        self.game_state.leader_index))
+        self.leader_index))
 
     def _following_players_in_order(self):
         """Return a list of players in turn order starting with
@@ -197,17 +215,17 @@ class Game(object):
         before the leader. This is players_in_turn_order()
         with the leader removed.
         """
-        n = self.game_state.leader_index
-        return self.game_state.players[n+1:] + self.game_state.players[:n]
+        n = self.leader_index
+        return self.players[n+1:] + self.players[:n]
 
     def _players_in_turn_order(self, start_player=None):
         """ Returns a list of players in turn order
         starting with start_player or the leader it's None.
         """
-        n = self.game_state.players.index(start_player) \
-            if start_player else self.game_state.leader_index
+        n = self.players.index(start_player) \
+            if start_player else self.leader_index
 
-        return self.game_state.players[n:] + self.game_state.players[:n]
+        return self.players[n:] + self.players[:n]
 
     def _init_common_piles(self, n_players):
         self._log('Initializing the game')
@@ -215,9 +233,9 @@ class Game(object):
         self._init_library()
         first_player_index = self._init_pool(n_players)
 
-        self.game_state.active_player = self.game_state.players[first_player_index]
-        self.game_state.leader_index = first_player_index
-        self.game_state.jacks = Zone([Card(i) for i in range(Game._initial_jack_count)])
+        self.active_player = self.players[first_player_index]
+        self.leader_index = first_player_index
+        self.jacks = Zone([Card(i) for i in range(Game._initial_jack_count)])
         self._init_sites(n_players)
 
     def _init_pool(self, n_players):
@@ -235,34 +253,34 @@ class Game(object):
             players = [c[0] for c in cards if c[1].name == first[1].name]
             all_cards.extend([c[1] for c in cards])
 
-            s = ' '.join(['{0} reveals {1!s}.'.format(self.game_state.players[i].name, card)
+            s = ' '.join(['{0} reveals {1!s}.'.format(self.players[i].name, card)
                          for i, card in cards])
             self._log(s)
 
             if len(players)==1:
                 has_winner = True
-                self._log('{0} plays first.'.format(self.game_state.players[0].name))
+                self._log('{0} plays first.'.format(self.players[0].name))
             else:
                 self._log('Deal more cards into pool to break tie.')
 
-        self.game_state.pool.extend(all_cards)
+        self.pool.extend(all_cards)
         return players[0]
 
     def _init_sites(self, n_players):
         n_out_of_town = 6 - n_players
         for material in cm.get_all_materials():
-            self.game_state.in_town_sites.extend([material]*n_players)
-            self.game_state.out_of_town_sites.extend([material]*n_out_of_town)
+            self.in_town_sites.extend([material]*n_players)
+            self.out_of_town_sites.extend([material]*n_out_of_town)
 
     def _init_library(self):
         """Initializes the library as a list of Card objects
         """
-        self.game_state.library = Zone(cm.get_orders_card_set())
+        self.library = Zone(cm.get_orders_card_set())
         self._shuffle_library()
 
     def _init_player_hands(self):
-        lg.info('Initializing {0} players.'.format(len(self.game_state.players)))
-        for player in self.game_state.players:
+        lg.info('Initializing {0} players.'.format(len(self.players)))
+        for player in self.players:
             self._draw_jack_for_player(player)
             self._thinker_for_cards(player, 5)
 
@@ -274,7 +292,7 @@ class Game(object):
         shuffle. See the SO question
           http://stackoverflow.com/questions/3062741/maximal-length-of-list-to-shuffle-with-python-random-shuffle
         """
-        random.shuffle(self.game_state.library.cards)
+        random.shuffle(self.library.cards)
 
     def _player_score(self, player):
         return self._buildings_score(player) + self._vault_score(player)
@@ -300,13 +318,13 @@ class Game(object):
         score for each player, including the merchant bonuses.
         """
         bonuses = {}
-        for player in self.game_state.players:
+        for player in self.players:
             bonuses[player.name] = []
 
         for material in cm.get_materials():
             # Set name to None if there's a tie, but maintain maximum
             name, maximum = None, 0
-            for player in self.game_state.players:
+            for player in self.players:
                 material_cards = filter(
                     lambda c : c.material == material, player.vault)
                 n = len(material_cards)
@@ -379,7 +397,7 @@ class Game(object):
         this list might contain buildings with the same name.
         """
         _active_buildings = player.complete_buildings
-        for player in self.game_state.players:
+        for player in self.players:
             _active_buildings.extend(player.stairwayed_buildings)
 
         b = next( (b for b in _active_buildings if b.foundation.name == 'Gate'), None)
@@ -397,13 +415,13 @@ class Game(object):
         if not do_thinker:
             # my_list[::-1] reverses the list
             for p in self._players_in_turn_order()[::-1]:
-                self.game_state.stack.push_frame("_perform_role_being_led", p)
+                self.stack.push_frame("_perform_role_being_led", p)
             for p in self._following_players_in_order()[::-1]:
-                self.game_state.stack.push_frame("_follow_role_action", p)
-            self.game_state.stack.push_frame("_lead_role_action")
+                self.stack.push_frame("_follow_role_action", p)
+            self.stack.push_frame("_lead_role_action")
 
         else:
-            self.game_state.stack.push_frame("_perform_thinker_action", p)
+            self.stack.push_frame("_perform_thinker_action", p)
 
         self._pump()
 
@@ -418,16 +436,16 @@ class Game(object):
         player.hand.append(self._draw_jack())
 
     def _discard_for_player(self, player, card):
-        player.hand.move_card(card, self.game_state.pool)
+        player.hand.move_card(card, self.pool)
 
     def _discard_all_for_player(self, player):
         cards_to_discard = list(player.hand)
         for card in cards_to_discard:
-            player.hand.move_card(card, self.game_state.pool)
+            player.hand.move_card(card, self.pool)
 
     def _draw_jack(self):
         try:
-            c = self.game_state.jacks.pop()
+            c = self.jacks.pop()
         except IndexError:
             raise GTRError('Jack pile is empty.')
 
@@ -436,24 +454,24 @@ class Game(object):
     def _draw_cards(self, n_cards):
         cards = []
         for i in range(0, n_cards):
-            cards.append(self.game_state.library.pop(0))
+            cards.append(self.library.pop(0))
         return cards
 
     def _thinker_or_lead(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.THINKERORLEAD
+        self.active_player = player
+        self.expected_action = message.THINKERORLEAD
         return
 
     def _log(self, msg):
         """Logs the message in the GameState log roll.
         """
         time = datetime.now().time().strftime('%H:%M:%S ')
-        self.game_state.game_log.append(time+msg)
+        self.game_log.append(time+msg)
 
     def _pump(self):
-        if self.game_state.stack.stack:
+        if self.stack.stack:
             try:
-                frame = self.game_state.stack.stack.pop()
+                frame = self.stack.stack.pop()
             except IndexError:
                 lg.warning('Tried to pop from empty stack!')
                 raise
@@ -467,13 +485,13 @@ class Game(object):
     def _advance_turn(self):
         """ Moves the leader index, prints game state, saves, and pushes the next turn.
         """
-        self.game_state.turn_number += 1
+        self.turn_number += 1
         self._increment_leader_index()
-        leader_index = self.game_state.leader_index
-        leader = self.game_state.players[leader_index]
-        self.game_state.stack.push_frame('_take_turn_stacked', leader)
+        leader_index = self.leader_index
+        leader = self.players[leader_index]
+        self.stack.push_frame('_take_turn_stacked', leader)
 
-        self._log('Turn {0}: {1}'.format(self.game_state.turn_number, leader.name))
+        self._log('Turn {0}: {1}'.format(self.turn_number, leader.name))
 
         self._pump()
 
@@ -483,10 +501,10 @@ class Game(object):
         Push END_TURN frame.
         Push THINKER_OR_LEAD frame.
         """
-        self.game_state.stack.push_frame("_advance_turn")
-        self.game_state.stack.push_frame("_end_turn")
-        self.game_state.stack.push_frame("_kids_in_pool")
-        self.game_state.stack.push_frame("_thinker_or_lead", player)
+        self.stack.push_frame("_advance_turn")
+        self.stack.push_frame("_end_turn")
+        self.stack.push_frame("_kids_in_pool")
+        self.stack.push_frame("_thinker_or_lead", player)
 
         self._pump()
 
@@ -504,13 +522,13 @@ class Game(object):
 
         This thinker is optional, unlike _perform_thinker_action().
         """
-        self.game_state.expected_action = message.SKIPTHINKER
+        self.expected_action = message.SKIPTHINKER
         return
 
     def _handle_skipthinker(self, a):
         skip = a.args[0]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if skip:
             self._log('{0} skips thinker with Academy'.format(p.name))
@@ -525,8 +543,8 @@ class Game(object):
         """ Entry point for the stack frame that performs one thinker action.
         """
         if self._player_has_active_building(player, 'Vomitorium'):
-            self.game_state.active_player = player
-            self.game_state.expected_action = message.USEVOMITORIUM
+            self.active_player = player
+            self.expected_action = message.USEVOMITORIUM
 
         else:
             a = message.GameAction(message.USEVOMITORIUM, False)
@@ -543,7 +561,7 @@ class Game(object):
         call _handle_uselatrine() to skip the latrine usage.
         Otherwise, ask for latrine use and return.
         """
-        p = self.game_state.active_player
+        p = self.active_player
 
         do_discard = a.args[0]
         if do_discard:
@@ -555,8 +573,8 @@ class Game(object):
             self._handle_uselatrine(a)
 
         elif self._player_has_active_building(p, 'Latrine'):
-            self.game_state.active_player = p
-            self.game_state.expected_action = message.USELATRINE
+            self.active_player = p
+            self.expected_action = message.USELATRINE
 
         else:
             a = message.GameAction(message.USELATRINE, None)
@@ -564,7 +582,7 @@ class Game(object):
 
 
     def _handle_uselatrine(self, a):
-        p = self.game_state.active_player
+        p = self.active_player
         latrine_card = a.args[0]
 
         if latrine_card is not None:
@@ -572,12 +590,12 @@ class Game(object):
             self._log('{0} discards {1} using Latrine.'
                 .format(p.name, latrine_card))
 
-        self.game_state.active_player = p
-        self.game_state.expected_action = message.THINKERTYPE
+        self.active_player = p
+        self.expected_action = message.THINKERTYPE
 
 
     def _handle_thinkertype(self, a):
-        p = self.game_state.active_player
+        p = self.active_player
         for_jack = a.args[0]
 
         is_leader = p == self.leader
@@ -602,7 +620,7 @@ class Game(object):
                 self._log('{0} thinks for {1} {2} instead of following.'
                     .format(p.name, n_cards, noun))
 
-            if len(self.game_state.library) == 0:
+            if len(self.library) == 0:
                 self._log('{0} has drawn the last Orders card. Game Over.'.format(p.name))
                 self._end_game()
 
@@ -612,8 +630,8 @@ class Game(object):
     def _lead_role_action(self):
         """ Entry point for the lead role stack frame.
         """
-        self.game_state.active_player = self.leader
-        self.game_state.expected_action = message.LEADROLE
+        self.active_player = self.leader
+        self.expected_action = message.LEADROLE
 
 
     def _handle_leadrole(self, a):
@@ -629,7 +647,7 @@ class Game(object):
             raise GTRError('Cards specified to lead role not in hand: {0}.'
                 .format(', '.join(map(str, cards))))
 
-        self.game_state.role_led = role
+        self.role_led = role
         p.n_camp_actions = n_actions
         for c in cards:
             p.hand.move_card(c, p.camp)
@@ -645,8 +663,8 @@ class Game(object):
 
 
     def _follow_role_action(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.FOLLOWROLE
+        self.active_player = player
+        self.expected_action = message.FOLLOWROLE
 
 
     def _check_action_units(self, player, role_led, n_actions, cards):
@@ -721,14 +739,14 @@ class Game(object):
         think, n_actions = a.args[0], a.args[1]
         cards = a.args[2:]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if think:
             p.n_camp_actions = 0
-            self.game_state.stack.push_frame("_perform_thinker_action", p)
+            self.stack.push_frame("_perform_thinker_action", p)
         else:
             # This will raise GTRError if the cards don't check out.
-            self._check_action_units(p, self.game_state.role_led, n_actions, cards)
+            self._check_action_units(p, self.role_led, n_actions, cards)
 
             # Check if cards exist in hand
             if not p.hand.contains(cards):
@@ -760,7 +778,7 @@ class Game(object):
         Also, if there's a perform_craftsman on top of a perform_clientele_action()
         (and we're leading craftsman), set "out of town allowed".
         """
-        role = self.game_state.role_led
+        role = self.role_led
         self._log('Player {} is performing {}'.format(player.name, role))
 
         n_merchants = player.n_clients('Merchant')
@@ -768,19 +786,19 @@ class Game(object):
 
         if role != 'Merchant':
             for _ in range(n_merchants):
-                self.game_state.stack.push_frame('_perform_clientele_action', player, 'Merchant')
+                self.stack.push_frame('_perform_clientele_action', player, 'Merchant')
 
         for _ in range(n_role):
-            self.game_state.stack.push_frame('_perform_clientele_action', player, role)
+            self.stack.push_frame('_perform_clientele_action', player, role)
 
         for _ in range(player.n_camp_actions):
-            self.game_state.stack.push_frame('_perform_role_action', player, role)
+            self.stack.push_frame('_perform_role_action', player, role)
 
         self._pump()
 
 
     def _perform_clientele_action(self, player, role):
-        role_led = self.game_state.role_led
+        role_led = self.role_led
         has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
         has_cm = self._player_has_active_building(player, 'Circus Maximus')
         is_leading_or_following = player.is_following_or_leading
@@ -789,15 +807,15 @@ class Game(object):
         # Only do these if the player has an active Ludus Magnus
         if role == 'Merchant' and role_led != 'Merchant':
             if has_ludus:
-                self.game_state.stack.push_frame('_perform_role_action', player, role_led)
+                self.stack.push_frame('_perform_role_action', player, role_led)
                 if has_cm and is_leading_or_following:
-                    self.game_state.stack.push_frame('_perform_role_action', player, role_led)
+                    self.stack.push_frame('_perform_role_action', player, role_led)
             # Skip Merchant if that's not the role being led and no Ludus
         else:
             # Do these for everyone
-            self.game_state.stack.push_frame('_perform_role_action', player, role)
+            self.stack.push_frame('_perform_role_action', player, role)
             if has_cm and is_leading_or_following:
-                self.game_state.stack.push_frame('_perform_role_action', player, role)
+                self.stack.push_frame('_perform_role_action', player, role)
 
         self._pump()
 
@@ -826,20 +844,20 @@ class Game(object):
 
         has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
 
-        f = self.game_state.stack.stack[-1]
+        f = self.stack.stack[-1]
 
         # Args are (player, role)
         if f.function_name == '_perform_role_action':
             p, role = f.args
 
-            if p.name == player.name and role == self.game_state.role_led:
+            if p.name == player.name and role == self.role_led:
                 return True
 
         if f.function_name == '_perform_clientele_action':
             p, role = f.args
 
             if p.name == player.name and \
-                    ((role=='Merchant' and has_ludus) or role == self.game_state.role_led):
+                    ((role=='Merchant' and has_ludus) or role == self.role_led):
                 return True
 
         return False
@@ -855,12 +873,12 @@ class Game(object):
         This will skip the action if the player doesn't have a tower.
         """
         has_tower = self._player_has_active_building(player, 'Tower')
-        used_oot = self.game_state.used_oot
+        used_oot = self.used_oot
 
-        self.game_state.used_oot = False
+        self.used_oot = False
         if not used_oot or (used_oot and has_tower):
 
-            self.game_state.oot_allowed = self._check_oot_allowed(player)
+            self.oot_allowed = self._check_oot_allowed(player)
 
             if role=='Patron':
                 self._perform_patron_action(player)
@@ -882,16 +900,16 @@ class Game(object):
 
 
     def _perform_laborer_action(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.LABORER
+        self.active_player = player
+        self.expected_action = message.LABORER
 
 
     def _handle_laborer(self, a):
         hand_c, pool_c = a.args[0:2]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
-        if pool_c and pool_c not in self.game_state.pool:
+        if pool_c and pool_c not in self.pool:
             raise GTRError('Tried to move non-existent card {0} from pool'
                        .format(pool_c))
 
@@ -903,7 +921,7 @@ class Game(object):
             raise GTRError('Tried to Laborer from hand without Dock.');
 
         if pool_c:
-            self.game_state.pool.move_card(pool_c, p.stockpile)
+            self.pool.move_card(pool_c, p.stockpile)
         if hand_c:
             p.hand.move_card(hand_c, p.stockpile)
 
@@ -923,15 +941,15 @@ class Game(object):
 
         if has_bar and has_aqueduct:
             # All patron stack frames will be pushed by _handle_baroraqueduct
-            self.game_state.expected_action = message.BARORAQUEDUCT
+            self.expected_action = message.BARORAQUEDUCT
 
         else:
             if has_bar:
-                self.game_state.stack.push_frame('_perform_patron_from_deck', player)
+                self.stack.push_frame('_perform_patron_from_deck', player)
             if has_aqueduct:
-                self.game_state.stack.push_frame('_perform_patron_from_hand', player)
+                self.stack.push_frame('_perform_patron_from_hand', player)
 
-            self.game_state.stack.push_frame('_perform_patron_from_pool', player)
+            self.stack.push_frame('_perform_patron_from_pool', player)
 
             self._pump()
 
@@ -939,39 +957,39 @@ class Game(object):
     def _handle_baroraqueduct(self, a):
         bar_first = a.args[0]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if bar_first:
-            self.game_state.stack.push_frame('_perform_patron_from_deck', p)
-            self.game_state.stack.push_frame('_perform_patron_from_hand', p)
+            self.stack.push_frame('_perform_patron_from_deck', p)
+            self.stack.push_frame('_perform_patron_from_hand', p)
         else:
-            self.game_state.stack.push_frame('_perform_patron_from_hand', p)
-            self.game_state.stack.push_frame('_perform_patron_from_deck', p)
+            self.stack.push_frame('_perform_patron_from_hand', p)
+            self.stack.push_frame('_perform_patron_from_deck', p)
 
-        self.game_state.stack.push_frame('_perform_patron_from_pool', p)
+        self.stack.push_frame('_perform_patron_from_pool', p)
 
         self._pump()
 
 
     def _perform_patron_from_pool(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.PATRONFROMPOOL
+        self.active_player = player
+        self.expected_action = message.PATRONFROMPOOL
 
 
     def _handle_patronfrompool(self, a):
         card = a.args[0]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if card:
             if len(p.clientele) >= self._clientele_limit(p):
                 raise GTRError('Player ' + p.name + ' has no room in clientele')
 
-            self.game_state.pool.move_card(card, p.clientele)
+            self.pool.move_card(card, p.clientele)
 
             if self._player_has_active_building(p, 'Bath'):
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
-                self.game_state.stack.push_frame('_perform_role_action', p, card.role)
+                self.stack.push_frame('_perform_role_action', p, card.role)
                 self._log(
                     '{0} performs Patron, hiring {1} from pool and performing {2} using Bath.'
                     .format(p.name, card, card.role))
@@ -985,14 +1003,14 @@ class Game(object):
 
 
     def _perform_patron_from_deck(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.PATRONFROMDECK
+        self.active_player = player
+        self.expected_action = message.PATRONFROMDECK
 
 
     def _handle_patronfromdeck(self, a):
         do_patron = a.args[0]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if do_patron:
             card = self._draw_cards(1)[0]
@@ -1000,7 +1018,7 @@ class Game(object):
 
             if self._player_has_active_building(p, 'Bath'):
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
-                self.game_state.stack.push_frame('_perform_role_action', p, card.role)
+                self.stack.push_frame('_perform_role_action', p, card.role)
                 self._log(
                     '{0} performs Patron, hiring {1} from deck and performing {2} using Bath.'
                     .format(p.name, card, card.role))
@@ -1014,21 +1032,21 @@ class Game(object):
 
 
     def _perform_patron_from_hand(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.PATRONFROMHAND
+        self.active_player = player
+        self.expected_action = message.PATRONFROMHAND
 
 
     def _handle_patronfromhand(self, a):
         card = a.args[0]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if card:
             p.hand.move_card(card, p.clientele)
 
             if self._player_has_active_building(p, 'Bath'):
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
-                self.game_state.stack.push_frame('_perform_role_action', p, card.role)
+                self.stack.push_frame('_perform_role_action', p, card.role)
                 self._log(
                     '{0} performs Patron, hiring {1} from hand and performing {2} using Bath.'
                     .format(p.name, card, card.role))
@@ -1054,12 +1072,12 @@ class Game(object):
         if player.owns_building(building):
             raise GTRError('Player already owns {0!s}.'.format(building))
 
-        if site not in self.game_state.out_of_town_sites:
+        if site not in self.out_of_town_sites:
             raise GTRError('No {0} sites left, including out of town'
                 .format(site))
 
-        if site not in self.game_state.in_town_sites and \
-                not self.game_state.oot_allowed:
+        if site not in self.in_town_sites and \
+                not self.oot_allowed:
             raise GTRError('Starting an out of town building is not allowed.')
 
         if not (building.material == site or building.name == 'Statue'):
@@ -1106,17 +1124,17 @@ class Game(object):
 
 
     def _perform_craftsman_action(self, player):
-        self.game_state.active_player = player
+        self.active_player = player
         if self._player_has_active_building(player, 'Fountain'):
-            self.game_state.expected_action = message.USEFOUNTAIN
+            self.expected_action = message.USEFOUNTAIN
         else:
             a = message.GameAction(message.USEFOUNTAIN, False)
             self._handle_usefountain(a)
 
 
     def _perform_architect_action(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.ARCHITECT
+        self.active_player = player
+        self.expected_action = message.ARCHITECT
 
 
     def _handle_usefountain(self, a):
@@ -1124,22 +1142,22 @@ class Game(object):
         # _handle_craftsman? We could just check if we're Fountain-ing.
         use_fountain = a.args[0]
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if use_fountain:
             p.fountain_card = self._draw_cards(1)[0]
-            self.game_state.expected_action = message.FOUNTAIN
+            self.expected_action = message.FOUNTAIN
             self._log('{0} reveals {1} with Fountain.'
                 .format(p.name, p.fountain_card))
 
         else:
-            self.game_state.expected_action = message.CRAFTSMAN
+            self.expected_action = message.CRAFTSMAN
 
 
     def _handle_fountain(self, a):
         skip, building, material, site = a.args
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         fountain_card = p.fountain_card
         p.hand.append(p.fountain_card)
@@ -1172,7 +1190,7 @@ class Game(object):
         if site is None:
             self._log('{0} adds {1} as material to {2}{3}.'
                 .format(player.name, material, building, material_source))
-        elif self.game_state.used_oot:
+        elif self.used_oot:
             self._log('{0} starts {1} on a {2} site, out of town.'
                 .format(player.name, building, site))
         else:
@@ -1201,7 +1219,7 @@ class Game(object):
             # raises if start is illegal
             self._check_building_start_legal(player, foundation, site)
 
-            is_oot = site not in self.game_state.in_town_sites
+            is_oot = site not in self.in_town_sites
 
             # TODO: These errors are all checked in check_building_start
             if player.owns_building(foundation):
@@ -1209,11 +1227,11 @@ class Game(object):
                     .format(player.name, foundation))
 
             if is_oot:
-                sites = self.game_state.out_of_town_sites
+                sites = self.out_of_town_sites
                 if site not in sites:
                     raise GTRError('{0} not available out of town.'.format(site))
             else:
-                sites = self.game_state.in_town_sites
+                sites = self.in_town_sites
                 if site not in sites:
                     raise GTRError('{0} not available in town.'.format(site))
 
@@ -1226,9 +1244,9 @@ class Game(object):
             b = Building(foundation_card, site_card)
             player.buildings.append(b)
 
-            self.game_state.used_oot = is_oot
+            self.used_oot = is_oot
 
-            if len(self.game_state.in_town_sites) == 0:
+            if len(self.in_town_sites) == 0:
                 self._end_game()
 
             return b
@@ -1267,7 +1285,7 @@ class Game(object):
     def _handle_craftsman(self, a):
         foundation, material, site = a.args
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if foundation is None or (material is None and site is None):
             self._pump()
@@ -1289,11 +1307,11 @@ class Game(object):
         """
         foundation, material, site, from_pool = a.args
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if foundation:
             if from_pool:
-                material_zone, s = self.game_state.pool, ' from pool'
+                material_zone, s = self.pool, ' from pool'
             else:
                 material_zone, s = p.stockpile, ' from stockpile'
 
@@ -1310,7 +1328,7 @@ class Game(object):
 
         has_stairway = self._player_has_active_building(p, 'Stairway')
         if has_stairway:
-            self.game_state.expected_action = message.STAIRWAY
+            self.expected_action = message.STAIRWAY
             return
 
         self._pump()
@@ -1323,14 +1341,14 @@ class Game(object):
         """
         player, foundation, material, from_pool = a.args
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if player is None or foundation is None or material is None:
             self._log('{0} chooses to skip use of Stairway.'.format(p.name))
             self._pump()
 
         b = player.get_building(foundation)
-        zone = self.game_state.pool if from_pool else p.stockpile
+        zone = self.pool if from_pool else p.stockpile
 
         zone.move_card(material, b.stairway_materials)
 
@@ -1359,39 +1377,39 @@ class Game(object):
         action, so we can evaluate the Circus Maximus and Ludus Magna on the
         listed stack frames.
         """
-        self.game_state.active_player = player
+        self.active_player = player
 
         has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
         has_cm = self._player_has_active_building(player, 'Circus Maximus')
         is_leading_or_following = player.is_following_or_leading
-        role_led = self.game_state.role_led
+        role_led = self.role_led
 
-        self.game_state.legionary_count = 1
+        self.legionary_count = 1
 
         # Traverse the stack, remove Legionary frames and increment legionary count
-        for f in self.game_state.stack.stack[::-1]:
+        for f in self.stack.stack[::-1]:
             if not len(f.args) or f.args[0] != player:
                 break
 
             if f.function_name == '_perform_role_action' and f.args[1] == 'Legionary':
-                self.game_state.legionary_count += 1
-                self.game_state.stack.remove(f)
+                self.legionary_count += 1
+                self.stack.remove(f)
 
             elif f.function_name == '_perform_clientele_action':
                 role = f.args[1]
 
                 if role == 'Legionary' or (has_ludus and role == 'Merchant'):
-                    self.game_state.legionary_count += 1
+                    self.legionary_count += 1
                     if has_cm and role_led == 'Legionary' and is_following_or_leading:
-                        self.game_state.legionary_count += 1
+                        self.legionary_count += 1
 
-                    self.game_state.stack.remove(f)
+                    self.stack.remove(f)
 
             else:
                 break
 
         # Player can infer the legionary count
-        self.game_state.expected_action = message.LEGIONARY
+        self.expected_action = message.LEGIONARY
 
 
     def _handle_legionary(self, a):
@@ -1400,7 +1418,7 @@ class Game(object):
         if len([c for c in cards if c.name == 'Jack']):
             raise GTRError('Cannot demand material with Jack.')
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if not p.hand.contains(cards):
             raise GTRError('Demanding with cards not in hand: {0}.'
@@ -1420,9 +1438,9 @@ class Game(object):
         # Get cards from pool
         pool_cards = []
         for card in cards:
-            for _c in self.game_state.pool:
+            for _c in self.pool:
                 if _c.material == card.material:
-                    self.game_state.pool.move_card(_c, p.stockpile)
+                    self.pool.move_card(_c, p.stockpile)
                     pool_cards.append(_c)
 
         if pool_cards:
@@ -1431,10 +1449,10 @@ class Game(object):
 
 
         # Get cards from other players
-        n = len(self.game_state.players)
-        p_index = self.game_state.players.index(p)
+        n = len(self.players)
+        p_index = self.players.index(p)
 
-        self.game_state.legionary_index = p_index
+        self.legionary_index = p_index
 
         has_bridge = self._player_has_active_building(p, 'Bridge')
 
@@ -1442,23 +1460,23 @@ class Game(object):
             r = range(n)
             indices = r[n+1:] + r[:n]
         else:
-            indices = [(self.game_state.legionary_index + 1) % n]
+            indices = [(self.legionary_index + 1) % n]
             if n > 2:
-                indices.append((self.game_state.legionary_index - 1) % n)
+                indices.append((self.legionary_index - 1) % n)
 
-        self.game_state.legionary_resp_indices = indices
+        self.legionary_resp_indices = indices
 
-        self.game_state.active_player = self.game_state.players[indices[0]]
-        self.game_state.expected_action = message.GIVECARDS
+        self.active_player = self.players[indices[0]]
+        self.expected_action = message.GIVECARDS
 
 
     def _handle_givecards(self, a):
         cards = a.args
         lg.debug('Received GIVECARDS(' + ','.join(map(str, cards))+')')
 
-        p = self.game_state.active_player
+        p = self.active_player
 
-        leg_p = self.game_state.players[self.game_state.legionary_index]
+        leg_p = self.players[self.legionary_index]
 
         has_bridge = self._player_has_active_building(leg_p, 'Bridge')
         has_coliseum = self._player_has_active_building(leg_p, 'Coliseum')
@@ -1473,13 +1491,13 @@ class Game(object):
         else:
             self._move_legionary_cards(p, leg_p, cards, has_bridge, has_coliseum)
 
-        self.game_state.legionary_resp_indices.pop(0)
-        if len(self.game_state.legionary_resp_indices):
+        self.legionary_resp_indices.pop(0)
+        if len(self.legionary_resp_indices):
             lg.debug('Waiting on next player to respond to legionary.')
-            next_index = self.game_state.legionary_resp_indices[0]
+            next_index = self.legionary_resp_indices[0]
 
-            self.active_player = self.game_state.players[next_index]
-            self.game_state.expected_action = message.GIVECARDS
+            self.active_player = self.players[next_index]
+            self.expected_action = message.GIVECARDS
 
         else:
             lg.debug('All players have responded to legionary.')
@@ -1562,14 +1580,14 @@ class Game(object):
 
 
     def _perform_merchant_action(self, player):
-        self.game_state.active_player = player
-        self.game_state.expected_action = message.MERCHANT
+        self.active_player = player
+        self.expected_action = message.MERCHANT
 
 
     def _handle_merchant(self, a):
         stockpile_card, hand_card, from_deck = a.args
 
-        p = self.game_state.active_player
+        p = self.active_player
 
         if stockpile_card and stockpile_card not in p.stockpile:
             raise GTRError('Card {0!s} not found in {1}\'s stockpile.'
@@ -1627,8 +1645,8 @@ class Game(object):
 
 
     def _do_kids_in_pool(self, p):
-        p_index = self.game_state.players.index(p)
-        self.game_state.kip_index = p_index
+        p_index = self.players.index(p)
+        self.kip_index = p_index
 
         p_in_order = self._players_in_turn_order(p)
         p_in_order.pop(0) # skip this player
@@ -1636,22 +1654,22 @@ class Game(object):
         indices = []
         for _p in p_in_order:
             if self._player_has_active_building(_p, 'Senate'):
-                indices.append(self.game_state.players.index(_p))
+                indices.append(self.players.index(_p))
 
-        self.game_state.senate_resp_indices = indices
+        self.senate_resp_indices = indices
 
         self._do_senate()
 
 
     def _do_senate(self):
-        if self.game_state.senate_resp_indices:
-            self.game_state.expected_action = message.USESENATE
+        if self.senate_resp_indices:
+            self.expected_action = message.USESENATE
             return
 
         else:
-            p = self.game_state.players[self.game_state.kip_index]
+            p = self.players[self.kip_index]
             if self._player_has_active_building(p, 'Sewer'):
-                self.game_state.expected_action = message.USESEWER
+                self.expected_action = message.USESEWER
                 return
 
             else:
@@ -1660,11 +1678,11 @@ class Game(object):
 
     def _handle_usesenate(self, a):
         take_jack = a.args[0]
-        p_index = self.game_state.senate_resp_indices.pop(0)
-        p_kip = self.game_state.players[self.game_state.kip_index]
+        p_index = self.senate_resp_indices.pop(0)
+        p_kip = self.players[self.kip_index]
 
         if take_jack and 'Jack' in p_kip.camp:
-            p = self.game_state.players[p_index]
+            p = self.players[p_index]
 
             jack = p_kip.camp.get_cards(['Jack'])[0]
             p_kip.camp.move_card(jack, p.hand)
@@ -1672,14 +1690,14 @@ class Game(object):
             self._log('{0} takes {1}\'s Jack with Senate.'
                 .format(p.name, p_kip.name))
 
-            self.game_state.senate_resp_indices = []
+            self.senate_resp_indices = []
 
         self._do_senate()
 
 
     def _handle_usesewer(self, a):
         cards = a.args
-        p = self.game_state.players[self.game_state.kip_index]
+        p = self.players[self.kip_index]
 
         if cards[0] is not None:
             for c in cards:
@@ -1692,17 +1710,17 @@ class Game(object):
 
         for c in p.camp.cards[:]: # Copy since we're removing
             if c.name == 'Jack':
-                p.camp.move_card(c, self.game_state.jacks)
+                p.camp.move_card(c, self.jacks)
             else:
-                p.camp.move_card(c, self.game_state.pool)
+                p.camp.move_card(c, self.pool)
 
-        kip_next = (self.game_state.kip_index + 1) % len(self.game_state.players)
+        kip_next = (self.kip_index + 1) % len(self.players)
 
-        if kip_next == self.game_state.leader_index:
+        if kip_next == self.leader_index:
             self._pump()
 
         else:
-            self._do_kids_in_pool(self.game_state.players[kip_next])
+            self._do_kids_in_pool(self.players[kip_next])
 
 
     def _end_turn(self):
@@ -1710,7 +1728,7 @@ class Game(object):
         players = self._players_in_turn_order()[::-1]
 
         for p in players:
-            self.game_state.stack.push_frame('_do_end_turn', p)
+            self.stack.push_frame('_do_end_turn', p)
 
         self._pump()
 
@@ -1738,7 +1756,7 @@ class Game(object):
         lg.info('  Glory to Rome!')
         lg.info('\n')
         self._log('Game over.')
-        for p in self.game_state.players:
+        for p in self.players:
             lg.info('Score for player {} : {}'.format(p.name, self._player_score(p)))
             self._log('Score for player {} : {}'.format(p.name, self._player_score(p)))
         lg.info('\n')
@@ -1761,7 +1779,7 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.game_state.stack.push_frame('_perform_laborer_action', player)
+                self.stack.push_frame('_perform_laborer_action', player)
 
         elif str(building_obj) == 'Garden':
             n = player.influence_points
@@ -1770,7 +1788,7 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.game_state.stack.push_frame('_perform_patron_action', player)
+                self.stack.push_frame('_perform_patron_action', player)
 
         elif str(building_obj) == 'School':
             n = player.influence_points
@@ -1779,7 +1797,7 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.game_state.stack.push_frame('_perform_optional_thinker_action', player)
+                self.stack.push_frame('_perform_optional_thinker_action', player)
 
         elif str(building_obj) == 'Amphitheatre':
             n = player.influence_points
@@ -1788,6 +1806,6 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.game_state.stack.push_frame('_perform_craftsman_action', player)
+                self.stack.push_frame('_perform_craftsman_action', player)
 
         self._pump()

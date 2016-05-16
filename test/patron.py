@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
@@ -23,7 +22,7 @@ class TestPatron(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Patron')
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
 
     def test_expects_patron(self):
@@ -36,12 +35,12 @@ class TestPatron(unittest.TestCase):
         """ Take one card from the pool with patron action.
         """
         atrium = cm.get_card('Atrium')
-        self.game.game_state.pool.set_content([atrium])
+        self.game.pool.set_content([atrium])
 
         a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.game.game_state.pool)
+        self.assertNotIn('Atrium', self.game.pool)
         self.assertIn('Atrium', self.p1.clientele)
 
     
@@ -51,15 +50,15 @@ class TestPatron(unittest.TestCase):
         This invalid game action should leave the game state unchanged.
         """
         atrium, dock = cm.get_cards(['Atrium', 'Dock'])
-        self.game.game_state.pool.set_content([atrium])
+        self.game.pool.set_content([atrium])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.PATRONFROMPOOL, dock)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_patron_at_clientele_limit(self):
@@ -68,16 +67,16 @@ class TestPatron(unittest.TestCase):
         This invalid game action should leave the game state unchanged.
         """
         atrium, insula, dock = cm.get_cards(['Atrium', 'Insula', 'Dock'])
-        self.game.game_state.pool.set_content([atrium])
+        self.game.pool.set_content([atrium])
         self.p1.clientele.set_content([insula, dock])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_patron_past_higher_clientele_limit(self):
@@ -86,17 +85,17 @@ class TestPatron(unittest.TestCase):
         This invalid game action should leave the game state unchanged.
         """
         atrium, insula, dock, palisade = cm.get_cards(['Atrium', 'Insula', 'Dock', 'Palisade'])
-        self.game.game_state.pool.set_content([atrium])
+        self.game.pool.set_content([atrium])
         self.p1.clientele.set_content([insula, dock, palisade])
         self.p1.influence.append('Wood')
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_patron_with_higher_clientele_limit(self):
@@ -105,14 +104,14 @@ class TestPatron(unittest.TestCase):
         This invalid game action should leave the game state unchanged.
         """
         atrium, insula, dock = cm.get_cards(['Atrium', 'Insula', 'Dock'])
-        self.game.game_state.pool.set_content([atrium])
+        self.game.pool.set_content([atrium])
         self.p1.clientele.set_content([insula, dock])
         self.p1.influence.append('Wood')
 
         a = message.GameAction(message.PATRONFROMPOOL, atrium)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.game.game_state.pool)
+        self.assertNotIn('Atrium', self.game.pool)
         self.assertIn('Atrium', self.p1.clientele)
 
 

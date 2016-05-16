@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 import cloaca.message as message
@@ -20,7 +19,7 @@ class TestHandleThinker(unittest.TestCase):
         """ This is run prior to every test.
         """
         self.game = test_setup.simple_two_player()
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
         a = message.GameAction(message.THINKERORLEAD, True)
         self.game.handle(a)
@@ -29,8 +28,8 @@ class TestHandleThinker(unittest.TestCase):
     def test_card_piles_full(self):
         """ Test that the jack and library piles aren't empty.
         """
-        self.assertTrue(len(self.game.game_state.library)>5)
-        self.assertEqual(len(self.game.game_state.jacks), 6)
+        self.assertTrue(len(self.game.library)>5)
+        self.assertEqual(len(self.game.jacks), 6)
 
 
     def test_waiting_for_thinker(self):

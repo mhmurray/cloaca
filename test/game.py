@@ -15,13 +15,12 @@ class TestGame(unittest.TestCase):
 
         g = Game()
         g.add_player(uuid4(), 'p1')
-        gs = g.game_state
 
-        self.assertEqual(len(gs.players), 1)
+        self.assertEqual(len(g.players), 1)
 
         g.add_player(uuid4(), 'p2')
 
-        self.assertEqual(len(gs.players), 2)
+        self.assertEqual(len(g.players), 2)
 
 
     def test_start(self):
@@ -30,24 +29,23 @@ class TestGame(unittest.TestCase):
         """
 
         g = Game()
-        gs = g.game_state
         g.add_player(uuid4(), 'p1')
         g.add_player(uuid4(), 'p2')
 
         g.start()
         
-        self.assertEqual(len(gs.jacks), 4)
+        self.assertEqual(len(g.jacks), 4)
 
         # We don't know how many cards because of tiebreakers in determining
         # who goes first but each player at least needs 4 cards + 1 in the pool
-        self.assertTrue(len(gs.library) <= 134)
-        self.assertTrue(len(gs.library) > 0)
+        self.assertTrue(len(g.library) <= 134)
+        self.assertTrue(len(g.library) > 0)
 
-        for p in gs.players:
+        for p in g.players:
             self.assertIn('Jack', p.hand)
 
         self.assertTrue(g.is_started)
-        self.assertEqual(gs.expected_action, message.THINKERORLEAD)
+        self.assertEqual(g.expected_action, message.THINKERORLEAD)
 
 
     def test_start_again(self):

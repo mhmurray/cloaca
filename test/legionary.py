@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloaca.gtr import Game
-from cloaca.gamestate import GameState
 from cloaca.player import Player
 from cloaca.building import Building
 
@@ -25,7 +24,7 @@ class TestMultiLegionary(unittest.TestCase):
         """
         clientele = [['Atrium'], []]
         self.game = test_setup.two_player_lead('Legionary', clientele)
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
 
     def test_opponent_has_some_match(self):
@@ -58,7 +57,7 @@ class TestLegionary(unittest.TestCase):
         """This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Legionary')
-        self.p1, self.p2 = self.game.game_state.players
+        self.p1, self.p2 = self.game.players
 
 
     def test_expects_legionary(self):
@@ -72,12 +71,12 @@ class TestLegionary(unittest.TestCase):
         """
         atrium, foundry = cm.get_cards(['Atrium', 'Foundry'])
         self.p1.hand.set_content([atrium])
-        self.game.game_state.pool.set_content([foundry])
+        self.game.pool.set_content([foundry])
 
         a = message.GameAction(message.LEGIONARY, atrium)
         self.game.handle(a)
 
-        self.assertNotIn('Foundry', self.game.game_state.pool)
+        self.assertNotIn('Foundry', self.game.pool)
         self.assertIn('Foundry', self.p1.stockpile)
 
         self.assertIn('Atrium', self.p1.revealed) 
@@ -133,12 +132,12 @@ class TestLegionary(unittest.TestCase):
         self.p2.hand.set_content([latrine])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEGIONARY, jack)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_demand_non_existent_card(self):
@@ -148,12 +147,12 @@ class TestLegionary(unittest.TestCase):
         self.p1.hand.set_content([atrium])
 
         mon = Monitor()
-        mon.modified(self.game.game_state)
+        mon.modified(self.game)
 
         a = message.GameAction(message.LEGIONARY, latrine)
         self.game.handle(a)
 
-        self.assertFalse(mon.modified(self.game.game_state))
+        self.assertFalse(mon.modified(self.game))
 
 
     

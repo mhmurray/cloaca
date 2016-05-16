@@ -1,5 +1,4 @@
 from cloaca.player import Player
-from cloaca.gamestate import GameState
 from cloaca.gtr import Game
 from cloaca.building import Building
 import cloaca.card_manager as cm
@@ -21,13 +20,12 @@ def simple_two_player():
     thinker or lead.
     """
     g = Game()
-    gs = g.game_state
 
     for p in ['p1', 'p2']:
         uid = uuid4().int
         g.add_player(uid, p)
 
-    p1, p2 = gs.players
+    p1, p2 = g.players
 
     g.controlled_start()
 
@@ -60,7 +58,7 @@ def two_player_lead(role, clientele=[], buildings=[]):
     convenient if you just want a static building ability active.
     """
     g = simple_two_player()
-    p1, p2 = g.game_state.players
+    p1, p2 = g.players
 
     if clientele:
         try:
