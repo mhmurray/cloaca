@@ -170,7 +170,7 @@ class GTRServer(object):
 
         elif action == message.REQGAMELIST:
             gl = self._get_game_list()
-            json_list = json.dumps(gl, default=lambda o:o.__dict__)
+            json_list = json.dumps(gl, sort_keys=True, default=lambda o:o.__dict__)
             resp = Command(game_id, GameAction(message.GAMELIST, json_list))
             self.send_command(user, resp)
 
@@ -319,7 +319,7 @@ class GTRServer(object):
         GAMESTATE command.
         """
         gs = self._get_game_state(user, game)
-        gs_json = json.dumps(gs, default=lambda o:o.__dict__)
+        gs_json = json.dumps(gs, sort_keys=True, default=lambda o:o.__dict__)
         resp = Command(game, GameAction(message.GAMESTATE, gs_json))
         self.send_command(user, resp)
 
