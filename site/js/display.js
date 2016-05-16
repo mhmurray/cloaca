@@ -83,7 +83,7 @@ function(Util, $, _){
 
             var $p = $('<div />').addClass('player-box').appendTo(this.playerInfo);
             var player = players[i_rot];
-            $p.html('<b>Player '+(ip)+': ' + player+'</b>');
+            $p.html('<b>Player '+(ip)+': ' + player.name+'</b>');
 
             var playerZones = this.playerZones[i_rot];
             $p.append(playerZones.hand);
