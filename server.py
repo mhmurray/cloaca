@@ -319,7 +319,6 @@ class GTRServer(object):
         GAMESTATE command.
         """
         gs = self._get_game_state(user, game)
-        lg.debug('Sending GameState: ' +str(gs));
         gs_json = json.dumps(gs, default=lambda o:o.__dict__)
         resp = Command(game, GameAction(message.GAMESTATE, gs_json))
         self.send_command(user, resp)

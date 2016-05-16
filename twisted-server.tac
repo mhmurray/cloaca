@@ -27,6 +27,8 @@ from uuid import uuid4
 sys.path.append("sockjs-twisted")
 from txsockjs.factory import SockJSFactory
 
+lg = logging.getLogger('twisted-server')
+
 # Set up logging. See logging.json for config
 def setup_logging(
         default_path='logging.json',
@@ -114,7 +116,7 @@ class GTRProtocol(NetstringReceiver):
                 uid = self.factory.register(self, session_id)
 
             if uid is None:
-                print 'Ignoring message from unauthenticated user'
+                lg.warning('Ignoring message from unauthenticated user')
                 return
         else:
             self.factory.handle_command(uid, command)
@@ -200,7 +202,7 @@ class GTRFactoryFromService(protocol.ServerFactory):
         try:
             username = _username_from_uid(uid)
         except KeyError as e:
-            print e.message
+            lg.exception(e.message)
             return None
 
         self.service.register_user(uid, {'name': username})
@@ -218,8 +220,9 @@ class GTRFactoryFromService(protocol.ServerFactory):
         protocol = self.protocol_from_user(uid)
         if protocol is None:
             username = _username_from_uid(uid)
-            print 'Error. Server tried to send a command to',\
-                    username, '('+str(uid)+') but the user is not connected.'
+            lg.error('Error. Server tried to send a command to {0!s}'
+                    '({1!s}) but the user is not connected.'
+                    .format(username, uid))
         else:
             protocol.send_command(command)
 
@@ -252,7 +255,7 @@ class GetUser(resource.Resource):
             uid = users[session_id]
             username = _username_from_uid(uid)
         except KeyError as e:
-            print e.message
+            lg.exception(e.message)
             return ''
 
         return username
@@ -260,36 +263,37 @@ class GetUser(resource.Resource):
 class NoPassLogin(resource.Resource):
     def render_POST(self, request):
         global users
-        #print request.args
         username = cgi.escape(str(request.args['user'][0]))
-        print 'Received login request for user', username
+        lg.info('Login request: {0}'.format(username))
 
         try:
             uid = _uid_from_username(username)
         except KeyError:
             uid = uuid4().int
-            print 'New user. Assigning uid', uid
+            lg.debug('Assigning uid to new user: {0!s}'.format(uid))
             try:
                 new_user(uid, username)
             except KeyError as e:
-                print e.message
+                lg.exception(e.message)
                 return
 
         session = request.getSession()
         users[session.uid] = uid
-        print 'Set session id:', session.uid, 'for user', \
-                username, '('+str(uid)+')'
+        lg.debug('Set session id: {0!s} for user {1} ({2!s})'
+                .format(session.uid, username, uid))
         session.notifyOnExpire(lambda: self._onExpire(session))
         return username
 
     def _onExpire(self, session):
         global users
         try:
-            print 'Session expired', session.uid, 'user:', users[session.uid]
+            lg.debug('Expired session {0!s} for user {1!s}'
+                    .format(session.uid, users[session.uid]))
             del users[session.uid]
         except KeyError:
-            print 'Couldn\'t remove session with uid', session.uid
-            print str(users)
+            lg.debug('Couldn\'t remove session with uid {0!s}'
+                    .format(session.uid))
+
 
 class Logout(resource.Resource):
     def render_GET(self, request):
