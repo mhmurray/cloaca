@@ -458,7 +458,6 @@ button[disabled] {
 #error-dialog {
   font: 14px/100% arial, sans-serif;
   background: #fbb;
-  /*border: 1px solid #ccc;*/
   border-radius: 3px;
   float: left;
   min-height: 1em;
@@ -488,7 +487,6 @@ button[disabled] {
 #error-dialog > ul > li:last-child {
   background: #f88;
   border-radius: 2px;
-  /*border: 2px solid #f88;*/
 }
 
 #error-dialog > ul > li {

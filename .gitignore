@@ -2,6 +2,9 @@
 *.swp
 *.log
 
+# Twisted
+twistd.pid
+
 # C extensions
 *.so
 
@@ -35,3 +38,4 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
