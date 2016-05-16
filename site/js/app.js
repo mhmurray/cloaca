@@ -18,6 +18,17 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
 
         $('#page-wrapper').before(heading);
 
+        $('#error-container').hide();
+        $('#error-dialog > .close').click(function(e) {
+            $('#error-container').hide();
+        });
+
+        function displayError(message) { 
+            var $list = $('#error-dialog > ul').append($('<li/>', {text: message}));
+            $('#error-container').show();
+            $list[0].scrollTop = $list[0].scrollHeight;
+        }
+
         // Handle messages sent by the server.
         function handleCommand(game, action, args) {
             
@@ -48,6 +59,9 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
                     var tabs = $('#tabs').tabs('refresh');
                     tabs.tabs('option', 'active', -1); // switch to new tab.
                 }
+            } else if (action == Util.Action.SERVERERROR) {
+                var message = args[0];
+                displayError(message);
             }
         };
 

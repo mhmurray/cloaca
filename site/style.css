@@ -440,3 +440,57 @@ button[disabled]:hover {
 button[disabled] {
   background: #cd9;
 }
+
+.close {
+  color: #777;
+  font: 14px/100% arial, sans-serif;
+  position: absolute;
+  text-decoration: none;
+  text-shadow: 0 1px 0 #fff;
+  top: 2px;
+  right: 20px;
+}
+
+.close:after {
+  content: '✖';
+}
+
+#error-dialog {
+  font: 14px/100% arial, sans-serif;
+  background: #fbb;
+  /*border: 1px solid #ccc;*/
+  border-radius: 3px;
+  float: left;
+  min-height: 1em;
+  position: relative;
+  width: 100%;
+}
+
+#error-container {
+  padding: 10px;
+}
+
+#error-container:after {
+  content: '';
+  display: block;
+  clear: both;
+}
+
+#error-dialog > ul {
+  margin: 0;
+  list-style-type: none;
+  overflow:hidden;
+  overflow-y:scroll;
+  max-height: 4em;
+  padding: 0px;
+}
+
+#error-dialog > ul > li:last-child {
+  background: #f88;
+  border-radius: 2px;
+  /*border: 2px solid #f88;*/
+}
+
+#error-dialog > ul > li {
+  padding-top: 1px;
+}
