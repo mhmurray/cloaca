@@ -55,6 +55,10 @@ def new_user(uid, username):
 
 
 class GTRProtocol(NetstringReceiver):
+    MESSAGE_ERROR_THRESHOLD = 5
+
+    def __init__(self):
+        self.message_errors = 0
 
     def connectionMade(self):
         pass
@@ -66,11 +70,21 @@ class GTRProtocol(NetstringReceiver):
         """Receives Command objects of the form <game, action>.
         
         Expects the first command on this protocol to be LOGIN.
+
+        If there is a parsing error, a SERVERERROR command is
+        send to the client, but after a number of errors, the
+        connection will be closed.
         """
         try:
             command = Command.from_json(request)
         except (ParsingError, GameActionError), e:
-            print e.message
+            self.message_errors+=1
+            if self.message_errors >= self.MESSAGE_ERROR_THRESHOLD:
+                self.transport.loseConnection()
+            else:
+                self.send_command(
+                        Command(None, GameAction(message.SERVERERROR, 
+                                'Error parsing message.')))
             return
 
         uid = self.factory.user_from_protocol(self)
