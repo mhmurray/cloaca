@@ -7,23 +7,17 @@ import card_manager as cm
 import termcolor
 from error import GTRError
 
-""" Utility functions for GTR.
+"""Utility functions for GTR.
 """
 
-def print_line(symbol='-'):
-    """ Print a line for visual division of info """
-    logging.info(symbol*80)
-
-def print_header(title, symbol='-'):
-    n_symbol = 80 - len(title)
-    logging.info('{0}: {1}'.format(title, symbol*n_symbol))
+lg = logging.getLogger(__name__)
 
 def get_card_from_zone(card, zone):
     """ Wrapper around the possible exception caused by trying to
     find a non-existent card in a list. Prints an error and
     re-raises the exception.
     """
-    logging.debug('getting card {0!s} from zone {1!s}'.format(card, zone))
+    lg.debug('getting card {0!s} from zone {1!s}'.format(card, zone))
     try:
         return zone.pop(zone.index(card))
     except ValueError as e:
@@ -32,14 +26,8 @@ def get_card_from_zone(card, zone):
 def add_card_to_zone(card, zone):
     """
     """
-    logging.debug('adding card {0!s} to zone {1!s}'.format(card, zone))
+    lg.debug('adding card {0!s} to zone {1!s}'.format(card, zone))
     zone.append(card)
-
-def move_card(card, source_zone, dest_zone):
-    """ Concatenates get_card_from_zone() and add_card_to_zone().
-    """
-    source_zone.move_card(card, dest_zone)
-    return 
 
 def get_short_zone_summary(string_list, n_letters=3):
     """Return a single-line string with n-letter card abbreviations and numbers
@@ -328,8 +316,6 @@ def colorize_material(any_string):
     return out_string
 
 
-
-
 class RoleColorFilter(logging.Filter):
     """ This is a filter which colorizes roles with ANSI color sequences.
     """
@@ -343,17 +329,3 @@ class MaterialColorFilter(logging.Filter):
     def filter(self, record):
         record.msg = colorize_material(record.msg)
         return True
-
-
-
-if __name__ == '__main__':
-
-    # simple tests...
-    logging.basicConfig(level=logging.DEBUG, format='%(message)s')
-
-    test_zone = ['a', 'a', 'b', 'c']
-    card_one = get_card_from_zone('a', test_zone)
-    card_two = get_card_from_zone('c', test_zone)
-    add_card_to_zone(card_one, test_zone)
-
-    print get_short_zone_summary(test_zone)

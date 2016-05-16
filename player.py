@@ -18,7 +18,7 @@ from zone import Zone
 import logging
 import collections
 
-lg = logging.getLogger('gtr')
+lg = logging.getLogger(__name__)
 
 class Player:
     """ Contains the piles and items controlled by a player. """

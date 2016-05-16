@@ -14,9 +14,6 @@ import pickle
 import logging
 
 lg = logging.getLogger(__name__)
-lg.setLevel(logging.INFO)
-#logging.basicConfig()
-#lg.setLevel(logging.DEBUG)
 
 class GTRServer(object):
     """Manages multiple Game objects including non-game actions related to

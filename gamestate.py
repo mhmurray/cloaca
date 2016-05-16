@@ -16,7 +16,7 @@ from card import Card
 
 import stack
 
-lg = logging.getLogger('gtr')
+lg = logging.getLogger(__name__)
 
 class GameState(object):
     """Data object containing the state of a game.

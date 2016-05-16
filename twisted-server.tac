@@ -3,30 +3,49 @@ from twisted.internet import protocol
 from twisted.web import resource, server, static
 from twisted.protocols.basic import NetstringReceiver
 from twisted.python import components
+from twisted.internet.protocol import ServerFactory, Protocol
 from zope.interface import Interface, implements
 
-from twisted.internet.protocol import ServerFactory, Protocol
-
 from bidict import bidict
-
 from gamestate import GameState
 from message import GameAction, Command
 import message
 from server import GTRServer
 from error import GTRError, ParsingError, GameActionError
+from interfaces import IGTRService, IGTRFactory
 
+import sys
+import cgi
+import json
+import logging
+import logging.config
+import os
 from pickle import dumps
 from uuid import uuid4
 
-from interfaces import IGTRService, IGTRFactory
-
 # For websocket test
-import sys
 sys.path.append("sockjs-twisted")
 from txsockjs.factory import SockJSFactory
-import cgi
 
-import json
+# Set up logging. See logging.json for config
+def setup_logging(
+        default_path='logging.json',
+        default_level=logging.INFO,
+        env_key='GTR_LOG_CFG'):
+    """Setup logging configuration
+    """
+    path = default_path
+    value = os.getenv(env_key, None)
+    if value is not None:
+        path = value
+    if os.path.exists(path):
+        with open(path, 'rt') as f:
+            config = json.load(f)
+        logging.config.dictConfig(config)
+    else:
+        logging.basicConfig(level=default_level)
+
+setup_logging()
 
 # Bi-directional mapping between user id (uid) and session id
 users = {};
@@ -212,7 +231,7 @@ components.registerAdapter(GTRFactoryFromService, IGTRService, IGTRFactory)
 
 application = service.Application('gtr')
 #s = GTRService('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
-s = GTRService('tmp/twistd_backup.dat', None)
+s = GTRService('/tmp/twistd_backup.dat', None)
 serviceCollection = service.IServiceCollection(application)
 
 root = resource.Resource()

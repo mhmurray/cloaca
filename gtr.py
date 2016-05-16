@@ -13,10 +13,7 @@ import logging
 import message
 from datetime import datetime
 
-lg = logging.getLogger('gtr')
-logging.basicConfig()
-lg.setLevel(logging.INFO)
-#lg.setLevel(logging.DEBUG)
+lg = logging.getLogger(__name__)
 
 class Game(object):
     """Controls the operation of a single game.
@@ -45,10 +42,6 @@ class Game(object):
 
     def __init__(self, game_state=None):
         self.game_state = game_state if game_state is not None else GameState()
-
-        logger = logging.getLogger('gtr')
-        logger.addFilter(gtrutils.RoleColorFilter())
-        logger.addFilter(gtrutils.MaterialColorFilter())
 
     def __repr__(self):
         rep=('Game(game_state={game_state!r})')
@@ -1387,7 +1380,7 @@ class Game(object):
         lg.debug('Moving cards for legionary. Revealed: ' + str(rev_cards) +
                 ' Given: ' + str(given_cards))
 
-        cards_moved_from_hand = [] # for logging
+        cards_moved_from_hand = []
 
         # Check that all required cards were offered.
         revealed = Counter([c.material for c in rev_cards])
