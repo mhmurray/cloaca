@@ -5,12 +5,10 @@ import logging
 import collections
 import card_manager as cm
 import termcolor
+from error import GTRError
 
 """ Utility functions for GTR.
 """
-
-class GTRError(Exception):
-    pass
 
 def print_line(symbol='-'):
     """ Print a line for visual division of info """

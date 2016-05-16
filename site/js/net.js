@@ -1,11 +1,11 @@
-define(['sockjs', 'util'],
-function(SockJS, Util) {
+define(['sockjs', 'util', 'fsm', 'jscookie'],
+function(SockJS, Util, FSM, Cookies) {
     var Net = {
         socket: null,
         user: null
     }
 
-    Net.connect = function(url) {
+    Net.connect = function(url, onopen, onmessage) {
         Net.socket = SockJS(url);
 
         // Handle any errors that occur.
@@ -18,7 +18,43 @@ function(SockJS, Util) {
             var socketStatus = $('.status');
             socketStatus.text('Connected.');
             socketStatus.removeClass('closed').addClass('open');
-            Net.sendAction(Net.user, Util.Action.REQGAMELIST);
+
+            uid = Cookies.get('TWISTED_SESSION');
+            console.log('Read TWISTED_SESSION cookie:', uid);
+
+            console.log('Try to read invalid cookie');
+            console.log(Cookies.get('NotARealCookie'));
+
+            if(uid !== null) {
+                Net.sendAction(0, Util.Action.LOGIN, [uid]);
+            }
+
+            onopen();
+        };
+        
+        // Split string, but only n times. Rest of string as last array element.
+        function splitWithTail(str, delim, count){
+          var parts = str.split(delim);
+          var tail = parts.slice(count).join(delim);
+          var result = parts.slice(0,count);
+          result.push(tail);
+          return result;
+        };
+
+        Net.socket.onmessage = function(event) {
+            var message = event.data;
+
+            // Parse NetString : <length>:<str>,
+            var msg = (splitWithTail(message, ':', 1)[1]).slice(0,-1);
+
+            var dict = JSON.parse(msg);
+            console.log('Received', dict);
+
+            var game = dict['game']
+            var action = dict['action']['action'];
+            var args = dict['action']['args'];
+
+            onmessage(game, action, args);
         };
         
         // Show a disconnected message when the WebSocket is closed.
@@ -47,9 +83,9 @@ function(SockJS, Util) {
     };
 
     Net.sendAction = function(game_id, action, args=[]) {
-        var s = {'user':Net.user, 'game':game_id, 'action':action, 'args':args};
+        var s = {'game':game_id, 'action':{'action':action, 'args':args}};
         console.log('Sending action: ' + JSON.stringify(s));
-        Net._sendString(JSON.stringify(s));    
+        Net._sendString(JSON.stringify(s));
     };
 
     return Net;

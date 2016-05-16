@@ -31,7 +31,9 @@ class Card(object):
 
     def __init__(self, ident):
         if type(ident) is not int:
-            raise TypeError('Card.ident must be an integer, received \'{0!s}\''.format(ident))
+            raise TypeError(
+                    'Card.ident must be an integer, received \'{0!s}\''
+                    .format(ident))
         self.ident = ident
         if self.ident >= len(cm.standard_deck()):
             raise TypeError('Card.ident out of range: {0}'.format(ident))

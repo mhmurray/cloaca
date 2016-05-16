@@ -10,7 +10,7 @@ from cloaca.card import Card
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError
+from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -43,7 +43,7 @@ class TestArchitect(unittest.TestCase):
     def test_expects_architect(self):
         """ The Game should expect a ARCHITECT action.
         """
-        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
+        self.assertEqual(self.game.expected_action, message.ARCHITECT)
 
 
     def test_skip_action(self):
@@ -53,7 +53,7 @@ class TestArchitect(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.game.game_state.leader_index, 1)
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
     def test_start_in_town(self):
@@ -69,7 +69,7 @@ class TestArchitect(unittest.TestCase):
 
         self.assertEqual(self.p1.buildings[0], Building(latrine, 'Rubble'))
 
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Latrine'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Latrine'))
 
     
     def test_add_to_empty_building(self):
@@ -91,7 +91,7 @@ class TestArchitect(unittest.TestCase):
         self.assertEqual(self.p1.buildings[0],
                 Building(foundry, 'Brick', materials=[atrium]))
 
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Foundry'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Foundry'))
 
 
     def test_add_to_nonempty_building(self):
@@ -112,7 +112,7 @@ class TestArchitect(unittest.TestCase):
         self.assertEqual(self.p1.buildings[0],
                 Building(temple, 'Marble', materials=[stairway, statue]))
 
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Temple'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Temple'))
 
 
     def test_complete_building(self):
@@ -128,7 +128,7 @@ class TestArchitect(unittest.TestCase):
 
         self.assertNotIn(statue, self.p1.stockpile)
         self.assertIn('Marble', self.p1.influence)
-        self.assertTrue(self.game.player_has_active_building(self.p1, 'Temple'))
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Temple'))
 
         self.assertEqual(self.p1.buildings[0],
                 Building(temple, 'Marble',
@@ -246,7 +246,7 @@ class TestArchitectClientele(unittest.TestCase):
 
         self.assertEqual(self.game.game_state.leader_index, 0)
         self.assertEqual(self.game.game_state.active_player, self.p2)
-        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
+        self.assertEqual(self.game.expected_action, message.ARCHITECT)
 
 
     def test_add_two_materials(self):
@@ -299,7 +299,7 @@ class TestArchitectClientele(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0], Building(tower, 'Concrete'))
-        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
+        self.assertEqual(self.game.expected_action, message.ARCHITECT)
 
         a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete', False)
         self.game.handle(a)
@@ -331,7 +331,7 @@ class TestArchitectClientele(unittest.TestCase):
         self.assertEqual(3, self.game.game_state.out_of_town_sites.count('Concrete'))
 
         self.assertNotIn(bridge, self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.ARCHITECT)
+        self.assertEqual(self.game.expected_action, message.ARCHITECT)
         self.assertEqual(self.game.game_state.active_player, self.p2)
 
 
@@ -355,7 +355,7 @@ class TestArchitectClientele(unittest.TestCase):
         self.assertEqual(self.p2.buildings[0],
                 Building(tower, 'Concrete', materials=[wall]))
 
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
         self.assertEqual(self.game.game_state.leader_index, 1)
 
 

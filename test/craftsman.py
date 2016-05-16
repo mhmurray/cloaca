@@ -8,7 +8,7 @@ from cloaca.building import Building
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError
+from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -29,7 +29,7 @@ class TestCraftsman(unittest.TestCase):
     def test_expects_craftsman(self):
         """ The Game should expect a CRAFTSMAN action.
         """
-        self.assertEqual(self.game.expected_action(), message.CRAFTSMAN)
+        self.assertEqual(self.game.expected_action, message.CRAFTSMAN)
 
 
     def test_skip_action(self):
@@ -39,7 +39,7 @@ class TestCraftsman(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.game.game_state.leader_index, 1)
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
     def test_start_in_town(self):
@@ -55,7 +55,7 @@ class TestCraftsman(unittest.TestCase):
 
         self.assertEqual(self.p1.buildings[0], Building(latrine, 'Rubble'))
 
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Latrine'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Latrine'))
 
     
     def test_add_to_empty_building(self):
@@ -74,7 +74,7 @@ class TestCraftsman(unittest.TestCase):
         self.assertEqual(self.p1.buildings[0],
                 Building(foundry, 'Brick', materials=[atrium]))
 
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Foundry'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Foundry'))
 
 
     def test_add_to_nonempty_building(self):
@@ -95,7 +95,7 @@ class TestCraftsman(unittest.TestCase):
         self.assertEqual(self.p1.buildings[0],
                 Building(temple, 'Marble', materials=[fountain, statue]))
 
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Temple'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Temple'))
 
     
     def test_complete_building(self):
@@ -112,7 +112,7 @@ class TestCraftsman(unittest.TestCase):
 
         self.assertNotIn(statue, self.p1.hand)
         self.assertIn('Marble', self.p1.influence)
-        self.assertTrue(self.game.player_has_active_building(self.p1, 'Temple'))
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Temple'))
     
         # The completed building keeps its site. A copy is added to influence.
         self.assertEqual(self.p1.buildings[0],
@@ -231,14 +231,14 @@ class TestFountain(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.p1.fountain_card, bath)
-        self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
+        self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, True, None, None, None)
         self.game.handle(a)
 
         self.assertIn(bath, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
     def test_fountain_start(self):
         """Test using a fountain to look at the top card and then start a
@@ -251,7 +251,7 @@ class TestFountain(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.p1.fountain_card, bath)
-        self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
+        self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, False, bath, None, 'Brick')
         self.game.handle(a)
@@ -260,9 +260,9 @@ class TestFountain(unittest.TestCase):
         self.assertIsNone(self.p1.fountain_card)
 
         self.assertIn('Bath', self.p1.building_names)
-        self.assertFalse(self.game.player_has_active_building(self.p1, 'Bath'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Bath'))
 
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
     def test_fountain_add(self):
@@ -278,7 +278,7 @@ class TestFountain(unittest.TestCase):
         self.game.handle(a)
 
         self.assertEqual(self.p1.fountain_card, bath)
-        self.assertEqual(self.game.expected_action(), message.FOUNTAIN)
+        self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, False, atrium, bath, None)
         self.game.handle(a)
@@ -286,9 +286,9 @@ class TestFountain(unittest.TestCase):
         self.assertNotIn(bath, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
 
-        self.assertTrue(self.game.player_has_active_building(self.p1, 'Atrium'))
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Atrium'))
 
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
 if __name__ == '__main__':

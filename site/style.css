@@ -140,7 +140,7 @@ li.ui-tabs-active a {
 }
 
 .dialog {
-  height: 50px;
+  height: 150px;
 }
 
 .deck-container {
@@ -157,13 +157,25 @@ li.ui-tabs-active a {
   border-radius: 6px;
   position:relative;
   float: left;
+  border: 1px solid black;
+  padding: 2px;
+}
+  
+.pile.selectable {
+  border: 3px solid #4F4;
+  padding: 0px;
 }
 
 .pile-title {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 4px;
+  left: 4px;
   font-size: 20px;
+}
+
+.pile.selectable > .pile-title {
+  top: 2px;
+  left: 2px;
 }
 
 .pile-count {
@@ -181,12 +193,22 @@ li.ui-tabs-active a {
   text-align: center;
   height: 40px;
   border-radius: 6px;
-  padding-top: 5px;
+  padding: 7px 2px 2px 2px;
   overflow: hidden;
 }
 
 .card:hover {
   opacity: 0.7;
+}
+
+.card.selectable {
+  border: 3px solid #4F4;
+  padding: 5px 0 0 0;
+}
+  
+.card.selected {
+  border: 3px solid #F22;
+  padding: 5px 0 0 0;
 }
 
 .sites-container .site {
@@ -246,12 +268,11 @@ li.ui-tabs-active a {
 
 .site {
   width: 100px;
-  border-width: 1px;
-  border-style: solid;
+  border: 1px solid black;
   text-align: center;
   height: 40px;
   border-radius: 6px;
-  padding-top: 5px;
+  padding: 7px 2px 2px 2px;
   background: #EEE;
   /* This limits the strips to the bottom part of the site
   background-size: 100% 40%;
@@ -261,9 +282,10 @@ li.ui-tabs-active a {
 }
 
 .site-title,.site-count {
+  font-size: 14px;
   background: #EEE;
   border-radius: 2px;
-  padding: 0 2px 0 2px;
+  padding: 0px 2px 0px 2px;
 }
 
 .site:hover {
@@ -305,24 +327,14 @@ li.ui-tabs-active a {
   );
 }
 
-.card.selectable {
-  border: 3px solid #4F4;
-}
-  
-.card.selected {
-  border: 3px solid #F22;
-}
-  
 .site.selectable {
   border: 3px solid #4F4;
+  padding: 5px 0px 0px 0px;
 }
   
 .site.selected {
   border: 3px solid #F22;
-}
-  
-.pile.selectable {
-  border: 3px solid #4F4;
+  padding: 5px 0px 0px 0px;
 }
   
 
@@ -354,7 +366,7 @@ li.ui-tabs-active a {
 
 #gamelist li span {
   display: inline-block;
-  width: 80px;
+  width: 180px;
   font-weight: bold;
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -406,7 +418,7 @@ button {
   font-size: 0.9rem;
   padding: 0.6rem 1em;
   color: white;
-  margin: 0 0.25rem;
+  margin: 0 4px;
   text-align: center;
   background: #86b32d;
 }
@@ -414,7 +426,6 @@ button {
 button.selectable {
   border: 3px solid #4F4;
 }
-  
 
 button:hover {
   opacity: 0.75;

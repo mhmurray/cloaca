@@ -23,10 +23,10 @@ lg = logging.getLogger('gtr')
 class Player:
     """ Contains the piles and items controlled by a player. """
     max_hand_size = 5
-    # Must use this None->(if hand)->[] method because all players end up
-    # pointing to the same list if the default is [].
-    def __init__(self, name):
+
+    def __init__(self, uid, name):
         self.name = name
+        self.uid = uid
         self.hand = Zone()
         self.stockpile = Zone()
         self.clientele = Zone()
@@ -37,39 +37,16 @@ class Player:
         self.buildings = []
         self.influence = []
         self.revealed = Zone()
-        self.previous_revealed = Zone()
         self.performed_craftsman = False
-        self.uid = None
 
     def __repr__(self):
         rep = ('Player(name={name!r}, hand={hand!r}, stockpile={stockpile!r}, '
                'clientele={clientele!r}, vault={vault!r}, camp={camp!r}, '
                'buildings={buildings!r}, influence={influence!r})')
-        return rep.format(
-          name=self.name, hand=self.hand, stockpile=self.stockpile,
-          clientele=self.clientele, vault=self.vault, camp=self.camp,
-          buildings=self.buildings, influence=self.influence)
+        return rep.format(**self.__dict__)
 
     def __str__(self):
         return self.name
-
-    def get_card_from_hand(self, card):
-        return get_card_from_zone(card, self.hand)
-
-    def get_card_from_stockpile(self, card):
-        return get_card_from_zone(card, self.stockpile)
-
-    def get_card_from_vault(self, card):
-        return get_card_from_zone(card, self.vault)
-
-    def get_card_from_clientele(self, card):
-        return get_card_from_zone(card, self.clientele)
-
-    def get_card_from_influence(self, card):
-        return get_card_from_zone(card, self.influence)
-
-    def get_card_from_camp(self,card):
-        return get_card_from_zone(card, self.camp)
 
     def owns_building(self, building):
         """Whether this player owns a building, complete or otherwise.
@@ -118,7 +95,6 @@ class Player:
                 .format(self.name, foundation_name))
         return b
 
-
     @property
     def stairwayed_buildings(self):
         """ Returns a list of Building objects that have a material added
@@ -149,24 +125,6 @@ class Player:
     @property
     def is_following_or_leading(self):
         return len(self.camp) > 0
-
-    def add_cards_to_hand(self, cards):
-        self.hand.extend(cards)
-
-    def add_cards_to_stockpile(self, cards):
-        self.stockpile.extend(cards)
-
-    def add_cards_to_vault(self, cards):
-        self.vault.extend(cards)
-
-    def add_cards_to_clientele(self, cards):
-        self.clientele.extend(cards)
-
-    def add_cards_to_influence(self, cards):
-        self.influence.extend(cards)
-
-    def play_cards(self, cards):
-        self.camp.extend(cards)
 
     @property
     def influence_points(self):

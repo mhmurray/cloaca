@@ -6,6 +6,98 @@ function(Util, $, _){
         this.user = username;
     };
 
+    // Return card objects from zone of player with specified index, counted from
+    // 1, not 0. If the zone is 'pool', the player index doesn't mater.
+    Display.prototype.zoneCards = function(zone, playerIndex) {
+        if(zone === 'pool') {
+            return $('#game'+this.id+'-pool > .card');
+        } else if(zone === 'sites') {
+            return this.sites.children('.site');
+        } else {
+            return $('#game'+this.id+'-p'+playerIndex+'-'+zone+'> .card');
+        }
+    };
+
+    // Return container object from zone of player with specified index, counted from
+    // 1, not 0. If the zone is 'pool', the player index doesn't mater.
+    Display.prototype.zone = function(zone, playerIndex) {
+        if(zone === 'pool') {
+            return $('#game'+this.id+'-pool');
+        } else if(zone === 'sites') {
+            return this.sites;
+        } else {
+            return $('#game'+this.id+'-p'+playerIndex+'-'+zone);
+        }
+    };
+
+    // Return the button using a title from 
+    // refresh, exit, ok, cancel, skip, petition, lead-role, glory, 
+    // patron, laborer, architect, craftsman, legionary, merchant
+    Display.prototype.button = function(title) {
+        return $('#'+title+'-btn-'+this.id);
+    };
+
+    // Return all role buttons.
+    Display.prototype.roleButtons = function() {
+        return $('#role-select-'+this.id+' > button');
+    };
+
+    Display.prototype.createPlayerZones = function() {
+        var players = this.players;
+        var id = this.id;
+
+        // List the user first, if possible
+        var playerIndex = players.indexOf(this.user);
+        if(playerIndex == -1) { playerIndex = 0; }
+
+        this.playerZones = [];
+
+
+        for(var i=0; i<players.length; i++) {
+            var ip = i+1;
+
+            var playerZones = {
+                hand: Util.makeCardZone('game'+id+'-p'+ip+'-hand', 'Hand'),
+                camp: Util.makeCardZone('game'+id+'-p'+ip+'-camp', 'Camp'),
+                stockpile: Util.makeCardZone('game'+id+'-p'+ip+'-stockpile', 'Stockpile'),
+                vault: Util.makeCardZone('game'+id+'-p'+ip+'-vault', 'Vault'),
+                clientele: Util.makeCardZone('game'+id+'-p'+ip+'-clientele', 'Clientele')
+            };
+
+            playerZones.influence = $('<div />', {
+                id: 'game'+id+'-p'+ip+'-influence',
+                class: 'influence'
+            }).text('Influence');
+
+            playerZones.buildings = $('<div />', {
+                id: 'game'+id+'-p'+ip+'-buildings',
+                class: 'building-container'
+            }).text('Buildings');
+
+            this.playerZones.push(playerZones);
+        };
+
+        for(var i=0; i<players.length; i++) {
+            var i_rot = (i+playerIndex) % players.length;
+            var ip = i_rot+1;
+
+            var $p = $('<div />').addClass('player-box').appendTo(this.playerInfo);
+            var player = players[i_rot];
+            $p.html('<b>Player '+(ip)+': ' + player+'</b>');
+
+            var playerZones = this.playerZones[i_rot];
+            $p.append(playerZones.hand);
+            $p.append(playerZones.camp);
+            $p.append(playerZones.stockpile);
+            $p.append(playerZones.vault);
+            $p.append(playerZones.clientele);
+            $p.append(playerZones.influence);
+            $p.append(playerZones.buildings);
+        };
+
+    };
+
+
     // Adds game div to #page-wrapper and an anchor to the #tabs list.
     // Does not refresh the tab list.
     Display.prototype.initialize = function() {
@@ -31,42 +123,10 @@ function(Util, $, _){
 
         this.playerInfo = $('<div/>').attr('id', 'player-info-'+id);
 
-        this.poolWrapper = Util.makeCardZone('game-'+id+'-pool', 'Pool');
+        this.poolWrapper = Util.makeCardZone('game'+id+'-pool', 'Pool');
         this.pool = this.poolWrapper.find('.card-container');
 
-        var players = this.players;
-
-        // List the user first, if possible
-        var playerIndex = players.indexOf(this.user);
-        if(playerIndex == -1) { playerIndex = 0; }
-        var players_rotated = players.slice(playerIndex).concat(
-                                players.slice(0, playerIndex));
-
-        for(var i=0; i<players_rotated.length; i++) {
-            var ip = ((playerIndex+i) % players_rotated.length) + 1;
-            var $p = $('<div />').addClass('player-box').appendTo(this.playerInfo);
-            var player = players_rotated[i];
-            $p.html('<b>Player '+(ip)+': ' + player+'</b>');
-
-            $p.append(Util.makeCardZone('game'+id+'-p'+ip+'-hand', 'Hand'));
-            $p.append(Util.makeCardZone('game'+id+'-p'+ip+'-camp', 'Camp'));
-            $p.append(Util.makeCardZone('game'+id+'-p'+ip+'-stockpile', 'Stockpile'));
-            $p.append(Util.makeCardZone('game'+id+'-p'+ip+'-vault', 'Vault'));
-            $p.append(Util.makeCardZone('game'+id+'-p'+ip+'-vault', 'Clientele'));
-
-            var $influence = $('<div />', {
-                id: 'game'+id+'-p'+ip+'-influence',
-                class: 'influence'
-            }).text('Influence');
-            $p.append($influence);
-
-            var buildingZone = $('<div />', {
-                id: 'game'+id+'-p'+ip+'-buildings',
-                class: 'building-container'
-            }).text('Buildings');
-            $p.append(buildingZone);
-
-        };
+        this.createPlayerZones();
 
         // display for leader, turn, game id, etc.
         this.gameInfo = $('<div/>').attr('id', 'gameinfo-'+id);
@@ -86,38 +146,41 @@ function(Util, $, _){
         });
         this.decks.append(this.deck, this.jacks);
 
-        this.sites = $('<div/>').attr('id', 'sites-'+id)
+        this.sites = $('<div/>').attr('id', 'game'+id+'-sites-'+id)
                 .addClass('sites-container');
 
         $.each(['Rubble', 'Wood', 'Concrete', 'Brick', 'Stone', 'Marble'],
                 function(i, item) {
-                    this.sites.append(Util.makeSitesStack(item, 0, 0));
+                    var _id = 'game'+id+'-sites-'+item.toLowerCase();
+                    this.sites.append(Util.makeSitesStack(_id, item, 0, 0));
                 }.bind(this));
 
         // Dialog and control buttons
         this.dialogWrapper = $('<div>').addClass('dialog-wrapper');
         this.dialog = $('<div/>').addClass('dialog');
         this.dialogBtns = $('<div/>').append([
-            $('<button/>').attr('id', 'okay-btn-'+id).text('OK'),
+            $('<button/>').attr('id', 'ok-btn-'+id).text('OK'),
             $('<button/>').attr('id', 'cancel-btn-'+id).text('Cancel'),
             $('<button/>').attr('id', 'skip-btn-'+id).text('Skip'),
             $('<button/>').attr('id', 'petition-btn-'+id).text('Petition'),
             $('<button/>').attr('id', 'lead-role-btn-'+id).text('Lead a Role'),
             $('<button/>').attr('id', 'glory-btn-'+id).text('Glory to Rome!'),
         ]);
-        var $roleBtns = $('<div/>').attr('id', 'role-select-'+id).append(
+        this.roleBtns = $('<div/>').attr('id', 'role-select-'+id).append(
                 $.map(
                     ['Patron', 'Laborer', 'Architect',
                         'Craftsman', 'Legionary', 'Merchant'],
                     function(role) {
-                        var id = role.toLowerCase()+'-'+id;
+                        var _id = role.toLowerCase()+'-btn-'+id;
                         var _class = Util.roleToMaterial(role).toLowerCase();
-                        return $('<button/>').attr('id', id).text(role)
+                        return $('<button/>').attr('id', _id).text(role)
                                 .addClass(_class).data('role', role);
                     }.bind(this))
         );
+        this.choiceBtns = $('<div/>').attr('id', '#choice-btns-'+id);
 
-        this.dialogWrapper.append(this.dialog, this.dialogBtns.append($roleBtns));
+        this.dialogBtns.append(this.roleBtns, this.choiceBtns)
+        this.dialogWrapper.append(this.dialog, this.dialogBtns);
 
         this.gameLog = $('<div/>').attr('id', 'log-'+id).addClass('log');
 
@@ -144,29 +207,18 @@ function(Util, $, _){
         if(id !== gs.game_id) {
             alert('Mismatched game ids during update: '+id+'!='+gs.game_id);
         }
-        var is_started = gs.is_started;
+        var is_started = gs.turn_number > 0;
         var turn_number = gs.turn_number;
         var library = gs.library.cards;
-        var jack_pile = gs.jack_pile.cards;
+        var jacks = gs.jacks.cards;
         var players = gs.players;
         var leader_index = gs.leader_index;
         var leader = players[leader_index];
         var expected_action = gs.expected_action;
         console.log('Expected action from '+gs.active_player.name+
             ': ' + expected_action);
-    
-        /*
-        function populateCardZone(zone, cards) {
-            var $cardList = zone.children('.card-container');
-            $cardList.empty();
-            for(var j=0; j<cards.length; j++) {
-                console.dir(Util.makeCard(cards[j].ident));
-                $cardList.append(Util.makeCard(cards[j].ident));
-            }
-            console.dir($cardList);
-            return zone;
-        };
-        */
+
+        this.players = players;
 
         function populateCardZone(zone, cards) {
             zone.empty();
@@ -194,32 +246,43 @@ function(Util, $, _){
 
         $.each(['Rubble', 'Wood', 'Concrete', 'Brick', 'Stone', 'Marble'],
                 function(i, material) {
-                    var $span = this.sites.find('.site.'+material.toLowerCase()+' .site-count');
-                    $span.text(in_town_counts[material]+'/'+out_of_town_counts[material]);
+                    var $site = this.zoneCards('sites').filter('.'+material.toLowerCase());
+                    var $count = $site.children('.site-count');
+                    $count.text(in_town_counts[material]+'/'+out_of_town_counts[material]);
+                    $site.data({
+                        inTown: in_town_counts[material],
+                        outOfTown: out_of_town_counts[material]
+                    });
         }.bind(this));
 
         populateCardZone(this.pool, gs.pool.cards);
 
+        this.playerInfo.empty();
+        this.createPlayerZones();
+
         for(var i=0; i<gs.players.length; i++) {
+            var zones = this.playerZones[i];
             var ip = i + 1;
             var player = gs.players[i];
             var prefix = 'game'+this.id+'-p'+ip+'-';
             $.map(['hand', 'camp', 'stockpile', 'vault', 'clientele'],
                     function(s) {
-                        var z = populateCardZone($('#'+prefix+s), player[s].cards)
-                    });
+                        var z = populateCardZone(this.zone(s, ip), player[s].cards)
+                    }.bind(this));
 
             var influence = player.influence;
-            var $influence = $(prefix+'influence');
+            var $influence = zones.influence;
+            $influence.empty();
             for(var j=0; j<influence.length; j++) {
                 $influence.append(Util.makeSite(influence[j]));
             }
 
             var buildings = player.buildings;
-            var $buildings = $(prefix+'buildings');
+            var $buildings = zones.buildings;
+            $buildings.empty();
             for(var j=0; j<buildings.length; j++) {
                 var b = buildings[j];
-                buildingZone.append(Util.makeBuilding(
+                $buildings.append(Util.makeBuilding(
                         prefix+'-building'+b.foundation.ident,
                         b.foundation.ident,
                         b.site,
@@ -230,14 +293,13 @@ function(Util, $, _){
             }
         }
 
-        $info = $('#gameinfo-'+id);
-        $info.text('Game '+id+'   Turn #'+turn_number
+        this.gameInfo.text('Game '+id+'   Turn #'+turn_number
                 +'   Leader: '+leader['name']);
 
-        $('#deck-'+id+' .pile-count').text(library.length);
-        $('#jacks-'+id+' .pile-count').text(jack_pile.length);
-        $('#deck-'+id).data({nCards: library.length});
-        $('#jacks-'+id).data({nCards: jack_pile.length});
+        this.deck.children('.pile-count').text(library.length);
+        this.deck.data({nCards: library.length});
+        this.jacks.children('.pile-count').text(jacks.length);
+        this.jacks.data({nCards: jacks.length});
 
         this.gameLog.html(gs.game_log.join('<br>'));
         this.gameLog[0].scrollTop = this.gameLog[0].scrollHeight;

@@ -7,11 +7,16 @@ from zope.interface import Interface, implements
 
 from twisted.internet.protocol import ServerFactory, Protocol
 
+from bidict import bidict
+
 from gamestate import GameState
-from message import GameAction
+from message import GameAction, Command
 import message
 from server import GTRServer
+from error import GTRError, ParsingError, GameActionError
+
 from pickle import dumps
+from uuid import uuid4
 
 from interfaces import IGTRService, IGTRFactory
 
@@ -19,74 +24,71 @@ from interfaces import IGTRService, IGTRFactory
 import sys
 sys.path.append("sockjs-twisted")
 from txsockjs.factory import SockJSFactory
+import cgi
 
 import json
 
+# Bi-directional mapping between user id (uid) and session id
+users = {};
+
+# Bi-directional mapping between username and user id (uid)
+usernames = bidict()
+
+def _username_from_uid(uid):
+    global usernames
+    return usernames[uid]
+
+def _uid_from_username(username):
+    global usernames
+    return usernames.inverse[username]
+
+def new_user(uid, username):
+    global usernames
+    if uid in usernames:
+        raise KeyError('UID', uid, 'is already registered'
+                'with username', _username_from_uid(uid))
+    elif username in usernames.inverse:
+        raise KeyError('Username', username, 'is already registered'
+                'with uid', _uid_from_username(username))
+    else:
+        usernames[uid] = username
+
+
 class GTRProtocol(NetstringReceiver):
 
-    @staticmethod
-    def game_action_to_json(user, game_id, action):
-        """Convert a username, game_id, and GameAction to a JSON string."""
-
-        d = {'user': user, 'game': game_id,
-            'action': action.action, 'args': action.args}
-
-        return json.dumps(d)
-
-    @staticmethod
-    def game_action_from_json(j):
-        """Convert json string and return (user, game_id, game_action).
-
-        Returns:
-        user -- string, username
-        game_id -- int
-        game_action -- list [<action>, <args>]
-        """
-        try:
-            d = json.loads(j)
-        except ValueError:
-            print 'Failed to parse JSON: ' + str(j)
-            return None
-
-        try:
-            user, game = d['user'], d['game']
-            action, args = d['action'], d['args']
-        except KeyError:
-            print 'JSON object does not represent a GameAction: ', d
-            return None
-
-        return user, game, action, args
-
-
     def connectionMade(self):
-        print 'client connected'
+        pass
 
     def connectionLost(self, reason):
-        print 'client disconnected'
-        print reason
+        self.factory.unregister(self)
 
     def stringReceived(self, request):
-        """Receives actions of the form "user, game_id, action".
-        Converts the game_id to an integer and tries to parse the
-        action.
+        """Receives Command objects of the form <game, action>.
+        
+        Expects the first command on this protocol to be LOGIN.
         """
-        print 'string received ', request
-        user, game, action, args = self.game_action_from_json(request)
-
         try:
-            a = message.parse_action(action, args)
-        except message.BadGameActionError as e:
+            command = Command.from_json(request)
+        except (ParsingError, GameActionError), e:
             print e.message
             return
 
-        self.factory.register(self, user)
-        self.factory.handle_action(user, game, a)
+        uid = self.factory.user_from_protocol(self)
 
-    def send_action(self, action):
-        """Send a GameAction to the client."""
-        #self.sendString(','.join(
-        #        [str(action.action)] + map(str, action.args)))
-        self.sendString(json.dumps(action, default = lambda o: o.__dict__))
+        if uid is None:
+            if command.action.action == message.LOGIN:
+                session_id = command.action.args[0]
+                uid = self.factory.register(self, session_id)
+
+            if uid is None:
+                print 'Ignoring message from unauthenticated user'
+                return
+        else:
+            self.factory.handle_command(uid, command)
+
+    def send_command(self, command):
+        """Send a Command to the client."""
+        self.sendString(command.to_json())
 
 
 class GTRService(service.Service):
@@ -98,16 +100,23 @@ class GTRService(service.Service):
         self.server = GTRServer(backup_file, load_backup_file)
 
         self.factory = None
-        self.server.send_action = lambda user, action : self.send_action(user, action)
+        self.server.send_command =\
+                lambda user, command : self.send_command(user, command)
 
-    def send_action(self, user, action):
+    def register_user(self, uid, userinfo):
+        self.server.register_user(uid, userinfo)
+
+    def unregister_user(self, uid, userinfo):
+        self.server.unregister_user(uid)
+
+    def send_command(self, user, command):
         """Sends a message to the user if the user exists.
         """
         if self.factory is not None:
-            self.factory.send_action(user, action)
+            self.factory.send_command(user, command)
 
-    def handle_action(self, user, game_id, a):
-        return self.server.handle_action(user, game_id, a)
+    def handle_command(self, user, command):
+        return self.server.handle_command(user, command)
 
 
 class GTRFactoryFromService(protocol.ServerFactory):
@@ -115,7 +124,7 @@ class GTRFactoryFromService(protocol.ServerFactory):
 
     Keeps a reference to a factory object that implements IGTRFactory.
     This object is used to communicate with the clients via the method
-    GTRFactory.send_action(user, action).
+    GTRFactory.send_command(user, command).
     """
 
     implements(IGTRFactory)
@@ -125,32 +134,67 @@ class GTRFactoryFromService(protocol.ServerFactory):
     def __init__(self, service):
         self.service = service
         self.service.factory = self
-        self.users = {} # User-to-protocol dictionary. Filled when the first command is received.
 
-    def register(self, protocol, user):
-        """Register protocol as associated with the specified user.
+        # Bidirectional mapping user-to-protocol. The inverse
+        # dictionary has a list of users with the same protocol
+        self.user_to_protocol = bidict()
+        self.session_user_dict = {}
+
+    def user_from_protocol(self, protocol):
+        try:
+            return self.user_to_protocol.inverse[protocol][0]
+        except KeyError:
+            return None
+
+    def protocol_from_user(self, user):
+        try:
+            return self.user_to_protocol[user]
+        except KeyError:
+            return None
+
+    def register(self, protocol, session_id):
+        """Register protocol as associated with the specified user id.
         This replaces the old protocol silently.
         """
-        self.users[user] = protocol
+        global users
+        try:
+            uid = users[session_id]
+        except KeyError:
+            uid = None
+        else:
+            self.user_to_protocol[uid] = protocol
 
-    def send_action(self, user, action):
+        try:
+            username = _username_from_uid(uid)
+        except KeyError as e:
+            print e.message
+            return None
+
+        self.service.register_user(uid, {'name': username})
+
+        return uid
+
+    def unregister(self, protocol):
+        uid = self.user_from_protocol(protocol)
+        if uid is not None:
+            del self.user_to_protocol[uid]
+
+    def send_command(self, uid, command):
         """Sends an action to the specified user.
         """
-        try:
-            protocol = self.users[user]
-        except KeyError:
-            print 'Error. Server tried to send a command to ' + user + \
-                    ' but the user is not connected.'
-            return
-        
-        protocol.send_action(action)
+        protocol = self.protocol_from_user(uid)
+        if protocol is None:
+            username = _username_from_uid(uid)
+            print 'Error. Server tried to send a command to',\
+                    username, '('+str(uid)+') but the user is not connected.'
+        else:
+            protocol.send_command(command)
 
-    def handle_action(self, user, game, action):
-        self.service.handle_action(user, game, action)
+    def handle_command(self, uid, command):
+        self.service.handle_command(uid, command)
 
 
 components.registerAdapter(GTRFactoryFromService, IGTRService, IGTRFactory)
-
 
 application = service.Application('gtr')
 #s = GTRService('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
@@ -166,30 +210,69 @@ class FormPage(static.File):
     def render_POST(self, request):
         return '<html><body>You submitted: %s</body></html>' % (cgi.escape(str(request.args)),)
 
-class DisableCache(static.File):
-    """Static file resource that sets the header to disable caching.
-    """
 
+class GetUser(resource.Resource):
     def render_GET(self, request):
-        print request.responseHeaders
-        request.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-        request.setHeader('Pragma', 'no-cache')
-        request.setHeader('Expires', '0')
-        print request.responseHeaders
-        size = self.getFileSize()
-        return static.File.render_GET(self, request)
+        session_id = request.getSession().uid
+        global users
+        try:
+            uid = users[session_id]
+            username = _username_from_uid(uid)
+        except KeyError as e:
+            print e.message
+            return ''
 
-class Test(resource.Resource):
+        return username
+
+class NoPassLogin(resource.Resource):
+    def render_POST(self, request):
+        global users
+        #print request.args
+        username = cgi.escape(str(request.args['user'][0]))
+        print 'Received login request for user', username
+
+        try:
+            uid = _uid_from_username(username)
+        except KeyError:
+            uid = uuid4().int
+            print 'New user. Assigning uid', uid
+            try:
+                new_user(uid, username)
+            except KeyError as e:
+                print e.message
+                return
+
+        session = request.getSession()
+        users[session.uid] = uid
+        print 'Set session id:', session.uid, 'for user', \
+                username, '('+str(uid)+')'
+        session.notifyOnExpire(lambda: self._onExpire(session))
+        return username
+
+    def _onExpire(self, session):
+        global users
+        try:
+            print 'Session expired', session.uid, 'user:', users[session.uid]
+            del users[session.uid]
+        except KeyError:
+            print 'Couldn\'t remove session with uid', session.uid
+            print str(users)
+
+class Logout(resource.Resource):
     def render_GET(self, request):
-        print request
-        print 'TEstint'
-        return 'stuff'
+        global users
+        session = request.getSession()
+        session.expire()
+        return 'Logged out session '+ session.uid
 
 root.putChild('hello', SockJSFactory(IGTRFactory(s)))
 root.putChild("index", static.File('site/index.html'))
 root.putChild("style.css", static.File('site/style.css'))
 root.putChild("favicon.ico", static.File('site/favicon.ico'))
 root.putChild("js", static.File('site/js'))
+root.putChild('user', GetUser())
+root.putChild('login', NoPassLogin())
+root.putChild('logout', Logout())
 site = server.Site(root)
 
 #reactor.listenTCP(5050, site)

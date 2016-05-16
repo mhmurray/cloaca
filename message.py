@@ -3,6 +3,7 @@ import card_manager
 from itertools import izip, izip_longest, count
 from card import Card
 import json
+from error import GameActionError, ParsingError
 
 THINKERORLEAD   =  0
 USELATRINE      =  1
@@ -38,6 +39,7 @@ REQSTARTGAME    = 30
 STARTGAME       = 31
 REQGAMELIST     = 32
 GAMELIST        = 33
+SERVERERROR     = 34
 
 # A dictionary of the number of arguments for each action type
 # and their signature.
@@ -101,17 +103,18 @@ class GTRActionSpec(object):
 #Card = int
 _action_args_dict = {
     REQGAMESTATE   : GTRActionSpec('reqgamestate',   (), () ),
-    GAMESTATE      : GTRActionSpec('gamestate',      ( (int, 'game_id'), (str,  'game_state'), ), () ),
+    GAMESTATE      : GTRActionSpec('gamestate',      ( (str,  'game_state'), ), () ), 
     SETPLAYERID    : GTRActionSpec('setplayerid',    ( (int,  'id'), ), () ),
-    REQJOINGAME    : GTRActionSpec('reqjoingame',    ( (int, 'game_id'), ), () ),
-    JOINGAME       : GTRActionSpec('joingame',       ( (int, 'game_id'), ), () ),
+    REQJOINGAME    : GTRActionSpec('reqjoingame',    (), () ),
+    JOINGAME       : GTRActionSpec('joingame',       (), () ),
     REQCREATEGAME  : GTRActionSpec('reqcreategame',  (), () ),
     CREATEGAME     : GTRActionSpec('creategame',     (), () ),
-    LOGIN          : GTRActionSpec('login',          ( (str, 'user_name'), ), () ),
+    LOGIN          : GTRActionSpec('login',          ( (str, 'session_id'), ), () ),
     REQSTARTGAME   : GTRActionSpec('reqstartgame',   (), () ),
-    STARTGAME      : GTRActionSpec('startgame',      ( (int, 'game_id'), ), () ),
+    STARTGAME      : GTRActionSpec('startgame',      (), () ),
     REQGAMELIST    : GTRActionSpec('reqgamelist',    (), () ),
     GAMELIST       : GTRActionSpec('gamelist',       ( (str, 'game_list'), ), () ),
+    SERVERERROR    : GTRActionSpec('servererror',    ( (str, 'err_msg'), ), () ),
 
     THINKERORLEAD  : GTRActionSpec('thinkerorlead',  ( (bool, 'do_thinker'), ), () ),
     THINKERTYPE    : GTRActionSpec('thinkertype',    ( (bool, 'for_jack'), ), () ),
@@ -157,7 +160,7 @@ _action_args_dict = {
 
 def parse_action_(action_string):
     """ Parses the action string into a valid action or
-    raises a BadGameActionError.
+    raises a GameActionError.
     It should be formatted like this:
 
         ARCHITECT,Foundation,Material,Site
@@ -173,12 +176,12 @@ def parse_action_(action_string):
     try:
         action_type_str = action_tokens[0]
     except (IndexError, TypeError):
-        raise BadGameActionError('Invalid action format: ' + action_string)
+        raise GameActionError('Invalid action format: ' + action_string)
 
     try:
         action_type = int(action_type_str)
     except ValueError:
-        raise BadGameActionError('Invalid action value: ' + action_type_str)
+        raise GameActionError('Invalid action value: ' + action_type_str)
 
     try:
         spec = _action_args_dict[action_type]
@@ -209,7 +212,7 @@ def parse_action_(action_string):
         arg_tokens = [] # default split if no req. or optional args.
 
     if len(arg_tokens) < spec.n_req_args:
-        raise BadGameActionError(
+        raise GameActionError(
             'Not enough arguments ({0} required) for action: {1}: {2}'
             .format(spec.name, spec.n_req_args, str(arg_tokens)))
     # Can't check for extra args, because there's no way to distinguish
@@ -221,16 +224,16 @@ def parse_action_(action_string):
             if token in ('True', 'true', 'TRUE', True): arg = True
             elif token in ('False', 'false', 'FALSE', False): arg = False
             else:
-                raise BadGameActionError('Boolean argument expected. Received ' + str(token))
+                raise GameActionError('Boolean argument expected. Received ' + str(token))
 
         elif token == 'None':
             arg = None
 
-        elif _type == Card:
+        elif _type == Card and type(token) is not Card:
             try:
                 arg = Card(int(token))
             except ValueError:
-                raise BadGameActionError(
+                raise GameActionError(
                     'Error converting "{0}" argument: {1} token: "{2}"'
                     .format(name, str(_type), token))
 
@@ -238,7 +241,7 @@ def parse_action_(action_string):
             try:
                 arg = _type(token)
             except ValueError:
-                raise BadGameActionError(
+                raise GameActionError(
                     'Error converting "{0}" argument: {1} token: "{2}"'
                     .format(name, str(_type), token))
 
@@ -251,9 +254,9 @@ def parse_action_(action_string):
     for i, tok, (typ, name) in izip(count(), req_tokens, spec.required_arg_specs):
         try:
             arg = parse_arg(typ, tok, name)
-        except BadGameActionError, e:
+        except GameActionError, e:
             # If we failed in parse_arg, message can be appended for details
-            raise BadGameActionError(
+            raise GameActionError(
                 'Could not convert argument {0}. '.format(i) + e.message)
 
         req_args.append(arg)
@@ -266,9 +269,9 @@ def parse_action_(action_string):
         typ, name = spec.extended_arg_spec
         try:
             arg = parse_arg(typ, tok, name)
-        except BadGameActionError, e:
+        except GameActionError, e:
             # If we failed in parse_arg, message can be appended for details
-            raise BadGameActionError(
+            raise GameActionError(
                 'Could not convert argument {0}. '.format(i) + e.message)
 
         extended_args.append(arg)
@@ -277,7 +280,7 @@ def parse_action_(action_string):
 
 def parse_action(action, args):
     """Parse the action and return a valid GameAction object or raises a
-    BadGameActionError.
+    GameActionError.
 
     Args:
     action -- int, with symbolic representation found in message.py.
@@ -289,12 +292,12 @@ def parse_action(action, args):
         raise Exception('Invalid action: ' + str(action))
 
     if len(args) < spec.n_req_args:
-        raise BadGameActionError(
+        raise GameActionError(
             'Not enough arguments ({0} required) for action: {1}: {2}'
             .format(spec.n_req_args, spec.name, str(args)))
 
     if len(args) > spec.n_req_args and not spec.has_extended:
-        raise BadGameActionError(
+        raise GameActionError(
                 'Received extra arguments ({0:d} required, {1:d} received)'
                 'for action: {1}: {2}'
             .format(spec.n_req_args, len(args), spec.name, str(args)))
@@ -310,7 +313,7 @@ def parse_action(action, args):
             if token in ('True', 'true', 'TRUE', True): arg = True
             elif token in ('False', 'false', 'FALSE', False): arg = False
             else:
-                raise BadGameActionError('Boolean argument expected. Received' + str(token))
+                raise GameActionError('Boolean argument expected. Received' + str(token))
 
         elif token == 'None':
             arg = None
@@ -319,7 +322,7 @@ def parse_action(action, args):
             try:
                 arg = Card(int(token))
             except ValueError:
-                raise BadGameActionError(
+                raise GameActionError(
                     'Error converting "{0}" argument: {1} token: "{2}"'
                     .format(name, str(type_), token))
 
@@ -327,7 +330,7 @@ def parse_action(action, args):
             try:
                 arg = type_(token)
             except ValueError:
-                raise BadGameActionError(
+                raise GameActionError(
                     'Error converting "{0}" argument: {1} token: "{2}"'
                     .format(name, str(type_), token))
 
@@ -340,9 +343,9 @@ def parse_action(action, args):
     for i, tok, (typ, name) in izip(count(), req_tokens, spec.required_arg_specs):
         try:
             arg = parse_arg(typ, tok, name)
-        except BadGameActionError, e:
+        except GameActionError, e:
             # If we failed in parse_arg, message can be appended for details
-            raise BadGameActionError(
+            raise GameActionError(
                 'Could not convert argument {0}. '.format(i) + e.message)
 
         req_args.append(arg)
@@ -355,9 +358,9 @@ def parse_action(action, args):
         typ, name = spec.extended_arg_spec
         try:
             arg = parse_arg(typ, tok, name)
-        except BadGameActionError, e:
+        except GameActionError, e:
             # If we failed in parse_arg, message can be appended for details
-            raise BadGameActionError(
+            raise GameActionError(
                 'Could not convert argument {0}. '.format(i) + e.message)
 
         extended_args.append(arg)
@@ -370,15 +373,70 @@ def get_action_name(action):
     """
     return _action_args_dict[action].name
 
-class BadGameActionError(Exception):
-    pass
+class Command(object):
+    """Command passed to the game server or client.
 
-class GameAction:
+    This is a GameAction object and the id of the game it's
+    intended for.
+    """
+    def __init__(self, game, action):
+        if game is None:
+            self.game = game
+        else:
+            try:
+                self.game = int(game)
+            except ValueError:
+                raise GameActionError('Game id must be an integer or None: '+str(game))
+
+        self.action = action
+
+        if type(self.action) is not GameAction:
+            raise TypeError('Action must be a GameAction object: '+str(action)+
+                    '('+str(type(action))+')')
+
+    def to_json(self):
+        """Return this action converted to a JSON string.
+        """
+        def convert(o):
+            if type(o) is Card:
+                return o.ident
+            else:
+                return o.__dict__
+
+        return json.dumps(self, default=convert)
+
+    @staticmethod
+    def from_json(s):
+        """Parse a JSON string and return a Command object.
+
+        Raises ParsingError if s is not a valid command object
+        or is invalid JSON.
+        """
+        try:
+            d = json.loads(s)
+        except ValueError:
+            raise ParsingError('Failed to parse JSON: ' + s)
+
+        try:
+            game, action_dict = d['game'], d['action']
+        except KeyError:
+            raise ParsingError('Failed to decode Command object from JSON: '+s)
+
+        try:
+            action, args = action_dict['action'], action_dict['args']
+        except KeyError:
+            raise ParsingError('Failed to decode GameAction when'
+                    'parsing Command from JSON')
+
+        return Command(game, GameAction(action, *args))
+
+
+class GameAction(object):
     """ Class that represents a game action that the client submits
     to the game server. Consists of an action type and one or more
     arguments, each of which should be representable by a string.
 
-    Raises a ValueError if the action type is not valid or if the
+    Raises a GameActionError if the action type is not valid or if the
     arguments don't match the action type signature.
     """
     def __init__(self, action, *args):
@@ -387,37 +445,28 @@ class GameAction:
 
         self.check_type()
         self.check_args()
-        self.convert_cards()
-
-    def convert_cards(self):
-        """Converts any arguments from ints to Cards based on the arg spec.
-        """
-        spec = _action_args_dict[self.action]
-
-        for i,arg, (_type, name) in izip(count(), self.args, spec.required_arg_specs):
-            pass
-
+        self.convert_args()
 
     def check_type(self):
         """ Raises an InvalidGameActionError if this is not a valid game
         action.
         """
         if self.action < 0 or self.action >= len(_action_args_dict):
-            raise BadGameActionError(msg='Invalid action type ({0})'.format(self.action))
+            raise GameActionError('Invalid action type ({0})'.format(self.action))
 
     def check_args(self):
-        """ Raises an BadGameActionError if there's a problem
+        """ Raises an GameActionError if there's a problem
         with the arguments.
         """
         spec = _action_args_dict[self.action]
         
         if not spec.has_extended and len(self.args) != spec.n_req_args:
-            raise BadGameActionError(
+            raise GameActionError(
                 'Number of args doesn\'t match (args={0}, n_args must be {1})'
                 .format(self.args, spec.n_req_args))
 
         elif spec.has_extended and len(self.args) < spec.n_req_args:
-            raise BadGameActionError(
+            raise GameActionError(
                 'Number of args doesn\'t match (args={0}, n_args must be >= {1})'
                 .format(self.args, n_args))
 
@@ -430,7 +479,7 @@ class GameAction:
                     or type(arg) is unicode and _type is str
 
             if bad_arg_match and not arg_is_none and not str_unicode_error and not card_arg_match:
-                raise BadGameActionError(
+                raise GameActionError(
                     'Argument {0} ("{1}"), {2} doesn\'t match type ({3} != {4})'
                     .format(i, name, str(arg), str(_type), str(type(arg))))
 
@@ -445,9 +494,78 @@ class GameAction:
                     or type(arg) is unicode and _type is str
 
             if bad_arg_match and not arg_is_none and not str_unicode_error and not card_arg_match:
-                raise BadGameActionError(
+                raise GameActionError(
                     'Argument {0} ("{1}"), {2} doesn\'t match type ({3} != {4})'
                     .format(i, name, str(arg), str(_type), str(type(arg))))
+
+
+    def convert_args(self):
+        """Convert the args that are represented by other types.
+
+        Card objects are transmited as ints.
+
+        Raise GameActionError if the argument can't be converted.
+
+        Args:
+        action -- int, with symbolic representation found in message.py.
+        args -- sequence, with type of items found in message.py
+        """
+        try:
+            spec = _action_args_dict[self.action]
+        except KeyError:
+            raise Exception('Invalid action: ' + str(action))
+
+        def parse_arg(type_, token, name):
+            """Converts token to type type_.
+            
+            This includes special cases for some argument types,
+            such as Card, bool, and NoneType.
+            """
+            if type_ is Card and token is not None and type(token) is not Card:
+                try:
+                    arg = Card(int(token))
+                except ValueError:
+                    raise GameActionError(
+                        'Error converting "{0}" argument: {1} token: "{2}"'
+                        .format(name, str(type_), token))
+
+                return arg
+
+            else:
+                return token
+
+
+        req_tokens = self.args[:spec.n_req_args]
+        req_args = []
+
+        for i, tok, (typ, name) in izip(count(), req_tokens, spec.required_arg_specs):
+            try:
+                arg = parse_arg(typ, tok, name)
+            except GameActionError, e:
+                # If we failed in parse_arg, message can be appended for details
+                raise
+                #raise GameActionError(
+                #    'Could not convert argument {0}. '.format(i) + e.message)
+
+            req_args.append(arg)
+
+
+        extended_tokens = self.args[spec.n_req_args:]
+        extended_args = []
+        
+        for i, tok in izip(count(spec.n_req_args), extended_tokens):
+            typ, name = spec.extended_arg_spec
+            try:
+                arg = parse_arg(typ, tok, name)
+            except GameActionError, e:
+                # If we failed in parse_arg, message can be appended for details
+                raise GameActionError(
+                    'Could not convert argument {0}. '.format(i) + e.message)
+
+            extended_args.append(arg)
+
+        self.args = req_args + extended_args
+
 
     def privatize(self):
         """ Re-names any information in this GameAction instance that is
@@ -472,3 +590,35 @@ class GameAction:
 
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
+    def to_json(self):
+        """Return this action converted to a JSON string.
+        """
+        def convert(o):
+            if type(o) is Card:
+                return o.ident
+            else:
+                return o.__dict__
+
+        return json.dumps(self, default=convert)
+
+    @staticmethod
+    def from_json(s):
+        """Parse the JSON string and return a GameAction object.
+
+        Raise ParsingError if the string is invalid JSON.
+
+        Raise ParsingError if the JSON is correctly decoded, but represents
+        an invalid GameAction object.
+        """
+        try:
+            d = json.loads(s)
+        except ValueError:
+            raise ParsingError('Failed to parse JSON: ' + s)
+
+        try:
+            action, args = d['action'], d['args']
+        except KeyError:
+            raise ParsingError('Failed to decode Command object from JSON: '+s)
+
+        return GameAction(action, *args)

@@ -30,13 +30,13 @@ class TestHandleThinker(unittest.TestCase):
         """ Test that the jack and library piles aren't empty.
         """
         self.assertTrue(len(self.game.game_state.library)>5)
-        self.assertEqual(len(self.game.game_state.jack_pile), 6)
+        self.assertEqual(len(self.game.game_state.jacks), 6)
 
 
     def test_waiting_for_thinker(self):
         """ Tests that the game is expecting a THINKERTYPE.
         """
-        self.assertEqual(self.game.expected_action(), message.THINKERTYPE)
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
 
         a = message.GameAction(message.SKIPTHINKER, False)
 

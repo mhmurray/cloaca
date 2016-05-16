@@ -1,5 +1,5 @@
 from card import Card
-from gtrutils import GTRError
+from error import GTRError
 
 from collections import Counter
 

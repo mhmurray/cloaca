@@ -11,42 +11,45 @@ import cloaca.card_manager as cm
 import test_setup
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError
+from cloaca.message import GameActionError
 
 import unittest
 from cloaca import gtrutils
 
 from collections import Counter
+from uuid import uuid4
 
 class TestInitPool(unittest.TestCase):
     """Test initialization of the pool and determining who goes first.
     """
 
     def test_two_player(self):
-        p1 = Player('p1')
-        p2 = Player('p2')
 
-        gs = GameState(players=['p1','p2'])
-        gs.players = (p1, p2)
+        g = Game()
+        g.add_player(uuid4(), 'p1')
+        g.add_player(uuid4(), 'p2')
 
+        gs = g.game_state
         gs.library.set_content(cm.get_cards(['Bar', 'Circus']))
 
-        g = Game(gs)
-
-        first = g.init_pool(len(gs.players))
+        first = g._init_pool(len(gs.players))
 
         self.assertEqual(first, 0)
         self.assertIn('Bar', gs.pool)
         self.assertIn('Circus', gs.pool)
 
     def test_five_player(self):
-        gs = GameState(players=['p'+str(i) for i in range(5)])
+        g = Game()
+        g.add_player(uuid4(), 'p1')
+        g.add_player(uuid4(), 'p2')
+        g.add_player(uuid4(), 'p3')
+        g.add_player(uuid4(), 'p4')
+        g.add_player(uuid4(), 'p5')
 
+        gs = g.game_state
         gs.library.set_content(cm.get_cards(['Statue', 'Circus', 'Dock', 'Dock', 'Ludus Magna']))
 
-        g = Game(gs)
-
-        first = g.init_pool(len(gs.players))
+        first = g._init_pool(len(gs.players))
 
         self.assertEqual(first, 1)
         self.assertIn('Statue', gs.pool)
@@ -55,16 +58,19 @@ class TestInitPool(unittest.TestCase):
         self.assertEqual(gs.pool.count('Dock'), 2)
 
     def test_resolve_tie(self):
-        gs = GameState(players=['p'+str(i) for i in range(3)])
+        g = Game()
+        g.add_player(uuid4(), 'p1')
+        g.add_player(uuid4(), 'p2')
+        g.add_player(uuid4(), 'p3')
 
+        gs = g.game_state
         gs.library.set_content(cm.get_cards(
             ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
              'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum',
              ]))
 
-        g = Game(gs)
 
-        first = g.init_pool(len(gs.players))
+        first = g._init_pool(len(gs.players))
 
         self.assertEqual(first, 2)
         z = Zone(cm.get_cards(
@@ -83,14 +89,17 @@ class TestGameStatePrivatize(unittest.TestCase):
     def test_privatize_library(self):
         """Test hiding the library.
         """
-        gs = GameState(players=['p'+str(i) for i in range(2)])
+        g = Game()
+        g.add_player(uuid4(), 'p1')
+        g.add_player(uuid4(), 'p2')
+        gs = g.game_state
 
         gs.library.set_content(cm.get_cards(
             ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
              'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum',
              ]))
 
-        gs.privatize('p0')
+        gs.privatize('p1')
 
         self.assertFalse(gs.library.contains('Circus'))
         self.assertEqual(gs.library, Zone([Card(-1)]*len(gs.library)))
@@ -98,7 +107,11 @@ class TestGameStatePrivatize(unittest.TestCase):
     def test_privatize_hands(self):
         """Test hiding opponents' hands.
         """
-        gs = GameState(players=['p'+str(i) for i in range(2)])
+        g = Game()
+        g.add_player(uuid4(), 'p0')
+        g.add_player(uuid4(), 'p1')
+        gs = g.game_state
+
         p0, p1 = gs.players
 
         latrine, insula, jack, road = cm.get_cards(['Latrine', 'Insula', 'Jack', 'Road'])
@@ -121,7 +134,11 @@ class TestGameStatePrivatize(unittest.TestCase):
     def test_privatize_vaults(self):
         """Test hiding all vaults.
         """
-        gs = GameState(players=['p'+str(i) for i in range(2)])
+        g = Game()
+        g.add_player(uuid4(), 'p0')
+        g.add_player(uuid4(), 'p1')
+        gs = g.game_state
+
         p0, p1 = gs.players
 
         latrine, insula, statue, road = cm.get_cards(['Latrine', 'Insula', 'Statue', 'Road'])
@@ -130,14 +147,18 @@ class TestGameStatePrivatize(unittest.TestCase):
 
         gs.privatize('p1')
 
-        self.assertEqual(p0.vault, [Card(-1)]*2)
-        self.assertEqual(p1.vault, [Card(-1)]*2)
+        self.assertEqual(p0.vault, Zone([Card(-1)]*2))
+        self.assertEqual(p1.vault, Zone([Card(-1)]*2))
 
 
     def test_privatize_fountain_card(self):
         """Test hiding the card revealed with the fountain.
         """
-        gs = GameState(players=['p'+str(i) for i in range(2)])
+        g = Game()
+        g.add_player(uuid4(), 'p0')
+        g.add_player(uuid4(), 'p1')
+
+        gs = g.game_state
         p0, p1 = gs.players
 
         latrine, insula, statue, road = cm.get_cards(['Latrine', 'Insula', 'Statue', 'Road'])

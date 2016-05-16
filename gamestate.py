@@ -4,7 +4,7 @@ draw a card from an empty pile.
 """
 
 import gtrutils
-from gtrutils import GTRError
+from error import GTRError
 from player import Player
 from building import Building
 import random
@@ -19,34 +19,25 @@ import stack
 lg = logging.getLogger('gtr')
 
 class GameState(object):
-    """Contains the current game state.
-    
-    Mostly a class with attributes representing all the information
-    needed to specify a game state. A few methods for simple game tasks,
-    but most of the game logic is in the Game class.
+    """Data object containing the state of a game.
     """
 
-    def __init__(self, players=None, jack_pile=None, library=None, pool=None,
-                 in_town_sites=None, out_of_town_sites=None,
-                 stack_=None):
+    def __init__(self):
         self.players = []
-        if players:
-            for player in players: self.find_or_add_player(player)
         self.leader_index = None
         self.turn_number = 0
         self.is_role_led = False
         self.role_led = None
         self.active_player = None
         self.turn_index = 0
-        self.jack_pile = jack_pile or Zone()
-        self.library = library or Zone()
-        self.pool = pool or Zone()
-        self.in_town_sites = in_town_sites or []
-        self.out_of_town_sites = out_of_town_sites or []
+        self.jacks = Zone()
+        self.library = Zone()
+        self.pool = Zone()
+        self.in_town_sites = []
+        self.out_of_town_sites = []
         self.oot_allowed = False
         self.used_oot = False
-        self.is_started = False
-        self.stack = stack_ if stack_ else stack.Stack()
+        self.stack = stack.Stack()
         self.legionary_count = 0
         self.legionary_index = 0
         self.legionary_resp_indices = []
@@ -54,16 +45,17 @@ class GameState(object):
         self.senate_resp_indices = []
         self.expected_action = None
         self.game_id = 0
+        self.host = None
 
-        #Official game log messages, narrating what happens in a game
         self.game_log = []
 
     active_player_index = property(lambda self : self.players.index(self.active_player))
     leader = property(lambda self : self.players[self.leader_index])
+    is_started = property(lambda self : self.turn_number > 0)
 
     def __repr__(self):
         rep = ('GameState(players={players!r}, leader={leader!r}, '
-               'jack_pile={jack_pile!r}, '
+               'jacks={jacks!r}, '
                'library={library!r}, '
                'in_town_sites={in_town_sites!r},'
                'out_of_town_sites={out_of_town_sites!r})'
@@ -71,7 +63,7 @@ class GameState(object):
         return rep.format(
             players=self.players,
             leader=self.leader_index,
-            jack_pile=self.jack_pile,
+            jacks=self.jacks,
             library=self.library,
             in_town_sites=self.in_town_sites,
             out_of_town_sites=self.out_of_town_sites,
@@ -123,10 +115,10 @@ class GameState(object):
         if n_cards < 1: n_cards = 1
         lg.debug(
             'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
-        player.add_cards_to_hand(self.draw_cards(n_cards))
+        player.hand.extend(self.draw_cards(n_cards))
 
     def draw_jack_for_player(self, player):
-        player.add_cards_to_hand([self.draw_jack()])
+        player.hand.append(self.draw_jack())
 
     def discard_for_player(self, player, card):
         player.hand.move_card(card, self.pool)
@@ -137,51 +129,28 @@ class GameState(object):
             player.hand.move_card(card, self.pool)
 
     def find_player_index(self, player_name):
-        """ Finds the index of a named player, otherwise creates a new
-        Player object with the given name, appending it to the list of
-        players. """
-        players_match = filter(lambda x : x.name==player_name, self.players)
-        if len(players_match) > 1:
-            lg.critical(
-              'Fatal error! Two instances of player {0}.'.format(players_match[0].name))
-            raise Exception('Cannot have two players with the same name.')
-        elif len(players_match) == 1:
-            lg.debug('Found existing player {0}.'.format(players_match[0].name))
-            player_index = self.players.index(players_match[0])
-            return player_index
-        else:
-            return None
+        """Finds the index of a named player.
+        """
+        players_match = [i for i,p in enumerate(self.players)
+                         if p.name==player_name]
+        return players_match[0] if len(players_match) else None
 
-    def find_or_add_player(self, player_name):
-        """ Finds the index of a named player, otherwise creates a new
-        Player object with the given name, appending it to the list of
-        players. """
-        players_match = filter(lambda x : x.name==player_name, self.players)
-        if len(players_match) > 1:
-            lg.warning(
-              'Fatal error! Two instances of player {0}.'.format(players_match[0].name))
-            raise Exception('Cannot create two players with the same name.')
-        elif len(players_match) == 1:
-            lg.debug('Found existing player {0}.'.format(players_match[0].name))
-            player_index = self.players.index(players_match[0])
-        else:
-            lg.debug('Adding player {0}.'.format(player_name))
-            self.players.append(Player(player_name))
-            player_index = len(self.players) - 1
-        return player_index
+    def find_player(self, name):
+        """Return the Player object with the specified name or None if no
+        such player is in the game.
+        """
+        players_match = filter(lambda x : x.name == name, self.players)
+        return players_match[0] if len(players_match) else None
 
-    def init_player(self, player):
-        self.draw_jack_for_player(player)
-        self.thinker_for_cards(player, 5)
-
-    def init_players(self):
+    def init_player_hands(self):
         lg.info('Initializing {0} players.'.format(len(self.players)))
         for player in self.players:
-            self.init_player(player)
+            self.draw_jack_for_player(player)
+            self.thinker_for_cards(player, 5)
 
     def draw_jack(self):
         try:
-            c = self.jack_pile.pop()
+            c = self.jacks.pop()
         except IndexError:
             raise GTRError('Jack pile is empty.')
 

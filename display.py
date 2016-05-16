@@ -50,7 +50,7 @@ class GameStateTextDisplay(object):
         s.append(pool_string)
 
         s.append('({0:d}/{1:d}) Library/Jacks'
-                .format(len(gs.library), len(gs.jack_pile)))
+                .format(len(gs.library), len(gs.jacks)))
 
         sites_string = ' '.join(
                 [mat[:3]+'[{0:d}/{1:d}]'.format(gs.in_town_sites.count(mat),

@@ -11,12 +11,16 @@ function($, AB, Games, Display, Net, Util) {
     // Build the game state HTML
     Game.prototype.initialize = function() {
         this.display.initialize();
+
+        $('#refresh-btn-'+this.id).click(function() {
+            Net.sendAction(this.id, Util.Action.REQGAMESTATE);
+        }.bind(this));
     };
     
     // Reset buttons/cards to be unclickable, remove onclicks, blank
     // the dialog, etc.
     Game.prototype.resetUIElements = function() {
-            var $btns = $('#role-select').find('button');
+            var $btns = this.display.dialogBtns.find('button');
             $btns.hide().prop('disabled', true).removeClass('selected selectable');
             $('#deck,#jacks').off('click').removeClass('selectable');
 
@@ -34,7 +38,7 @@ function($, AB, Games, Display, Net, Util) {
 
     Game.prototype.updateState = function(gs) {
         // the game state will be null if the game isn't started
-        if (!gs) {
+        if (gs === null) {
             console.log("Game not started yet.");
             return;
         }
@@ -75,7 +79,8 @@ function($, AB, Games, Display, Net, Util) {
             var petitionMin = 3;
             var petitionMax = 3;
             var hasPalace = false;
-            AB.leadRole(hasPalace, petitionMin, petitionMax, function(action, args) {
+            console.log('Lead role');
+            AB.leadRole(this.display, hasPalace, petitionMin, petitionMax, function(action, args) {
                 if(action == Util.Action.THINKERTYPE) {
                     Net.sendAction(gs.game_id, Util.Action.THINKERORLEAD, [true]);
                     Net.sendAction(gs.game_id, action, args);
@@ -91,34 +96,34 @@ function($, AB, Games, Display, Net, Util) {
             var petitionMax = 3;
             var hasPalace = false;
             console.log('Follow role!');
-            AB.followRole(roleLed, hasPalace, petitionMin, petitionMax,
+            AB.followRole(this.display, roleLed, hasPalace, petitionMin, petitionMax,
                     function(action, args) {
                         Net.sendAction(gs.game_id, action, args);
                     }
             );
 
         } else if (gs.expected_action == Util.Action.PATRONFROMHAND) {
-            AB.patronFromHand(function(card) {
+            AB.patronFromHand(this.display, function(card) {
                 Net.sendAction(gs.game_id, Util.Action.PATRONFROMHAND, [card]);
             });
 
         } else if (gs.expected_action == Util.Action.PATRONFROMPOOL) {
-            AB.patronFromPool(function(card) {
+            AB.patronFromPool(this.display, function(card) {
                 Net.sendAction(gs.game_id, Util.Action.PATRONFROMPOOL, [card]);
             });
 
         } else if (gs.expected_action == Util.Action.USELATRINE) {
-            AB.patronFromPool(function(card) {
+            AB.patronFromPool(this.display, function(card) {
                 Net.sendAction(gs.game_id, Util.Action.USELATRINE, [card]);
             });
 
         } else if (gs.expected_action == Util.Action.USESEWER) {
-            AB.useSewer(function(cards) {
+            AB.useSewer(this.display, function(cards) {
                 Net.sendAction(gs.game_id, Util.Action.USESEWER, cards);
             });
 
         } else if (gs.expected_action == Util.Action.PATRONFROMDECK) {
-            AB.singleChoice('Patron from deck using Bar?',
+            AB.singleChoice(this.display, 'Patron from deck using Bar?',
                     [{text: 'Yes', return: true},
                      {text: 'No', return: false}
                     ], function(useBar) {
@@ -126,7 +131,7 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.USEVOMITORIUM) {
-            AB.singleChoice('Discard hand before thinking with Vomitorium?',
+            AB.singleChoice(this.display, 'Discard hand before thinking with Vomitorium?',
                     [{text: 'Yes', return: true},
                      {text: 'No', return: false}
                     ], function(use) {
@@ -134,7 +139,7 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.BARORAQUEDUCT) {
-            AB.singleChoice('Patron first with Bar or Aqueduct?',
+            AB.singleChoice(this.display, 'Patron first with Bar or Aqueduct?',
                     [{text: 'Bar', return: true},
                      {text: 'Aqueduct', return: false}
                     ], function(use) {
@@ -142,7 +147,7 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.USEFOUNTAIN) {
-            AB.singleChoice('Use Fountain to Craftsman from deck?',
+            AB.singleChoice(this.display, 'Use Fountain to Craftsman from deck?',
                     [{text: 'Use Fountain', return: true},
                      {text: 'Skip', return: false}
                     ], function(use) {
@@ -150,7 +155,7 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.SKIPTHINKER) {
-            AB.singleChoice('Skip optional Thinker action?',
+            AB.singleChoice(this.display, 'Skip optional Thinker action?',
                     [{text: 'Thinker', return: false},
                      {text: 'Skip', return: true}
                     ], function(use) {
@@ -158,7 +163,7 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.USESENATE) {
-            AB.singleChoice('Take opponent\'s Jack with Senate?',
+            AB.singleChoice(this.display, 'Take opponent\'s Jack with Senate?',
                     [{text: 'Yes', return: true},
                      {text: 'No', return: false}
                     ], function(use) {
@@ -167,13 +172,13 @@ function($, AB, Games, Display, Net, Util) {
 
         } else if (gs.expected_action == Util.Action.LABORER) {
             var hasDock = false;
-            AB.laborer(hasDock, function(handCard, poolCard) {
+            AB.laborer(this.display, hasDock, function(handCard, poolCard) {
                 Net.sendAction(gs.game_id, Util.Action.LABORER, [handCard, poolCard]);
             });
         } else if (gs.expected_action == Util.Action.MERCHANT) {
             var hasBasilica = false;
             var hasAtrium = false;
-            AB.merchant(hasBasilica, hasAtrium,
+            AB.merchant(this.display, hasBasilica, hasAtrium,
                     function(stockpileCard, handCard, fromDeck) {
                 Net.sendAction(gs.game_id, Util.Action.MERCHANT,
                     [stockpileCard, handCard, fromDeck]);
@@ -184,7 +189,7 @@ function($, AB, Games, Display, Net, Util) {
             var hasTower = false;
             var hasScriptorium = false;
             var ootAllowed = gs.oot_allowed;
-            AB.craftsman(ootAllowed, hasRoad, hasTower, hasScriptorium,
+            AB.craftsman(this.display, ootAllowed, hasRoad, hasTower, hasScriptorium,
                     function(building, material, site) {
                         Net.sendAction(gs.game_id,
                             Util.Action.CRAFTSMAN,
@@ -197,7 +202,7 @@ function($, AB, Games, Display, Net, Util) {
             var hasScriptorium = false;
             var hasArchway = false;
             var ootAllowed = gs.oot_allowed;
-            AB.architect(ootAllowed, hasRoad, hasTower,
+            AB.architect(this.display, ootAllowed, hasRoad, hasTower,
                     hasScriptorium, hasArchway,
                     function(building, material, site, fromPool) {
                         Net.sendAction(gs.game_id,
@@ -206,7 +211,7 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.LEGIONARY) {
-            AB.legionary(gs.legionary_count, function(cards) {
+            AB.legionary(this.display, gs.legionary_count, function(cards) {
                     Net.sendAction(gs.game_id, Util.Action.LEGIONARY, cards);
             });
 
@@ -214,14 +219,12 @@ function($, AB, Games, Display, Net, Util) {
             var hasBridge = false;
             var hasColiseum = false;
             var immune = false;
-            var revealed = gs.players[gs.legionary_index].revealed.cards;
+            var revealed = gs.players[gs.legionary_index].revealed;
             var materials = $.map(revealed, function(card) {
-                console.dir(card);
-                console.log(card);
                 return Util.cardProperties(card.ident).material;
             });
 
-            AB.giveCards(materials, hasBridge, hasColiseum, immune,
+            AB.giveCards(this.display, materials, hasBridge, hasColiseum, immune,
                     function(cards) {
                         Net.sendAction(gs.game_id, Util.Action.GIVECARDS, cards);
                     }

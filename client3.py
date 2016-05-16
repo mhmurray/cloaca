@@ -1341,7 +1341,7 @@ class Client(object):
         cards_str = '{0:d} card{1}'.format(n_cards, 's' if n_cards==1 else '')
 
         self.builder = SingleChoiceActionBuilder(message.THINKERTYPE,
-            [Choice(True, 'Thinker for Jack', bool(self.game.game_state.jack_pile)),
+            [Choice(True, 'Thinker for Jack', bool(self.game.game_state.jacks)),
              Choice(False, 'Thinker for '+cards_str)])
 
 
@@ -1535,7 +1535,7 @@ class Client(object):
         """
         player = self.get_player()
 
-        has_dock = self.game.player_has_active_building(player, 'Dock')
+        has_dock = self.game._player_has_active_building(player, 'Dock')
         pool = self.game.game_state.pool
         hand = player.hand
 
@@ -1549,8 +1549,8 @@ class Client(object):
 
         self.builder = MerchantActionBuilder(
                 player.stockpile, player.hand,
-                self.game.player_has_active_building(player, 'Atrium'),
-                self.game.player_has_active_building(player, 'Basilica'))
+                self.game._player_has_active_building(player, 'Atrium'),
+                self.game._player_has_active_building(player, 'Basilica'))
 
 
     def action_stairway(self):
@@ -1584,7 +1584,7 @@ class Client(object):
             player_name = player.name
             building_name = building.foundation
 
-            has_archway = self.game.player_has_active_building(p, 'Archway')
+            has_archway = self.game._player_has_active_building(p, 'Archway')
 
             sorted_stockpile = sorted(p.stockpile)
             game_lg.info('Choose a material to add from your stockpile:')
@@ -1623,11 +1623,11 @@ class Client(object):
 
         legionary_cards = leg_player.revealed
 
-        has_bridge = self.game.player_has_active_building(leg_player, 'Bridge')
-        has_coliseum = self.game.player_has_active_building(leg_player, 'Coliseum')
+        has_bridge = self.game._player_has_active_building(leg_player, 'Bridge')
+        has_coliseum = self.game._player_has_active_building(leg_player, 'Coliseum')
 
-        has_palisade = self.game.player_has_active_building(p, 'Palisade')
-        has_wall = self.game.player_has_active_building(p, 'Wall')
+        has_palisade = self.game._player_has_active_building(p, 'Palisade')
+        has_wall = self.game._player_has_active_building(p, 'Wall')
 
         immune = has_wall or (has_palisade and not has_bridge)
 
@@ -1655,10 +1655,10 @@ class Client(object):
                 self.game.game_state.pool,
                 self.game.game_state.in_town_sites,
                 self.game.game_state.out_of_town_sites,
-                self.game.player_has_active_building(player, 'Archway'),
-                self.game.player_has_active_building(player, 'Road'),
-                self.game.player_has_active_building(player, 'Tower'),
-                self.game.player_has_active_building(player, 'Scriptorium'),
+                self.game._player_has_active_building(player, 'Archway'),
+                self.game._player_has_active_building(player, 'Road'),
+                self.game._player_has_active_building(player, 'Tower'),
+                self.game._player_has_active_building(player, 'Scriptorium'),
                 self.game.game_state.oot_allowed)
                 
 
@@ -1678,22 +1678,22 @@ class Client(object):
                 player.hand,
                 self.game.game_state.in_town_sites,
                 self.game.game_state.out_of_town_sites,
-                self.game.player_has_active_building(player, 'Road'),
-                self.game.player_has_active_building(player, 'Tower'),
-                self.game.player_has_active_building(player, 'Scriptorium'),
+                self.game._player_has_active_building(player, 'Road'),
+                self.game._player_has_active_building(player, 'Tower'),
+                self.game._player_has_active_building(player, 'Scriptorium'),
                 self.game.game_state.oot_allowed)
                 
 
     def action_leadrole(self):
         hand = self.get_player().hand
-        has_palace = self.game.player_has_active_building(self.get_player(), 'Palace')
-        petition_count = 2 if self.game.player_has_active_building(self.get_player(), 'Circus') else 3
+        has_palace = self.game._player_has_active_building(self.get_player(), 'Palace')
+        petition_count = 2 if self.game._player_has_active_building(self.get_player(), 'Circus') else 3
         self.builder = RoleActionBuilder(hand, None, has_palace, petition_count)
 
 
     def action_followrole(self):
         hand = self.get_player().hand
-        has_palace = self.game.player_has_active_building(self.get_player(), 'Palace')
-        petition_count = 2 if self.game.player_has_active_building(self.get_player(), 'Circus') else 3
+        has_palace = self.game._player_has_active_building(self.get_player(), 'Palace')
+        petition_count = 2 if self.game._player_has_active_building(self.get_player(), 'Circus') else 3
         role = self.game.game_state.role_led
         self.builder = RoleActionBuilder(hand, role, has_palace, petition_count)

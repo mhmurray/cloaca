@@ -157,10 +157,10 @@ function($){
         return $container;
     };
 
-    util.makeSitesStack = function(material, nInTown, nOutOfTown) {
+    util.makeSitesStack = function(_id, material, nInTown, nOutOfTown) {
         var material_lower = material.toLowerCase();
         return $('<div />', {
-                id: 'sites-'+material_lower,
+                id: _id,
                 class: 'site ' + material_lower,
                 data: {material: material, inTown : nInTown, outOfTown: nOutOfTown}
         }).append($('<span/>').text(material).addClass('site-title'),
@@ -223,7 +223,8 @@ function($){
         REQSTARTGAME    : 30,
         STARTGAME       : 31,
         REQGAMELIST     : 32,
-        GAMELIST        : 33
+        GAMELIST        : 33,
+        SERVERERROR     : 34
     };
 
     util._cardDictionary = {

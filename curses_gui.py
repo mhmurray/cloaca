@@ -8,6 +8,7 @@ import sys
 from time import sleep
 import traceback
 import pdb
+from random import randint
 
 from functools import wraps
 
@@ -259,6 +260,13 @@ class CursesGUI(object):
         """
         self.choices_list[:] = [self.colorize(str(c)) for c in choices]
         self._modified()
+
+        length = len([c for c in choices if c[2] == '['])
+        i = randint(1,length) if length else 0
+        self.choices_list.append(self.colorize('\nPicking random choice: {0} in 1s'.format(i)))
+        self._modified()
+        #from twisted.internet import reactor
+        #reactor.callLater(1, self.handle_choice, i)
 
     @fail_safely
     def update_prompt(self, prompt):

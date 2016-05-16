@@ -6,80 +6,132 @@ from cloaca.player import Player
 from cloaca.building import Building
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError, parse_action, GameAction
+from cloaca.message import parse_action, GameAction, Command
+from cloaca.error import GTRError, ParsingError, GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
 
-
+import json
 import unittest
 
-class TestParseGameAction(unittest.TestCase):
-    """Test GameAction utility method to parse from string
+class TestGameActionJSON(unittest.TestCase):
+    """Test GameAction conversion to and from JSON.
     """
 
-    def setUp(self):
-        """This is run prior to every test.
+    def test_to_json(self):
+        """Convert GameAction to JSON.
         """
-        pass
+        a = GameAction(message.THINKERORLEAD, True)
 
-    def test_thinkorlead(self):
-        """Thinker or lead is representative of all GameAction instances
-        with a single required boolean argument.
+        a_json = a.to_json()
+
+        d = json.loads(a_json)
+
+        self.assertIn('action', d.keys())
+        self.assertIn('args', d.keys())
+        
+        action, args = d['action'], d['args']
+
+        self.assertEqual(action, message.THINKERORLEAD)
+        self.assertEqual(args, [True])
+
+    def test_multiple_args_to_json(self):
+        """Convert GameAction to JSON.
         """
-        a = parse_action('0,True')
+        a = GameAction(message.LEADROLE, 'Craftsman', 1, 106, 107, 108)
 
-        self.assertEqual(a, GameAction(message.THINKERORLEAD, True))
-        self.assertNotEqual(a, GameAction(message.THINKERORLEAD, False))
+        a_json = a.to_json()
 
-        a = parse_action('0,False')
+        d = json.loads(a_json)
+        action, args = d['action'], d['args']
 
-        self.assertEqual(a, GameAction(message.THINKERORLEAD, False))
-        self.assertNotEqual(a, GameAction(message.THINKERORLEAD, True))
+        self.assertEqual(action, message.LEADROLE)
+        self.assertEqual(args, ['Craftsman', 1, 106, 107, 108])
 
-        with self.assertRaises(BadGameActionError):
-            a = parse_action('0')
-
-        with self.assertRaises(BadGameActionError):
-            a = parse_action('0,None')
-
-        with self.assertRaises(BadGameActionError):
-            a = parse_action('0,4')
-
-        with self.assertRaises(BadGameActionError):
-            a = parse_action('0,Bar')
-
-        with self.assertRaises(BadGameActionError):
-            a = parse_action('0,True,True')
-
-        with self.assertRaises(BadGameActionError):
-            a = parse_action('0,False,False')
-
-    def test_joingame(self):
-        """JOINGAME is representative of GameAction instances with a single
-        integer argument.
+    def test_from_json(self):
+        """Convert JSON dictionary to GameAction.
         """
-        a = parse_action('26,1')
-        self.assertEqual(a, GameAction(message.JOINGAME, 1))
+        a_json = '{"action": 0, "args": [true]}'
+        a = GameAction.from_json(a_json)
 
-        a = parse_action('26,0')
-        self.assertEqual(a, GameAction(message.JOINGAME, 0))
-        self.assertNotEqual(a, GameAction(message.JOINGAME, 1))
+        self.assertEqual(a.action, message.THINKERORLEAD)
+        self.assertEqual(a.args, [True])
 
-        with self.assertRaises(BadGameActionError):
-            parse_action('26,')
+    def test_from_bad_json(self):
+        """Failure to convert bad JSON raises ValueError.
+        """
+        a_json = '{"act]]]}' # not valid JSON
 
-        with self.assertRaises(BadGameActionError):
-            parse_action('26')
+        with self.assertRaises(ParsingError):
+            a = GameAction.from_json(a_json)
 
-        with self.assertRaises(BadGameActionError):
-            parse_action('26,True')
+    def test_from_json_bad_action(self):
+        """Raises ParsingError if the valid JSON doesn't
+        represent a valid GameAction.
+        """
+        with self.assertRaises(GameActionError):
+            a = GameAction.from_json('{"action": -1, "args": [true]}')
 
-        with self.assertRaises(BadGameActionError):
-            parse_action('26,2.5')
+        with self.assertRaises(GameActionError):
+            a = GameAction.from_json('{"action": 0, "args": []}')
 
-        with self.assertRaises(BadGameActionError):
-            parse_action('26,0,1')
+        with self.assertRaises(GameActionError):
+            a = GameAction.from_json('{"action": 0, "args": [true, false]}')
+
+
+class TestCommandJSON(unittest.TestCase):
+    """Test Command conversion to and from JSON.
+    """
+
+    def test_to_json(self):
+        """Convert Command to JSON.
+        """
+        a = GameAction(message.THINKERORLEAD, True)
+        c = Command(1, a)
+
+        c_json = c.to_json()
+
+        d = json.loads(c_json)
+
+        self.assertIn('action', d.keys())
+        self.assertIn('game', d.keys())
+        
+        action, args, game = d['action']['action'], d['action']['args'], d['game']
+
+        self.assertEqual(action, message.THINKERORLEAD)
+        self.assertEqual(args, [True])
+        self.assertEqual(game, 1)
+
+    def test_from_json(self):
+        """Convert JSON dictionary to Command.
+        """
+        c_json = '{"game":1, "action":{"action": 0, "args": [true]}}'
+        c = Command.from_json(c_json)
+
+        self.assertEqual(c.action.action, message.THINKERORLEAD)
+        self.assertEqual(c.game, 1)
+        self.assertEqual(c.action.args, [True])
+
+    def test_from_bad_json(self):
+        """Failure to convert bad JSON raises ParsingError.
+        """
+        c_json = '{"act]]]}' # not valid JSON
+
+        with self.assertRaises(ParsingError):
+            c = Command.from_json(c_json)
+
+    def test_from_json_bad_command(self):
+        """Raises GameActionError if the valid JSON doesn't
+        represent a valid Command.
+        """
+        c_json = '{"game":"notagame", "action":{"action": 0, "args": [true]}}'
+        with self.assertRaises(GameActionError):
+            a = Command.from_json(c_json)
+
+        c_json = '{"game":"0", "action":{"args": [true]}}'
+        with self.assertRaises(ParsingError):
+            a = Command.from_json(c_json)
 
 
 if __name__ == '__main__':

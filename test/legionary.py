@@ -8,7 +8,7 @@ from cloaca.building import Building
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError
+from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -46,7 +46,7 @@ class TestMultiLegionary(unittest.TestCase):
         self.assertEqual(len(self.p2.hand), 0)
 
         # It should be p2's turn now
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
 
@@ -64,7 +64,7 @@ class TestLegionary(unittest.TestCase):
     def test_expects_legionary(self):
         """The Game should expect a LEGIONARY action.
         """
-        self.assertEqual(self.game.expected_action(), message.LEGIONARY)
+        self.assertEqual(self.game.expected_action, message.LEGIONARY)
 
 
     def test_legionary(self):
@@ -82,7 +82,7 @@ class TestLegionary(unittest.TestCase):
 
         self.assertIn('Atrium', self.p1.revealed) 
 
-        self.assertEqual(self.game.expected_action(), message.GIVECARDS)
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
 
 
     def test_give_cards(self):
@@ -102,7 +102,7 @@ class TestLegionary(unittest.TestCase):
         self.assertNotIn('Foundry', self.p2.hand)
 
         # It should be p2's turn now
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
     def test_opponent_has_no_match(self):
@@ -122,7 +122,7 @@ class TestLegionary(unittest.TestCase):
         self.assertIn('Latrine', self.p2.hand)
 
         # It should be p2's turn now
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
     def test_demand_jack(self):

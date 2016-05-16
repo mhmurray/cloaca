@@ -8,7 +8,7 @@ from cloaca.building import Building
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError
+from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -29,7 +29,7 @@ class TestMerchant(unittest.TestCase):
     def test_expects_merchant(self):
         """ The Game should expect a MERCHANT action.
         """
-        self.assertEqual(self.game.expected_action(), message.MERCHANT)
+        self.assertEqual(self.game.expected_action, message.MERCHANT)
 
 
     def test_merchant_one_from_stockpile(self):

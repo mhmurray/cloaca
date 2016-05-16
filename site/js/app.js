@@ -1,21 +1,12 @@
-define(['jquery', 'jqueryui', 'sockjs', 'util', 'display', 'action_builder', 'games', 'fsm', 'game', 'net'],
-function($, _, SockJS, Util, Display, AB, Games, FSM, Game, Net){
+define(['jquery', 'jqueryui', 'sockjs', 'util', 'display', 'games', 'fsm', 'game', 'net'],
+function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
     var App = {
         game_id: null,
         playerIndex: null,
-        fsm: null
-    }
-
-    App.fsm = FSM.create({
-        initial: 'Loading',
-
-        events: [
-            { name: 'loaded', from: 'Loading', to: 'MainMenu' },
-            { name: 'join', from: 'Loading', to: 'MainMenu' },
-            ]
-    });
+    };
 
     App.initialize = function(){
+        var WS_URI = 'http://localhost:5000/hello/';
         var tabs = $('#tabs').tabs({
             active: 0, // Default to game list
         });
@@ -27,12 +18,105 @@ function($, _, SockJS, Util, Display, AB, Games, FSM, Game, Net){
 
         $('#page-wrapper').before(heading);
 
-        Games.user = 'a';
-        //Games.user = $('#player-select').val();
+        // Handle messages sent by the server.
+        function handleCommand(game, action, args) {
+            
+            if (action == Util.Action.GAMESTATE) {
+                update_game_state(game, JSON.parse(args[0]));
 
-        // Create a new WebSocket.
-        Net.user = Games.user;
-        Net.connect('http://localhost:5000/hello/');
+            } else if (action == Util.Action.GAMELIST) {
+                update_game_list(args);
+
+            } else if (action == Util.Action.CREATEGAME) {
+                console.log('Received CREATEGAME');
+                sendAction(0, Util.Action.REQGAMELIST);
+
+            } else if (action == Util.Action.JOINGAME) {
+                console.log('Received JOINGAME');
+                App.game_id = game;
+                sendAction(0, Util.Action.REQGAMELIST);
+
+            } else if (action == Util.Action.STARTGAME) {
+                console.log('Received STARTGAME');
+                if(game in Games.games) {
+                    console.log('Game '+game+' already started.');
+                } else {
+                    console.log('Starting game ' + game);
+                    var game_obj = new Game(Games.records[game], Games.user);
+                    Games.games[game] = game_obj;
+                    game_obj.initialize();
+                    var tabs = $('#tabs').tabs('refresh');
+                    tabs.tabs('option', 'active', -1); // switch to new tab.
+                }
+            }
+        };
+
+        var loginSM = FSM.create({
+            initial: 'Start',
+
+            events: [
+                { name: 'start', from: 'Start', to: 'LoggedOut' },
+                { name: 'login', from: 'LoggedOut', to: 'LoggedIn' },
+                { name: 'logout', from: 'LoggedIn', to: 'LoggedOut' },
+                ]
+        });
+
+        loginSM.onafterstart = function() {
+            // Check if already logged in
+            $.get('user', {}, function(data, status) {
+                if(data !== '') {
+                    loginSM.login(data);
+                }
+            });
+        };
+
+        loginSM.onenterLoggedIn = function(event, from, to, user) {
+            $('#username').addClass('open').text(user);
+            $('#login-status').removeClass('closed').text('Logged in as ');
+            $('#login-form').hide();
+            $('#logout-btn').show();
+            Games.user = user;
+            Net.user = user;
+            Net.connect(WS_URI, function() {
+                Net.sendAction(0, Util.Action.REQGAMELIST);
+            }, handleCommand);
+        };
+
+        loginSM.onenterLoggedOut = function(event, from, to) {
+            $('#username').removeClass('open').text('');
+            $('#login-status').removeClass('open').addClass('closed').text('Not logged in.');
+            $('#login-form').show();
+            $('#logout-btn').hide();
+            Games.user = undefined;
+            Net.user = undefined;
+            if(Net.socket !== null) {
+                Net.socket.close();
+            }
+        };
+
+        loginSM.start();
+
+        var $loginForm = $('#login-form');
+        $loginForm.submit(function(e) {
+            e.preventDefault();
+
+            var user = $('#login-text').val();
+
+            $.post('login', {user: user}, function(data, status) {
+                if(data === user) {
+                    loginSM.login(data);
+                } else {
+                    console.error('Failed login:', user);
+                }
+            });
+        });
+
+        var logoutBtn = $('#logout-btn');
+        logoutBtn.click(function(e) {
+            $.get('logout', {}, function(data, status) {
+                loginSM.logout();
+            });
+        });
 
         function sendAction(game_id, action, args) {
             return Net.sendAction(game_id, action, args);
@@ -54,40 +138,38 @@ function($, _, SockJS, Util, Display, AB, Games, FSM, Game, Net){
             sendAction(0, Util.Action.REQCREATEGAME);
         };
         
-        // Split string, but only n times. Rest of string as last array element.
-        function splitWithTail(str, delim, count){
-          var parts = str.split(delim);
-          var tail = parts.slice(count).join(delim);
-          var result = parts.slice(0,count);
-          result.push(tail);
-          return result;
-        };
 
         function update_game_list(json_list) {
             // The args is a json formated list of GameRecord dicts, with
             // keys game_id and players.
 
-            list = JSON.parse(json_list);
+            var list = JSON.parse(json_list);
             gameList.innerHTML = '';
+
+            function join(num) {
+                return function() {
+                    console.log('join'+num);
+                    sendAction(num, Util.Action.REQJOINGAME);
+                };
+            };
+            function start(num) {
+                return function() {
+                    console.log('start'+num);
+                    sendAction(num, Util.Action.REQSTARTGAME);
+                };
+            };
+
+            var gamesJoined = [];
+
             for(var i=0; i<list.length; ++i) {
-                var game_id = list[i].game_id;
+                console.log(list[i]);
+                var game_id = parseInt(list[i].game_id);
                 var players = list[i].players;
+                var isStarted = list[i].started;
+                var host = list[i].host
                 Games.records[game_id] = {
                     id: game_id,
                     players: players
-                };
-
-                function join(num) {
-                    return function() {
-                        console.log('join'+num);
-                        sendAction(0, Util.Action.REQJOINGAME, [num]);
-                    };
-                };
-                function start(num) {
-                    return function() {
-                        console.log('start'+num);
-                        sendAction(num, Util.Action.REQSTARTGAME);
-                    };
                 };
 
                 var gamelist = $('#gamelist');
@@ -108,61 +190,47 @@ function($, _, SockJS, Util, Display, AB, Games, FSM, Game, Net){
                     class:'submit',
                     click: start(game_id)
                 });
-                $li.append($('<span/>').text('Game '+game_id))
+                var text = 'Game '+game_id;
+                if(isStarted) {
+                    text+= ' (in progress...)';
+                } else {
+                    text+= ' (not started)';
+                }
+
+                $li.append($('<span/>').text(text))
                         .append('Players: '+players.join(', ')).addClass('game-listing');
                 gamelist.append($li);
                 $li.append($joinbtn);
                 $li.append($startbtn);
+
+                if(players.indexOf(Games.user) > -1) {
+                    if(isStarted) {
+                        gamesJoined.push(game_id);
+                    }
+                }
+            }
+
+            gamesJoined.sort(function(a,b) {return a-b;});
+            for(var i=0; i<gamesJoined.length; i++) {
+                var _id = gamesJoined[i];
+                if(!(_id in Games.games)){
+                    console.log('Resuming game', game_id);
+                    var game_obj = new Game(Games.records[_id], Games.user);
+                    Games.games[_id] = game_obj;
+                    game_obj.initialize();
+                    var tabs = $('#tabs').tabs('refresh');
+                    tabs.tabs('option', 'active', -1); // switch to new tab.
+                    sendAction(_id, Util.Action.REQGAMESTATE);
+                }
             }
         };
 
         function update_game_state(game_id, gameState) {
+            console.dir(gameState);
             var game = Games.games[game_id];
-            game.updateState(JSON.parse(gameState));
+            game.updateState(gameState);
         };
         
-        // Handle messages sent by the server.
-        Net.socket.onmessage = function(event) {
-            var message = event.data;
-
-            // Parse NetString : <length>:<str>,
-            var msg = (splitWithTail(message, ':', 1)[1]).slice(0,-1);
-
-            var dict = JSON.parse(msg);
-            var action = dict['action'];
-            var args = dict['args'];
-            
-            if (action == Util.Action.GAMESTATE) {
-                var game_id = parseInt(args[0]);
-                update_game_state(game_id, args[1]);
-            } else if (action == Util.Action.GAMELIST) {
-                update_game_list(args);
-            } else if (action == Util.Action.CREATEGAME) {
-                console.log('Received CREATEGAME');
-                sendAction(0, Util.Action.REQGAMELIST);
-            } else if (action == Util.Action.JOINGAME) {
-                console.log('Received JOINGAME');
-                var game_id = parseInt(args[0]);
-                App.game_id = game_id;
-                sendAction(0, Util.Action.REQGAMELIST);
-            } else if (action == Util.Action.STARTGAME) {
-                console.log('Received STARTGAME');
-                var id = parseInt(args);
-                if(id in Games.games) {
-                    console.log('Game '+id+' already started.');
-                } else {
-                    console.log('Starting game ' + id);
-                    var game = new Game(Games.records[id], Games.user);
-                    Games.games[id] = game;
-                    game.initialize();
-                    var tabs = $('#tabs').tabs('refresh');
-                    tabs.tabs('option', 'active', -1); // switch to new tab.
-                }
-            }
-
-        };
-
-
         // Send a message when the form is submitted.
         form.onsubmit = function(e) {
             e.preventDefault();

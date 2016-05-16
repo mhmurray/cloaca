@@ -7,6 +7,7 @@ import cloaca.message as message
 from cloaca.zone import Zone
 
 from sys import stderr
+from uuid import uuid4
 
 """ Utilities to easily set up test game states.
 """
@@ -19,27 +20,16 @@ def simple_two_player():
     is pumped, so it's ready for the first player (p1) to 
     thinker or lead.
     """
-    p1 = Player('p1')
-    p2 = Player('p2')
+    g = Game()
+    gs = g.game_state
 
-    gs = GameState(players=['p1','p2'])
-    gs.players[0] = p1
-    gs.players[1] = p2
+    for p in ['p1', 'p2']:
+        uid = uuid4().int
+        g.add_player(uid, p)
 
-    g = Game(gs)
-    g.init_common_piles(2)
-    gs.pool = Zone()
-    
-    p1.hand = Zone()
-    p2.hand = Zone()
+    p1, p2 = gs.players
 
-    gs.turn_index = 0
-    gs.leader_index = 0
-    gs.priority_index = 0
-
-    gs.stack.push_frame('take_turn_stacked', p1)
-
-    g.pump()
+    g.controlled_start()
 
     return g
 

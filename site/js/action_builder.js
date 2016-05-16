@@ -27,15 +27,15 @@ function($, _, FSM, Util, Selectable){
      *    Use .one('click',func) instead of .click(func) defensively.
      */
 
-    mod.laborer = function(hasDock, actionCallback) {
+    mod.laborer = function(display, hasDock, actionCallback) {
         var ip = mod.playerIndex+1;
         var $poolpick = null;
         var $handpick = null;
-        var $poolcards = $('#pool > .card');
-        var $handcards = $('#p'+ip+'-hand > .card').not('.jack');
-        var $dialog = $('#dialog');
-        var $okBtn = $('#ok-btn');
-        var $skipBtn = $('#skip-btn');
+        var $pool = display.zoneCards('pool');
+        var $handcards = display.zoneCards('hand', ip).not('.jack');
+        var $dialog = display.dialog;
+        var $okBtn = display.button('ok');
+        var $skipBtn = display.button('skip');
 
         if(hasDock) {
             $dialog.text('Select card from pool and/or hand.');
@@ -43,7 +43,7 @@ function($, _, FSM, Util, Selectable){
             $dialog.text('Select card from pool.');
         }
 
-        var selPool = new Selectable($poolcards);
+        var selPool = new Selectable($pool);
         selPool.makeSelectN(1);
         if(hasDock) {
             var selHand = new Selectable($handcards);
@@ -53,15 +53,15 @@ function($, _, FSM, Util, Selectable){
             $poolpicks = selPool.selected();
             var frompool = $poolpicks.length 
                     ? Util.extractCardIds($poolpicks)[0]
-                    : 'None';
+                    : null;
             selPool.reset();
 
-            var fromhand = 'None';
+            var fromhand = null;
             if(hasDock) {
                 $handpicks = selHand.selected();
                 fromhand = $handpicks.length
                         ? Util.extractCardIds($handpicks)[0]
-                        : 'None';
+                        : null;
                 selHand.reset();
             }
 
@@ -71,11 +71,11 @@ function($, _, FSM, Util, Selectable){
         return;
     };
     
-    mod.patronFromPool = function(actionCallback) {
+    mod.patronFromPool = function(display, actionCallback) {
         var ip = mod.playerIndex+1;
-        var $pool = $('#pool > .card');
-        var $dialog = $('#dialog');
-        var $skipBtn = $('#skip-btn');
+        var $pool = display.zoneCards('pool');
+        var $dialog = display.dialog;
+        var $skipBtn = display.button('skip');
 
         $dialog.text('Select client from pool.');
 
@@ -89,17 +89,17 @@ function($, _, FSM, Util, Selectable){
 
         $skipBtn.show().prop('disabled', false).click(function(e) {
             sel.reset();
-            actionCallback('None');
+            actionCallback(null);
         });
 
         return;
     };
     
-    mod.patronFromHand = function(actionCallback) {
+    mod.patronFromHand = function(display, actionCallback) {
         var ip = mod.playerIndex+1;
-        var $hand = $('#p'+ip+'-hand> .card').not('.jack');
-        var $dialog = $('#dialog');
-        var $skipBtn = $('#skip-btn');
+        var $hand = display.zoneCards('hand', ip).not('.jack');
+        var $dialog = display.dialog;
+        var $skipBtn = display.button('skip');
 
         $dialog.text('Select client from hand.');
 
@@ -113,17 +113,17 @@ function($, _, FSM, Util, Selectable){
 
         $skipBtn.show().prop('disabled', false).click(function(e) {
             sel.reset();
-            actionCallback('None');
+            actionCallback(null);
         });
 
         return;
     };
 
-    mod.useLatrine = function(actionCallback) {
+    mod.useLatrine = function(display, actionCallback) {
         var ip = mod.playerIndex+1;
-        var $hand = $('#p'+ip+'-hand> .card').not('.jack');
-        var $dialog = $('#dialog');
-        var $skipBtn = $('#skip-btn');
+        var $hand = display.zoneCards('hand', ip).not('.jack');
+        var $dialog = display.dialog;
+        var $skipBtn = display.button('skip');
 
         $dialog.text('Use latrine? Select card from hand.');
 
@@ -137,18 +137,18 @@ function($, _, FSM, Util, Selectable){
 
         $skipBtn.show().prop('disabled', false).click(function(e) {
             sel.reset();
-            actionCallback('None');
+            actionCallback(null);
         });
 
         return;
     };
     
-    mod.useSewer = function(actionCallback) {
+    mod.useSewer = function(display, actionCallback) {
         var ip = mod.playerIndex+1;
         var $camp = $('#p'+ip+'-camp> .card').not('.jack');
-        var $dialog = $('#dialog');
-        var $skipBtn = $('#skip-btn');
-        var $okBtn = $('#ok-btn');
+        var $dialog = display.dialog;
+        var $skipBtn = display.button('skip');
+        var $okBtn = display.button('ok');
 
         $dialog.text('Select cards to move from Camp to Stockpile with Sewer.');
 
@@ -157,7 +157,7 @@ function($, _, FSM, Util, Selectable){
 
         $skipBtn.show().prop('disabled', false).click(function(e) {
             sel.reset();
-            actionCallback(['None']);
+            actionCallback([null]);
         });
 
         $okBtn.prop('disabled', false).click(function(e) {
@@ -169,11 +169,11 @@ function($, _, FSM, Util, Selectable){
         return;
     };
     
-    mod.legionary = function(count, actionCallback) {
+    mod.legionary = function(display, count, actionCallback) {
         var ip = mod.playerIndex+1;
-        var $hand = $('#p'+ip+'-hand> .card').not('.jack');
-        var $dialog = $('#dialog');
-        var $skipBtn = $('#skip-btn');
+        var $hand = display.zoneCards('hand', ip).not('.jack');
+        var $dialog = display.dialog;
+        var $skipBtn = display.button('skip');
 
         $dialog.text('Reveal cards for Legionary or skip remaining actions.');
 
@@ -195,18 +195,19 @@ function($, _, FSM, Util, Selectable){
         return;
     };
     
-    mod.giveCards = function(materials, hasBridge,
+    mod.giveCards = function(display, materials, hasBridge,
             hasColiseum, immune, actionCallback)
     {
 
         var ip = mod.playerIndex+1;
-        var $hand = $('#p'+ip+'-hand> .card').not('.jack');
-        var $dialog = $('#dialog');
+        var $hand = display.zoneCards('hand', ip).not('.jack');
+        var $dialog = display.dialog;
+        var $gloryBtn = display.button('glory');
 
         $dialog.text('Rome demands ' + materials.join(', ')+'!');
 
         function gloryButton() {
-            $('glory-to-rome').show().prop('disabled', false).click(function(e) {
+            $gloryBtn.show().prop('disabled', false).click(function(e) {
                 actionCallback([]);
             });
         };
@@ -271,30 +272,30 @@ function($, _, FSM, Util, Selectable){
      *           {text: 'No', return: false}
      *           ], actionCallbackFunction);
      */
-    mod.singleChoice = function(dialog, choices, actionCallback) {
+    mod.singleChoice = function(display, dialog, choices, actionCallback) {
         var ip = mod.playerIndex+1;
-        var $dialog = $('#dialog').text(dialog);
+        var $dialog = display.dialog.text(dialog);
 
-        $buttons = $('#choice-btns');
+        var choiceButtons = display.choiceBtns;
 
         $.each(choices, function(i, item) {
-            $buttons.append($('<button/>').click(function(e) {
+            choiceButtons.append($('<button/>').click(function(e) {
                 actionCallback(item.return);
-                $buttons.children('button').prop('disabled', true);
-                $buttons.empty();
+                choiceButtons.children('button').prop('disabled', true);
+                choiceButtons.empty();
             }).text(item.text));
         });
 
         return;
     };
         
-    mod.merchant = function(hasBasilica, hasAtrium, actionCallback) {
+    mod.merchant = function(display, hasBasilica, hasAtrium, actionCallback) {
         var ip = mod.playerIndex+1;
 
-        var $stockpile = $('#p'+ip+'-stockpile > .card');
-        var $handcards = $('#p'+ip+'-hand > .card').not('.jack');
-        var $dialog = $('#dialog');
-        var $okBtn = $('#ok-btn');
+        var $stockpile = display.zoneCards('stockpile', ip);
+        var $handcards = display.zoneCards('hand', ip).not('.jack');
+        var $dialog = display.dialog;
+        var $okBtn = display.button('ok');
 
         if(hasAtrium && hasBasilica) {
             $dialog.text('Select card from stockpile or deck, and one from your hand.');
@@ -307,7 +308,7 @@ function($, _, FSM, Util, Selectable){
         }
 
         if(hasAtrium) {
-            $stockpile.extend($('#deck'));
+            $stockpile.extend(display.deck);
         }
         var selStockpile = new Selectable($stockpile);
         selStockpile.makeSelectN(1);
@@ -320,7 +321,7 @@ function($, _, FSM, Util, Selectable){
         $okBtn.show().prop('disabled', false).click(function(event) {
             var $stockpilePick = selStockpile.selected();
 
-            var fromStockpile = 'None';
+            var fromStockpile = null;
             var fromDeck = false;
             if($stockpilePick.length) {
                 fromDeck = $stockpilePick[0].id === 'deck';
@@ -329,16 +330,16 @@ function($, _, FSM, Util, Selectable){
                     fromStockpile = Util.extractCardIds($stockpilePick)[0];
                 }
             } else {
-                fromStockpile = 'None';
+                fromStockpile = null;
             }
             selStockpile.reset();
 
-            var fromHand = 'None';
+            var fromHand = null;
             if(hasBasilica) {
                 var $handPick = selHand.selected();
                 fromHand = $handPick.length
                         ? Util.extractCards($handPick)[0]
-                        : 'None';
+                        : null;
                 selHand.reset();
 
             }
@@ -362,23 +363,26 @@ function($, _, FSM, Util, Selectable){
     mod.leadRole = function(display, hasPalace, petitionMin,
             petitionMax, actionCallback)
     {
-        var $dialog = $('#dialog');
+        var $dialog = display.dialog;
         var ip = mod.playerIndex+1;
 
-        var $handcards = $('#p'+ip+'-hand > .card');
+        var $handcards = display.zoneCards('hand', ip);
         var selHand = new Selectable($handcards);
 
+        var $handNoJacks = $($handcards).not('.jack');
+        var selHandNoJacks = new Selectable($handNoJacks);
+
         var role = null;
-        var $roleBtns = $('#role-select > button');
+        var $roleBtns = display.roleButtons();
         var selRole = new Selectable($roleBtns);
 
-        var $cancelBtn = $('#cancel-btn');
-        var $okBtn = $('#ok-btn');
-        var $petitionBtn = $('#petition-btn');
+        var $cancelBtn = display.button('cancel');
+        var $okBtn = display.button('ok');
+        var $petitionBtn = display.button('petition');
 
-        var $deck = $('#deck');
-        var $jacks = $('#jacks');
-        var $lead = $('#lead-role');
+        var $deck = display.deck;
+        var $jacks = display.jacks;
+        var $lead = display.button('lead-role');
 
         var fsm = FSM.create({
             initial: 'Start',
@@ -413,19 +417,19 @@ function($, _, FSM, Util, Selectable){
             ]
         });
 
-        fsm.onenterThinkerOrLead = function(event, from, to, args) {
-            $('#dialog').text('Thinker or lead a role?');
+        fsm.onenterThinkerOrLead = function() {
+            $dialog.text('Thinker or lead a role?');
 
             if($jacks.data('nCards') > 0) {
                 $jacks.addClass('selectable');
-                $jacks.one('click', function(ev) {
+                $jacks.off('click').one('click', function(ev) {
                     actionCallback(Util.Action.THINKERTYPE, [true]);
                     fsm.think();
                 });
             }
 
             $deck.addClass('selectable');
-            $deck.one('click', function(ev) {
+            $deck.off('click').one('click', function(ev) {
                 actionCallback(Util.Action.THINKERTYPE, [false]);
                 fsm.think();
             });
@@ -435,13 +439,13 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleaveThinkerOrLead = function(event, from, to, args) {
+        fsm.onleaveThinkerOrLead = function() {
             Util.off($lead, $deck, $jacks);
             $jacks.removeClass('selectable');
             $deck.removeClass('selectable');
         };
 
-        fsm.onenterSelectingCards = function(event, from, to, args) {
+        fsm.onenterSelectingCards = function() {
             $dialog.text('Select a card to lead.');
 
             $cancelBtn.show().prop('disabled', false).one('click', function(event) {
@@ -466,11 +470,11 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleaveSelectingCards = function(event, from, to, args) {
+        fsm.onleaveSelectingCards = function() {
             Util.off($cancelBtn, $petitionBtn);
         };
 
-        fsm.onenterJackRole = function(event, from, to, args) {
+        fsm.onenterJackRole = function() {
             $dialog.text('Pick role for Jack.');
 
             $cancelBtn.show().prop('disabled', false).one('click', function(event) {
@@ -487,25 +491,26 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleaveJackRole = function(event, from, to, args) {
+        fsm.onleaveJackRole = function() {
             Util.off($roleBtns, $cancelBtn);
         };
 
-        fsm.onenterPetitionFirst = function(event, from, to, args) {
+        fsm.onenterPetitionFirst = function() {
             $dialog.text('Pick at least '+petitionMin+' cards for petition');
 
             selHand.reset();
-            selHand.makeSelectN(1, function($selected) {
+            selHandNoJacks.reset();
+            selHandNoJacks.makeSelectN(1, function($selected) {
                 fsm.first($selected);
             });
 
             $cancelBtn.show().prop('disabled', false).one('click', function(ev) {
-                selHand.reset();
+                selHandNoJacks.reset();
                 fsm.cancel();
             });
         };
 
-        fsm.onleavePetitionFirst = function(event, from, to) {
+        fsm.onleavePetitionFirst = function() {
             Util.off($cancelBtn);
         };
 
@@ -535,11 +540,11 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleavePetitionRest = function(event, from, to, args) {
+        fsm.onleavePetitionRest = function() {
             Util.off($cancelBtn, $okBtn);
         };
 
-        fsm.onenterPetitionRole = function(event, from, to, args) {
+        fsm.onenterPetitionRole = function() {
             $dialog.text('Pick role for Petition.');
 
             $cancelBtn.prop('disabled', false).one('click', function(event) {
@@ -556,11 +561,11 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleavePetitionRole = function(event, from, to, args) {
+        fsm.onleavePetitionRole = function() {
             Util.off($roleBtns, $cancelBtn);
         };
 
-        fsm.onenterHaveRole = function(event, from, to, args) {
+        fsm.onenterHaveRole = function() {
             if(hasPalace) {
                 fsm.palace();
             } else {
@@ -568,7 +573,7 @@ function($, _, FSM, Util, Selectable){
             }
         };
 
-        fsm.onenterFinish = function(event, from, to) {
+        fsm.onenterFinish = function() {
             var card_ids = Util.extractCardIds(selHand.selected());
             actionCallback(Util.Action.LEADROLE, [role, 1].concat(card_ids));
 
@@ -581,25 +586,26 @@ function($, _, FSM, Util, Selectable){
         return;
     };
 
-    mod.followRole = function(role, hasPalace, petitionMin,
+    mod.followRole = function(display, role, hasPalace, petitionMin,
             petitionMax, actionCallback)
     {
         var materialLed = Util.roleToMaterial(role);
-        var $dialog = $('#dialog');
+        var $dialog = display.dialog;
         var ip = mod.playerIndex+1;
 
-        var $hand = $('#p'+ip+'-hand > .card').not('.jack');
+        var $hand = display.zoneCards('hand', ip).not('.jack');
         var selHand = new Selectable($hand);
-        var $matchingHand = $('#p'+ip+'-hand > .card').filter('.'+materialLed.toLowerCase()+',.jack');
+        var $matchingHand = display.zoneCards('hand', ip).filter(
+                '.'+materialLed.toLowerCase()+',.jack');
         var selMatching = new Selectable($matchingHand);
 
-        var $cancelBtn = $('#cancel-btn');
-        var $okBtn = $('#ok-btn');
-        var $petitionBtn = $('#petition-btn');
+        var $cancelBtn = display.button('cancel');
+        var $okBtn = display.button('ok');
+        var $petitionBtn = display.button('petition');
 
-        var $piles = $('#deck,#jacks');
-        var $deck = $('#deck');
-        var $jacks = $('#jacks');
+        var $piles = display.decks;
+        var $deck = display.deck;
+        var $jacks = display.jacks;
 
         var fsm = FSM.create({
             initial: 'Start',
@@ -627,22 +633,22 @@ function($, _, FSM, Util, Selectable){
             ]
         });
 
-        fsm.onenterSelectingCards = function(event, from, to, args) {
-            $('#dialog').text('Thinker or follow '+role+'?');
+        fsm.onenterSelectingCards = function() {
+            display.dialog.text('Thinker or follow '+role+'?');
 
             if($jacks.data('nCards') > 0) {
                 $jacks.addClass('selectable');
                 $jacks.one('click', function(ev) {
-                    actionCallback(Util.Action.FOLLOWROLE, [true, 0, 'None']);
-                    actionCallback(Util.Action.THINKERTYPE, ['True']);
+                    actionCallback(Util.Action.FOLLOWROLE, [true, 0, null]);
+                    actionCallback(Util.Action.THINKERTYPE, [true]);
                     fsm.think();
                 });
             }
 
             $deck.addClass('selectable');
             $deck.one('click', function(ev) {
-                actionCallback(Util.Action.FOLLOWROLE, [true, 0, 'None']);
-                actionCallback(Util.Action.THINKERTYPE, ['False']);
+                actionCallback(Util.Action.FOLLOWROLE, [true, 0, null]);
+                actionCallback(Util.Action.THINKERTYPE, [false]);
                 fsm.think();
             });
 
@@ -657,13 +663,13 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleaveSelectingCards = function(event, from, to, args) {
+        fsm.onleaveSelectingCards = function() {
             Util.off($deck, $jacks, $petitionBtn);
             $jacks.removeClass('selectable');
             $deck.removeClass('selectable');
         };
 
-        fsm.onenterPetitionFirst = function(event, from, to, args) {
+        fsm.onenterPetitionFirst = function() {
             $dialog.text('Pick at least '+petitionMin+' cards for petition');
 
             selMatching.reset();
@@ -678,11 +684,11 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleavePetitionFirst = function(event, from, to, args) {
+        fsm.onleavePetitionFirst = function() {
             Util.off($cancelBtn);
         };
 
-        fsm.onenterPetitionRest = function(event, from, to, $selected) {
+        fsm.onenterPetitionRest = function($selected) {
             $dialog.text('Pick at least '+petitionMin+' cards for petition');
 
             selHand.reset();
@@ -708,11 +714,11 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleavePetitionRest = function(event, from, to, args) {
+        fsm.onleavePetitionRest = function() {
             Util.off($cancelBtn, $okBtn);
         };
 
-        fsm.onenterHaveFirst = function(event, from, to, args) {
+        fsm.onenterHaveFirst = function() {
             if(hasPalace) {
                 fsm.palace();
             } else {
@@ -720,7 +726,7 @@ function($, _, FSM, Util, Selectable){
             }
         };
 
-        fsm.onenterFinish = function(event, from, to, args) {
+        fsm.onenterFinish = function() {
             var petition_ids = Util.extractCardIds(selHand.selected());
             var card_ids = Util.extractCardIds(selMatching.selected());
             console.log('card ids: ' + card_ids);
@@ -737,22 +743,22 @@ function($, _, FSM, Util, Selectable){
         return;
     };
 
-    mod.craftsman = function(ootAllowed, hasRoad, hasTower, hasScriptorium,
+    mod.craftsman = function(display, ootAllowed, hasRoad, hasTower, hasScriptorium,
             actionCallback)
     {
-        var $dialog = $('#dialog');
+        var $dialog = display.dialog;
         var ip = mod.playerIndex+1;
 
-        var $handcards = $('#p'+ip+'-hand > .card').not('.jack');
+        var $handcards = display.zoneCards('hand', ip).not('.jack');
         var selHand = new Selectable($handcards);
 
         var selBuilding = null;
 
-        var $sites = $('#sites-container > .site');
+        var $sites = display.zoneCards('sites');
         var selSite = null;
 
-        var $cancelBtn = $('#cancel-btn');
-        var $skipBtn = $('#skip-btn');
+        var $cancelBtn = display.button('cancel');
+        var $skipBtn = display.button('skip');
 
         var fsm = FSM.create({
             initial: 'Start',
@@ -762,10 +768,11 @@ function($, _, FSM, Util, Selectable){
                 { name: 'card', from: 'SelectHand', to: 'SelectSite' },
                 { name: 'cancel', from: 'SelectSite', to: 'SelectHand' },
                 { name: 'finish', from: 'SelectSite', to: 'Finish' },
+                { name: 'finish', from: 'SelectHand', to: 'Finish' },
             ]
         });
 
-        fsm.onenterSelectHand = function(event, from, to) {
+        fsm.onenterSelectHand = function() {
             $dialog.text('Choose card in hand to use with Craftsman.');
             selHand.makeSelectN(1, function($selected) {
                 fsm.card();
@@ -773,16 +780,16 @@ function($, _, FSM, Util, Selectable){
 
             $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
                 selHand.reset();
-                actionCallback('None', 'None', 'None');
+                fsm.finish(null, null, null);
             });
         };
 
-        fsm.onleaveSelectHand = function(event, from, to) {
+        fsm.onleaveSelectHand = function() {
             selHand.makeUnselectable();
             $skipBtn.show().prop('disabled', true).off('click');
         };
 
-        fsm.onenterSelectSite = function(event, from, to) {
+        fsm.onenterSelectSite = function() {
             $dialog.text('Choose existing building to add or a site '
                     +'to start a new building.');
 
@@ -791,8 +798,7 @@ function($, _, FSM, Util, Selectable){
             var cardProp = Util.cardProperties(cardName);
             var cardMaterial = cardProp.material;
 
-            var $sites = $('#sites-container > .site');
-            var $sitesAllowed = $sites.filter(function(i, site) {
+            var $sitesAllowed = $($sites).filter(function(i, site) {
                     var $site = $(site);
                     var siteAvail = $site.data('inTown') > 0 ||
                             (ootAllowed && $site.data('outOfTown') > 0);
@@ -805,8 +811,7 @@ function($, _, FSM, Util, Selectable){
             selSite = new Selectable($sitesAllowed);
             selSite.makeSelectN(1, function($selected) {
                 var siteName = $selected.data('material');
-                actionCallback(cardIdent, "None", siteName);
-                fsm.finish();
+                fsm.finish(cardIdent, null, siteName);
             });
 
             var $buildings = $('#p'+ip+'-buildings > .building').filter(
@@ -817,8 +822,6 @@ function($, _, FSM, Util, Selectable){
                 var materialMatch = $.inArray(cardMaterial, materials)>-1;
                 var notComplete = !$building.data('complete');
                 var roadMatch = hasRoad && $.inArray('Stone', materials)>-1;
-                console.log(hasRoad + ', ' + materials);
-                console.log(roadMatch);
                 var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials)>-1;
                 var towerMatch = cardMaterial === 'Rubble';
 
@@ -833,8 +836,7 @@ function($, _, FSM, Util, Selectable){
             selBuilding = new Selectable($buildings);
             selBuilding.makeSelectN(1, function($selected) {
                 var ident = $selected.data('ident');
-                actionCallback(ident, cardIdent, "None");
-                fsm.finish();
+                fsm.finish(ident, cardIdent, null);
             });
 
             $cancelBtn.show().prop('disabled', false).off('click').click(function(event) {
@@ -842,14 +844,17 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleaveSelectSite = function(event, from, to) {
+        fsm.onleaveSelectSite = function() {
+            console.dir(selSite.selected());
             selBuilding.reset();
             selHand.reset();
             selSite.reset();
+            //TODO: the sites don't actually lose the selected class, even though reset is called.
         };
 
-        fsm.onenterFinish = function(event, from, to) {
+        fsm.onenterFinish = function(event, from, to, card, building, site) {
             $dialog.text('Waiting...');
+            actionCallback(card, building, site);
         };
 
         fsm.start();
@@ -858,28 +863,28 @@ function($, _, FSM, Util, Selectable){
         
     };
 
-    mod.architect = function(ootAllowed, hasRoad, hasTower, hasScriptorium,
+    mod.architect = function(display, ootAllowed, hasRoad, hasTower, hasScriptorium,
             hasArchway, actionCallback)
     {
-        var $dialog = $('#dialog');
+        var $dialog = display.dialog;
         var ip = mod.playerIndex+1;
 
-        var $handcards = $('#p'+ip+'-hand > .card').not('.jack');
+        var $handcards = display.zoneCards('hand', ip).not('.jack');
         var selHand = new Selectable($handcards);
 
-        var $stockpile = $('#p'+ip+'-stockpile > .card');
+        var $stockpile = display.zoneCards('stockpile', ip);
         var selStockpile = new Selectable($stockpile);
 
-        var $pool = $('#pool > .card');
+        var $pool = display.zoneCards('pool');
         var selPool = new Selectable($pool);
 
         var selBuilding = null;
 
-        var $sites = $('#sites-container > .site');
+        var $sites = display.zoneCards('sites');
         var selSite = null;
 
-        var $cancelBtn = $('#cancel-btn');
-        var $skipBtn = $('#skip-btn');
+        var $cancelBtn = display.button('cancel');
+        var $skipBtn = display.button('skip');
 
         var fromPool = false;
 
@@ -897,7 +902,7 @@ function($, _, FSM, Util, Selectable){
             ]
         });
 
-        fsm.onenterSelectHand = function(event, from, to) {
+        fsm.onenterSelectHand = function() {
             if(hasArchway) {
                 $dialog.text('Choose card in hand to start a new building or '+
                         'card in stockpile or pool to add to existing building.');
@@ -926,11 +931,11 @@ function($, _, FSM, Util, Selectable){
                 selHand.reset();
                 selStockpile.reset();
                 selPool.reset()
-                actionCallback('None', 'None', 'None', false);
+                actionCallback(null, null, null, false);
             });
         };
 
-        fsm.onleaveSelectHand = function(event, from, to) {
+        fsm.onleaveSelectHand = function() {
             selHand.makeUnselectable();
             selStockpile.makeUnselectable();
             if(hasArchway) {selPool.makeUnselectable();}
@@ -938,7 +943,7 @@ function($, _, FSM, Util, Selectable){
             Util.off($skipBtn);
         };
 
-        fsm.onenterSelectSite = function(event, from, to) {
+        fsm.onenterSelectSite = function() {
             $dialog.text('Choose site to start a new building.');
 
             var cardIdent = Util.extractCardIds(selHand.selected())[0];
@@ -946,31 +951,31 @@ function($, _, FSM, Util, Selectable){
             var cardProp = Util.cardProperties(cardName);
             var cardMaterial = cardProp.material;
 
-            var $sites = $('#sites-container > .site');
-            var $sitesAllowed = $sites.filter(function(i, site) {
-                    var $site = $(site);
-                    var siteAvail = $site.data('inTown') > 0 ||
-                            (ootAllowed && $site.data('outOfTown') > 0);
-                    var siteMatch = cardName === 'Statue' || 
-                            $site.data('material') === cardProp.material;
+            var $sitesAllowed = $(display.zoneCards('sites'))
+                    .filter(function(i, site) {
+                        var $site = $(site);
+                        var siteAvail = $site.data('inTown') > 0 ||
+                                (ootAllowed && $site.data('outOfTown') > 0);
+                        var siteMatch = cardName === 'Statue' || 
+                                $site.data('material') === cardProp.material;
 
-                    return siteAvail && siteMatch;
+                        return siteAvail && siteMatch;
             });
 
             selSite = new Selectable($sitesAllowed);
             selSite.makeSelectN(1, function($selected) {
                 var siteName = $selected.data('material');
-                actionCallback(cardIdent, "None", siteName, false);
+                actionCallback(cardIdent, null, siteName, false);
                 fsm.finish();
             });
         };
 
-        fsm.onleaveSelectSite = function(event, from, to) {
+        fsm.onleaveSelectSite = function() {
             selHand.reset();
             selSite.reset();
         };
 
-        fsm.onenterSelectBuilding = function(event, from, to) {
+        fsm.onenterSelectBuilding = function() {
             $dialog.text('Choose building to add material to.');
 
             var $card;
@@ -1004,7 +1009,7 @@ function($, _, FSM, Util, Selectable){
             selBuilding = new Selectable($buildings);
             selBuilding.makeSelectN(1, function($selected) {
                 var ident = $selected.data('ident');
-                actionCallback(ident, cardIdent, "None", fromPool);
+                actionCallback(ident, cardIdent, null, fromPool);
                 fsm.finish();
             });
 
@@ -1013,13 +1018,13 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        fsm.onleaveSelectBuilding = function(event, from, to) {
+        fsm.onleaveSelectBuilding = function() {
             selBuilding.reset();
             selPool.reset();
             selStockpile.reset();
         };
 
-        fsm.onenterFinish = function(event, from, to) {
+        fsm.onenterFinish = function() {
             $dialog.text('Waiting...');
         };
 

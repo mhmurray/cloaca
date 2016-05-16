@@ -8,7 +8,7 @@ from cloaca.zone import Zone
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import BadGameActionError
+from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -28,7 +28,7 @@ class TestThinkerOrLead(unittest.TestCase):
     def test_expects_thinker_or_lead(self):
         """ The Game should expect a THINKERORLEAD action.
         """
-        self.assertEqual(self.game.expected_action(), message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
     
     def test_handle_do_thinker(self):
@@ -37,7 +37,7 @@ class TestThinkerOrLead(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, True)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.THINKERTYPE)
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
 
 
     def test_handle_do_lead(self):
@@ -46,7 +46,7 @@ class TestThinkerOrLead(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, False)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.LEADROLE)
+        self.assertEqual(self.game.expected_action, message.LEADROLE)
 
     def test_thinker_for_cards_many_times(self):
         """ Thinker several times in a row for both players.
@@ -97,7 +97,7 @@ class TestThinkerOrLead(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, True)
         b = message.GameAction(message.THINKERTYPE, True)
 
-        self.game.game_state.jack_pile.set_content([])
+        self.game.game_state.jacks.set_content([])
 
         self.game.handle(a)
 
@@ -139,7 +139,7 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertIn(latrine, self.p1.camp)
         self.assertNotIn(latrine, self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
 
     def test_handle_lead_latrine_with_jack(self):
@@ -156,7 +156,7 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertIn(jack, self.p1.camp)
         self.assertNotIn(jack, self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
 
     def test_petition(self):
@@ -172,7 +172,7 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
 
     def test_petition_for_same_role(self):
@@ -189,7 +189,7 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
 
     def test_petition_with_circus_and_two_cards(self):
@@ -208,7 +208,7 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
 
     def test_petition_with_circus_and_three_cards(self):
@@ -227,7 +227,7 @@ class TestLeadRole(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 1)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertNotIn('Road', self.p1.hand)
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
 
     def test_petition_with_too_few_cards(self):
@@ -326,7 +326,7 @@ class TestPalace(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, n_actions)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertFalse(self.p1.hand.contains(['Road','Dock']))
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
     def test_petition_with_palace_5_actions(self):
         """Tests petition with multiple lead actions using Palace.
@@ -344,7 +344,7 @@ class TestPalace(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, n_actions)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertFalse(self.p1.hand.contains(['Road','Dock']))
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
     def test_petition_with_palace_7_actions(self):
         """Tests petition with multiple lead actions using Palace.
@@ -362,7 +362,7 @@ class TestPalace(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, n_actions)
         self.assertTrue(self.p1.camp.contains(cards))
         self.assertFalse(self.p1.hand.contains(['Road','Dock']))
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
     def test_petition_with_illegal_n_actions(self):
         """Tests petition with multiple lead actions using Palace.
@@ -435,7 +435,7 @@ class TestFollow(unittest.TestCase):
     def test_expects_follow_role(self):
         """ The Game should expect a FOLLOWROLE action.
         """
-        self.assertEqual(self.game.expected_action(), message.FOLLOWROLE)
+        self.assertEqual(self.game.expected_action, message.FOLLOWROLE)
 
     
     def test_do_thinker(self):
@@ -444,7 +444,7 @@ class TestFollow(unittest.TestCase):
         a = message.GameAction(message.FOLLOWROLE, True, 0, None)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.THINKERTYPE)
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
         self.assertEqual(self.p2.n_camp_actions, 0)
 
 
@@ -457,7 +457,7 @@ class TestFollow(unittest.TestCase):
         a = message.GameAction(message.FOLLOWROLE, False, 1, jack)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.LABORER)
+        self.assertEqual(self.game.expected_action, message.LABORER)
         self.assertIn(jack, self.p2.camp)
         self.assertNotIn(jack, self.p2.hand)
         self.assertEqual(self.p2.n_camp_actions, 1)
@@ -472,7 +472,7 @@ class TestFollow(unittest.TestCase):
         a = message.GameAction(message.FOLLOWROLE, False, 1, latrine)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.LABORER)
+        self.assertEqual(self.game.expected_action, message.LABORER)
         self.assertIn(latrine, self.p2.camp)
         self.assertNotIn(latrine, self.p2.hand)
         self.assertEqual(self.p2.n_camp_actions, 1)
@@ -521,7 +521,7 @@ class TestFollow(unittest.TestCase):
         
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.LABORER)
+        self.assertEqual(self.game.expected_action, message.LABORER)
         self.assertIn(atrium, self.p2.camp)
         self.assertIn(school1, self.p2.camp)
         self.assertIn(school2, self.p2.camp)
@@ -538,7 +538,7 @@ class TestFollow(unittest.TestCase):
 
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action(), message.LABORER)
+        self.assertEqual(self.game.expected_action, message.LABORER)
         self.assertIn(latrine, self.p2.camp)
         self.assertIn(insula1, self.p2.camp)
         self.assertIn(insula2, self.p2.camp)

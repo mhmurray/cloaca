@@ -65,8 +65,10 @@ def get_cards(card_names):
         try:
             c = d[name].pop(0)
         except IndexError:
-            raise ValueError('There aren\'t {0} {1} cards in the game.'
-                    .format(card_names.count(name), name))
+            raise ValueError(
+                    'There are only {0} {1} cards in the game '
+                    '({2} requested).'
+                    .format(len(cards(name)), name, card_names.count(name)))
 
         out.append(c)
     

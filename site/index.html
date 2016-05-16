@@ -15,62 +15,9 @@
     <div id="tabs">
         <ul>
             <li><a href="#gamelist-wrapper">Game List</a></li>
-            <li><a href="#game-wrapper">Game</a></li>
             <li><a href="#devtools">DevTools</a></li>
         </ul>
         <div id="page-wrapper">
-            <div id="game-wrapper">
-
-                <div id="gamestate-wrapper">
-                    <div>
-                        <button id='game-refresh-btn'>Refresh</button>
-                        <button id='game-exit-btn'>Close Game</button>
-                    </div>
-
-
-                    <div id=player-info>
-                    </div>
-
-                </div>
-                <div id="gameinfo"></div>
-                <div id="decks">
-                    <div id="deck" class="pile orders">
-                        <div class="pile-title">Deck</div>
-                        <div class="pile-count">0</div>
-                    </div>
-                    <div id="jacks" class="pile jack">
-                        <div class="pile-title">Jacks</div>
-                        <div class="pile-count">0</div>
-                    </div>
-                </div>
-                <div id=sites></div>
-
-                <div class="dialog-wrapper">
-                    <div class="dialog"></div>
-                    <div id='ok-cancel-btns'>
-                        <button id='ok-btn'>OK</button>
-                        <button id='cancel-btn'>Cancel</button>
-                        <button id='skip-btn'>Skip</button>
-                        <button id='petition-btn'>Petition</button>
-                        <button id='lead-role'>Lead a Role</button>
-                        <button id='glory-to-rome'>Glory to Rome!</button>
-                        <div id="role-select">
-                            <button id='select-patron' class='marble'>Patron</button>
-                            <button id='select-laborer' class='rubble'>Laborer</button>
-                            <button id='select-architect' class='concrete'>Architect</button>
-                            <button id='select-craftsman' class='wood'>Craftsman</button>
-                            <button id='select-legionary' class='brick'>Legionary</button>
-                            <button id='select-merchant' class='stone'>Merchant</button>
-                        </div>
-                    </div>
-                    <div id='choice-btns'>
-                    </div>
-                </div>
-                <div>Game Log</div>
-
-                <div id="game-log" class="log"></div>
-            </div>
-
             <div id="gamelist-wrapper">
                 <div id='gamelist-canvas'>
                     <ul id="gamelist"></ul>
@@ -79,6 +26,17 @@
                 <button id="refresh">Refresh</button>
                 <button id="creategame">New Game</button>
                 <button id="close">Close Connection</button>
+
+                <div>
+                    <span id='login-status' class='closed'>Not logged in.</span>
+                    <span id='username'></span>
+                </div>
+
+                <form id="login-form" action="/login" method="post">
+                    <textarea id='login-text' required>reasgt</textarea>
+                    <button type="submit">Login</button>
+                </form>
+                <button id="logout-btn">Logout</button>
             </div>
 
             <div id="devtools">
