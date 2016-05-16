@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from cloaca.gtr import Game
+from cloaca.game import Game
 from cloaca.player import Player
 from cloaca.building import Building
 from cloaca.zone import Zone

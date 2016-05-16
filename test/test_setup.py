@@ -1,5 +1,5 @@
 from cloaca.player import Player
-from cloaca.gtr import Game
+from cloaca.game import Game
 from cloaca.building import Building
 import cloaca.card_manager as cm
 import cloaca.message as message

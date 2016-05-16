@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from cloaca.gtr import Game
+from cloaca.game import Game
 from cloaca import message
 from cloaca.error import GTRError
 

@@ -1,4 +1,4 @@
-from gtr import Game
+from game import Game
 from player import Player
 from game_record import GameRecord
 from message import GameAction, Command
