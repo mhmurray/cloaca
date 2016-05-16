@@ -22,7 +22,7 @@ class TestServer(unittest.TestCase):
 
         s.register_user(uid1, dict(name='p1'))
 
-        userinfo1 = s.userinfo(uid1)
+        userinfo1 = s._userinfo(uid1)
         self.assertEqual(userinfo1['name'], 'p1')
 
 
@@ -34,12 +34,12 @@ class TestServer(unittest.TestCase):
 
         s.register_user(uid1, dict(name='p1'))
 
-        userinfo1 = s.userinfo(uid1)
+        userinfo1 = s._userinfo(uid1)
         self.assertEqual(userinfo1['name'], 'p1')
 
         s.register_user(uid1, dict(name='p2'))
 
-        userinfo1 = s.userinfo(uid1)
+        userinfo1 = s._userinfo(uid1)
         self.assertEqual(userinfo1['name'], 'p2')
 
 
@@ -47,7 +47,7 @@ class TestServer(unittest.TestCase):
         s = GTRServer()
 
         with self.assertRaises(KeyError):
-            s.userinfo(uuid4().int)
+            s._userinfo(uuid4().int)
 
 
     def test_unregister_user(self):
@@ -56,12 +56,12 @@ class TestServer(unittest.TestCase):
 
         s.register_user(uid1, dict(name='p1'))
 
-        self.assertEqual(s.userinfo(uid1)['name'], 'p1')
+        self.assertEqual(s._userinfo(uid1)['name'], 'p1')
 
         s.unregister_user(uid1)
 
         with self.assertRaises(KeyError):
-            s.userinfo(uid1)
+            s._userinfo(uid1)
 
 
     def test_unregister_nonexistent_user(self):
