@@ -46,7 +46,7 @@ class TestGame(unittest.TestCase):
         for p in gs.players:
             self.assertIn('Jack', p.hand)
 
-        self.assertTrue(gs.is_started)
+        self.assertTrue(g.is_started)
         self.assertEqual(gs.expected_action, message.THINKERORLEAD)
 
 

@@ -8,6 +8,8 @@ from card import Card
 from zone import Zone
 from error import GTRError
 
+import random
+import copy
 from collections import Counter
 import logging
 import message
@@ -44,23 +46,27 @@ class Game(object):
     def __init__(self, game_state=None):
         self.game_state = game_state if game_state is not None else GameState()
 
+    active_player_index = property(lambda self : self.game_state.players.index(self.game_state.active_player))
+    leader = property(lambda self : self.game_state.players[self.game_state.leader_index])
+    is_started = property(lambda self : self.game_state.turn_number > 0)
+
     def __repr__(self):
         rep=('Game(game_state={game_state!r})')
         return rep.format(game_state = self.game_state)
 
     def start(self):
-        if self.game_state.is_started:
+        if self.is_started:
             raise GTRError('Game has already started.')
 
         self._init_common_piles(len(self.game_state.players))
-        self.game_state.init_player_hands()
+        self._init_player_hands()
         self.game_state.stack.push_frame('_take_turn_stacked', self.game_state.active_player)
         self.game_state.turn_number = 1
 
         self._log('Starting game.')
         self._log('Turn {0}: {1}'
             .format(self.game_state.turn_number,
-                    self.game_state.leader.name))
+                    self.leader.name))
 
         self._pump()
 
@@ -72,7 +78,7 @@ class Game(object):
 
         The deck of Orders cards is still random, however.
         """
-        if self.game_state.is_started:
+        if self.is_started:
             raise GTRError('Game has already started.')
 
         self._init_library()
@@ -89,7 +95,7 @@ class Game(object):
         self._log('Starting game.')
         self._log('Turn {0}: {1}'
             .format(self.game_state.turn_number,
-                    self.game_state.leader.name))
+                    self.leader.name))
 
         self._pump()
 
@@ -98,11 +104,11 @@ class Game(object):
         full. If a player with the specified name is already in the game,
         silently do nothing.
         """
-        if self.game_state.find_player(name) is not None:
+        if self._find_player(name) is not None:
             raise GTRError('Cannot add player to same game twice: {0}'
                     .format(name))
 
-        if self.game_state.is_started:
+        if self.is_started:
             raise GTRError('Cannot add player after game start.')
 
         n = len(self.game_state.players)
@@ -139,6 +145,70 @@ class Game(object):
                 lg.debug(str(e))
                 return
 
+
+    def privatized_game_state_copy(self, player_name):
+        """Change card names to 'Card' in order to represent a game
+        visible by player_name. Hide the library, vault, and other
+        players' hands, as well as the revealed card for a Fountain.
+
+        Do not hide Jacks in hand.
+
+        Return a new game state object
+        """
+        gs = copy.deepcopy(self.game_state)
+
+        gs.library.set_content([Card(-1)]*len(gs.library))
+
+        for p in gs.players:
+            p.vault.set_content([Card(-1)]*len(p.vault))
+
+            if p.name != player_name:
+                p.hand.set_content([c if c.name == 'Jack' else Card(-1) for c in p.hand ])
+                p.fountain_card = Card(-1) if p.fountain_card else None
+
+        return gs
+
+    def find_player_index(self, player_name):
+        """Finds the index of a named player.
+        """
+        players_match = [i for i,p in enumerate(self.game_state.players)
+                         if p.name==player_name]
+        return players_match[0] if len(players_match) else None
+
+    def _find_player(self, name):
+        """Return the Player object with the specified name or None if no
+        such player is in the game.
+        """
+        players_match = filter(lambda x : x.name == name, self.game_state.players)
+        return players_match[0] if len(players_match) else None
+
+    def _increment_leader_index(self):
+        prev_index = self.game_state.leader_index
+        self.game_state.leader_index = self.game_state.leader_index + 1
+        if self.game_state.leader_index >= len(self.game_state.players):
+            self.game_state.leader_index = 0
+            self.game_state.turn_index = self.game_state.turn_index + 1
+        lg.debug('Leader index changed from {0} to {1}'.format(prev_index,
+        self.game_state.leader_index))
+
+    def _following_players_in_order(self):
+        """Return a list of players in turn order starting with
+        the next player after the leader, and ending with the player
+        before the leader. This is players_in_turn_order()
+        with the leader removed.
+        """
+        n = self.game_state.leader_index
+        return self.game_state.players[n+1:] + self.game_state.players[:n]
+
+    def _players_in_turn_order(self, start_player=None):
+        """ Returns a list of players in turn order
+        starting with start_player or the leader it's None.
+        """
+        n = self.game_state.players.index(start_player) \
+            if start_player else self.game_state.leader_index
+
+        return self.game_state.players[n:] + self.game_state.players[:n]
+
     def _init_common_piles(self, n_players):
         self._log('Initializing the game')
 
@@ -160,7 +230,7 @@ class Game(object):
         players = range(n_players)
         while not has_winner:
             # Make list of (player, card) pairs
-            cards = [(i,self.game_state.draw_cards(1)[0]) for i in players]
+            cards = [(i,self._draw_cards(1)[0]) for i in players]
             first = min(cards, key=lambda x : x[1])
             players = [c[0] for c in cards if c[1].name == first[1].name]
             all_cards.extend([c[1] for c in cards])
@@ -188,7 +258,23 @@ class Game(object):
         """Initializes the library as a list of Card objects
         """
         self.game_state.library = Zone(cm.get_orders_card_set())
-        self.game_state.shuffle_library()
+        self._shuffle_library()
+
+    def _init_player_hands(self):
+        lg.info('Initializing {0} players.'.format(len(self.game_state.players)))
+        for player in self.game_state.players:
+            self._draw_jack_for_player(player)
+            self._thinker_for_cards(player, 5)
+
+    def _shuffle_library(self):
+        """ Shuffles the library.
+
+        random.shuffle has a finite period, which is apparently 2**19937-1.
+        This means lists of length >~ 2080 will not get a completely random
+        shuffle. See the SO question
+          http://stackoverflow.com/questions/3062741/maximal-length-of-list-to-shuffle-with-python-random-shuffle
+        """
+        random.shuffle(self.game_state.library.cards)
 
     def _player_score(self, player):
         return self._buildings_score(player) + self._vault_score(player)
@@ -306,13 +392,13 @@ class Game(object):
 
     def _handle_thinkerorlead(self, a):
         do_thinker = a.args[0]
-        p = self.game_state.leader
+        p = self.leader
 
         if not do_thinker:
             # my_list[::-1] reverses the list
-            for p in self.game_state.players_in_turn_order()[::-1]:
+            for p in self._players_in_turn_order()[::-1]:
                 self.game_state.stack.push_frame("_perform_role_being_led", p)
-            for p in self.game_state.following_players_in_order()[::-1]:
+            for p in self._following_players_in_order()[::-1]:
                 self.game_state.stack.push_frame("_follow_role_action", p)
             self.game_state.stack.push_frame("_lead_role_action")
 
@@ -320,6 +406,38 @@ class Game(object):
             self.game_state.stack.push_frame("_perform_thinker_action", p)
 
         self._pump()
+
+    def _thinker_for_cards(self, player, max_hand_size):
+        n_cards = max_hand_size - len(player.hand)
+        if n_cards < 1: n_cards = 1
+        lg.debug(
+            'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
+        player.hand.extend(self._draw_cards(n_cards))
+
+    def _draw_jack_for_player(self, player):
+        player.hand.append(self._draw_jack())
+
+    def _discard_for_player(self, player, card):
+        player.hand.move_card(card, self.game_state.pool)
+
+    def _discard_all_for_player(self, player):
+        cards_to_discard = list(player.hand)
+        for card in cards_to_discard:
+            player.hand.move_card(card, self.game_state.pool)
+
+    def _draw_jack(self):
+        try:
+            c = self.game_state.jacks.pop()
+        except IndexError:
+            raise GTRError('Jack pile is empty.')
+
+        return c
+
+    def _draw_cards(self, n_cards):
+        cards = []
+        for i in range(0, n_cards):
+            cards.append(self.game_state.library.pop(0))
+        return cards
 
     def _thinker_or_lead(self, player):
         self.game_state.active_player = player
@@ -330,7 +448,7 @@ class Game(object):
         """Logs the message in the GameState log roll.
         """
         time = datetime.now().time().strftime('%H:%M:%S ')
-        self.game_state.log(time+msg)
+        self.game_state.game_log.append(time+msg)
 
     def _pump(self):
         if self.game_state.stack.stack:
@@ -350,7 +468,7 @@ class Game(object):
         """ Moves the leader index, prints game state, saves, and pushes the next turn.
         """
         self.game_state.turn_number += 1
-        self.game_state.increment_leader_index()
+        self._increment_leader_index()
         leader_index = self.game_state.leader_index
         leader = self.game_state.players[leader_index]
         self.game_state.stack.push_frame('_take_turn_stacked', leader)
@@ -400,7 +518,7 @@ class Game(object):
 
         else:
             self._log('{0} thinks at the end of turn with Academy'.format(p.name))
-            self._perform_thinker_action(self.game_state.leader)
+            self._perform_thinker_action(self.leader)
 
 
     def _perform_thinker_action(self, player):
@@ -432,7 +550,7 @@ class Game(object):
             self._log('{0} discards their entire hand with Vomitorium: {1}.'
                 .format(p.name, ', '.join(p.hand)))
 
-            self.game_state.discard_all_for_player(p)
+            self._discard_all_for_player(p)
             a = message.GameAction(message.USELATRINE, None)
             self._handle_uselatrine(a)
 
@@ -450,7 +568,7 @@ class Game(object):
         latrine_card = a.args[0]
 
         if latrine_card is not None:
-            self.game_state.discard_for_player(p, latrine_card)
+            self._discard_for_player(p, latrine_card)
             self._log('{0} discards {1} using Latrine.'
                 .format(p.name, latrine_card))
 
@@ -462,10 +580,10 @@ class Game(object):
         p = self.game_state.active_player
         for_jack = a.args[0]
 
-        is_leader = p == self.game_state.leader
+        is_leader = p == self.leader
 
         if for_jack:
-            self.game_state.draw_jack_for_player(p)
+            self._draw_jack_for_player(p)
 
             if is_leader:
                 self._log('{0} thinks for a Jack.'.format(p.name))
@@ -473,7 +591,7 @@ class Game(object):
                 self._log('{0} thinks for a Jack instead of following.'.format(p.name))
 
         else:
-            self.game_state.thinker_for_cards(p, self._max_hand_size(p))
+            self._thinker_for_cards(p, self._max_hand_size(p))
 
             n_cards = max(1, self._max_hand_size(p) - len(p.hand))
             noun = 'cards' if n_cards > 1 else 'card'
@@ -494,12 +612,12 @@ class Game(object):
     def _lead_role_action(self):
         """ Entry point for the lead role stack frame.
         """
-        self.game_state.active_player = self.game_state.leader
+        self.game_state.active_player = self.leader
         self.game_state.expected_action = message.LEADROLE
 
 
     def _handle_leadrole(self, a):
-        p = self.game_state.leader
+        p = self.leader
 
         role, n_actions = a.args[0:2]
         cards = a.args[2:]
@@ -877,7 +995,7 @@ class Game(object):
         p = self.game_state.active_player
 
         if do_patron:
-            card = self.game_state.draw_cards(1)[0]
+            card = self._draw_cards(1)[0]
             gtrutils.add_card_to_zone(card, p.clientele)
 
             if self._player_has_active_building(p, 'Bath'):
@@ -1009,7 +1127,7 @@ class Game(object):
         p = self.game_state.active_player
 
         if use_fountain:
-            p.fountain_card = self.game_state.draw_cards(1)[0]
+            p.fountain_card = self._draw_cards(1)[0]
             self.game_state.expected_action = message.FOUNTAIN
             self._log('{0} reveals {1} with Fountain.'
                 .format(p.name, p.fountain_card))
@@ -1479,7 +1597,7 @@ class Game(object):
             p.hand.move_card(hand_card, p.vault)
 
         if from_deck:
-            gtrutils.add_card_to_zone(self.game_state.draw_cards(1)[0], player.vault)
+            gtrutils.add_card_to_zone(self._draw_cards(1)[0], player.vault)
 
         # Logging
         if stockpile_card:
@@ -1505,14 +1623,14 @@ class Game(object):
         2) If dropping a Jack, ask players_with_senate in order.
         """
         self._log('Kids in the pool.')
-        self._do_kids_in_pool(self.game_state.leader)
+        self._do_kids_in_pool(self.leader)
 
 
     def _do_kids_in_pool(self, p):
         p_index = self.game_state.players.index(p)
         self.game_state.kip_index = p_index
 
-        p_in_order = self.game_state.players_in_turn_order(p)
+        p_in_order = self._players_in_turn_order(p)
         p_in_order.pop(0) # skip this player
 
         indices = []
@@ -1589,7 +1707,7 @@ class Game(object):
 
     def _end_turn(self):
         # players in reverse order
-        players = self.game_state.players_in_turn_order()[::-1]
+        players = self._players_in_turn_order()[::-1]
 
         for p in players:
             self.game_state.stack.push_frame('_do_end_turn', p)

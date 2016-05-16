@@ -7,7 +7,6 @@ import message
 from error import GTRError
 
 import uuid
-import copy
 
 import json
 import pickle
@@ -190,7 +189,7 @@ class GTRServer(object):
                 
                 # If the game is started, we need the game state
                 gs = self._get_game_state(user, id_)
-                if gs is not None and gs.is_started:
+                if gs is not None and self.games[id_].is_started:
                     self._send_gamestate(user, id_)
 
         elif action == message.REQSTARTGAME:
@@ -230,7 +229,7 @@ class GTRServer(object):
                 self._send_error(user, msg)
 
             name = self._userinfo(user)['name']
-            player_index = game.game_state.find_player_index(name)
+            player_index = game.find_player_index(name)
             if player_index is None:
                 msg = ('User {0} is not part of game {1:d}, players: {2!s}'
                         ).format(name, game_id,
@@ -243,7 +242,7 @@ class GTRServer(object):
             lg.debug('Got action: {0}'.format(repr(action)))
             lg.debug('Handling action: {0}'.format(repr(action)))
 
-            i_active_p = game.game_state.active_player_index
+            i_active_p = game.active_player_index
 
             if i_active_p == player_index:
                 try:
@@ -300,20 +299,20 @@ class GTRServer(object):
             return None
 
         username = self._userinfo(user)['name']
-        player_index = game.game_state.find_player_index(username)
+        player_index = game.find_player_index(username)
         if player_index is None:
             lg.warning('User {0:s} is not part of game {1:d}'.format(username, game_id))
             return None
 
-        if game.game_state.is_started:
-            # privatize modifies the object, so make a copy
-            gs = copy.deepcopy(game.game_state)
-
+        if game.is_started:
             username = self._userinfo(user)['name']
-            gs.privatize(username)
-            return gs
+
+            gs_privatized = game.privatized_game_state_copy(username)
+
+            return gs_privatized
         else:
             return None
+
 
     def _send_gamestate(self, user, game):
         """Sends the game state from the specified game to the user as a
@@ -374,7 +373,7 @@ class GTRServer(object):
         game_list = []
         for i, game in enumerate(self.games):
             players = [p.name for p in game.game_state.players]
-            started = game.game_state.is_started
+            started = game.is_started
             host = game.game_state.host
             game_list.append(GameRecord(i, players, started, host))
         
@@ -388,11 +387,11 @@ class GTRServer(object):
         except IndexError:
             raise GTRError('Tried to start non-existent game {0:d}'.format(game))
 
-        if game.game_state.is_started:
+        if game.is_started:
             raise GTRError('Game already started')
 
         name = self._userinfo(user)['name']
-        p = game.game_state.find_player(name)
+        p = game.find_player_index(name)
         if p is None:
             raise GTRError('Player {0} cannot start game {1} that they haven\'t joined.'
                     .format(name, game_id))

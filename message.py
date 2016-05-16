@@ -567,18 +567,6 @@ class GameAction(object):
         self.args = req_args + extended_args
 
 
-    def privatize(self):
-        """ Re-names any information in this GameAction instance that is
-        not public. For example, MERCHANT(None, 'Wall', False) becomes
-        MERCHANT(None, 'Card', False). Modifies this object.
-        
-        This merchant-from-hand with Basilica is the only case where
-        a card moves from a private zone to a hidden zone.
-        """
-        if self.action == MERCHANT:
-            if self.args[1]:
-                self.args[1] = 'Card'
-
     def __str__(self):
         """ Convert to string, eg. str(THINKERORLEAD) -> 'THINKERORLEAD'
         """
