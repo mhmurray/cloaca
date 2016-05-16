@@ -11,6 +11,7 @@ from error import GTRError
 """
 
 lg = logging.getLogger(__name__)
+lg.addHandler(logging.NullHandler())
 
 def get_card_from_zone(card, zone):
     """ Wrapper around the possible exception caused by trying to

@@ -14,6 +14,7 @@ import message
 from datetime import datetime
 
 lg = logging.getLogger(__name__)
+lg.addHandler(logging.NullHandler())
 
 class Game(object):
     """Controls the operation of a single game.

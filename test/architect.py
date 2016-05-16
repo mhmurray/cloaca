@@ -16,18 +16,6 @@ from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
 
 import unittest
-import logging
-import sys
-
-if 0:
-    lg = logging.getLogger('gtr')
-    formatter = logging.Formatter('%(message)s')
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.DEBUG)
-    ch.setFormatter(formatter)
-    lg.addHandler(ch)
-    lg.setLevel(logging.DEBUG)
-    lg.propagate = False
 
 class TestArchitect(unittest.TestCase):
     """ Test handling architect responses.

@@ -19,6 +19,7 @@ import logging
 import collections
 
 lg = logging.getLogger(__name__)
+lg.addHandler(logging.NullHandler())
 
 class Player:
     """ Contains the piles and items controlled by a player. """

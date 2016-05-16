@@ -17,6 +17,7 @@ from card import Card
 import stack
 
 lg = logging.getLogger(__name__)
+lg.addHandler(logging.NullHandler())
 
 class GameState(object):
     """Data object containing the state of a game.
