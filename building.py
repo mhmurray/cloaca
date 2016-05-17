@@ -1,4 +1,5 @@
 from zone import Zone
+from error import GTRError
 
 class Building:
     """A container that represents buildings.
@@ -28,12 +29,23 @@ class Building:
 
         The args are the same type as the attributes except that
         any iterable can be provided for the materials and stairway_materials.
+
+        Creating a building with no site or no foundation raises a GTRError.
         """
         self.foundation = foundation
         self.site = site
         self.materials = Zone(materials if materials else [])
         self.stairway_materials = Zone(stairway_materials if stairway_materials else [])
         self.complete = complete
+
+        self.materials.name = 'materials'
+        self.stairway_materials.name = 'stairway_materials'
+
+        if self.foundation is None:
+            raise GTRError('Invalid building (no foundation): '+repr(self))
+
+        if self.site is None:
+            raise GTRError('Invalid building (no site): '+repr(self))
 
     def __str__(self):
         """Return the name of the foundation card."""
