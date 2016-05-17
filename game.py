@@ -4,7 +4,7 @@ import card_manager as cm
 from building import Building
 from card import Card
 from zone import Zone
-from error import GTRError
+from error import GTRError, GameOver
 import stack
 
 import random
@@ -42,7 +42,8 @@ class Game(object):
 
     active_player_index = property(lambda self : self.players.index(self.active_player))
     leader = property(lambda self : self.players[self.leader_index])
-    is_started = property(lambda self : self.turn_number > 0)
+    started = property(lambda self : self.turn_number > 0)
+    finished = property(lambda self : self.winners is not None)
 
     def __init__(self):
         self.players = []
@@ -68,11 +69,15 @@ class Game(object):
         self.expected_action = None
         self.game_id = 0
         self.host = None
+        self.winners = None
+
+        # Keep track of currently-executing stack frame.
+        self._current_frame = None
 
         self.game_log = []
 
     def start(self):
-        if self.is_started:
+        if self.started:
             raise GTRError('Game has already started.')
 
         self._init_common_piles(len(self.players))
@@ -95,7 +100,7 @@ class Game(object):
 
         The deck of Orders cards is still random, however.
         """
-        if self.is_started:
+        if self.started:
             raise GTRError('Game has already started.')
 
         self._init_library()
@@ -125,7 +130,7 @@ class Game(object):
             raise GTRError('Cannot add player to same game twice: {0}'
                     .format(name))
 
-        if self.is_started:
+        if self.started:
             raise GTRError('Cannot add player after game start.')
 
         n = len(self.players)
@@ -1761,6 +1766,43 @@ class Game(object):
 
         self._pump()
 
+    def _calc_winners(self):
+
+        max_score = self._player_score(self.players[0])
+        winners = [self.players[0]]
+
+        for p in self.players[1:]:
+            score = self._player_score(p)
+
+            if score > max_score:
+                max_score = score
+                winners = [p]
+
+            elif score == max_score:
+                winners.append(p)
+
+        if len(winners) > 1:
+
+            max_hand = len(winners[0].hand)
+            real_winners =  [winners[0]]
+
+            for p in winners:
+                hand = len(p.hand)
+
+                if hand > max_hand:
+                    max_hand = hand
+                    real_winners = [p]
+
+                elif hand == max_hand:
+                    real_winners.append(p)
+
+            return real_winners
+
+        else:
+            return winners
+
+
+
 
     def _end_game(self):
         """ The game is over. This determines a winner.
@@ -1773,10 +1815,22 @@ class Game(object):
         lg.info('\n')
         self._log('Game over.')
         for p in self.players:
-            lg.info('Score for player {} : {}'.format(p.name, self._player_score(p)))
-            self._log('Score for player {} : {}'.format(p.name, self._player_score(p)))
+            self._log('Player {0} scores {1}'.format(p.name, self._player_score(p)))
         lg.info('\n')
-        raise GTRError('Game over.')
+
+        winners = self._calc_winners()
+        if len(winners) == 1:
+            self._log('{0} has won the game with {1} points.'
+                    .format(winners[0].name, self._player_score(winners[0])))
+        elif len(winners) > 1:
+            self._log('There is a TIE between players ' +
+                    ', '.join([p.name for p in winners[:-1]]) + 
+                    ' and {0} with {1} points.'
+                    .format(winners[-1].name, self._player_score(winners[-1])))
+
+        self.winners = winners
+
+        raise GameOver()
 
 
     def _resolve_building(self, player, building_obj):

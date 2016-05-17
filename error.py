@@ -9,3 +9,6 @@ class GameActionError(GTRError):
 
 class ParsingError(GTRError):
     pass
+
+class GameOver(Exception):
+    pass

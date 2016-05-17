@@ -68,7 +68,7 @@ class GTRServer(object):
         list of JSON objects with the format:
             {'game_id': <id>,
              'players': <player_list>,
-             'started': <is_started>,
+             'started': <started>,
              'host' : <host_uid>}
 
         Errors
@@ -188,7 +188,7 @@ class GTRServer(object):
                 
                 # If the game is started, we need the game state
                 gs = self._get_game_state(user, id_)
-                if gs is not None and self.games[id_].is_started:
+                if gs is not None and self.games[id_].started:
                     self._send_gamestate(user, id_)
 
         elif action == message.REQSTARTGAME:
@@ -243,12 +243,17 @@ class GTRServer(object):
 
             i_active_p = game.active_player_index
 
+            if game.finished:
+                self._send_error(user, 'Game {0} has finished.'.format(game_id))
+
             if i_active_p == player_index:
                 try:
                     game.handle(command.action)
                 except GTRError as e:
                     lg.warning(e.message)
                     self._send_error(user, e.message)
+                except GameOver:
+                    lg.info('Game {0} has ended.'.format(game_id))
 
                 self._save_backup()
 
@@ -303,7 +308,7 @@ class GTRServer(object):
             lg.warning('User {0:s} is not part of game {1:d}'.format(username, game_id))
             return None
 
-        if game.is_started:
+        if game.started:
             username = self._userinfo(user)['name']
 
             gs_privatized = game.privatized_game_state_copy(username)
@@ -372,7 +377,7 @@ class GTRServer(object):
         game_list = []
         for i, game in enumerate(self.games):
             players = [p.name for p in game.players]
-            started = game.is_started
+            started = game.started
             host = game.host
             game_list.append(GameRecord(i, players, started, host))
         
@@ -386,7 +391,7 @@ class GTRServer(object):
         except IndexError:
             raise GTRError('Tried to start non-existent game {0:d}'.format(game))
 
-        if game.is_started:
+        if game.started:
             raise GTRError('Game already started')
 
         name = self._userinfo(user)['name']
