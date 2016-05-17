@@ -158,9 +158,8 @@ class Game(object):
             try:
                 method(a)
             except GTRError as e:
-                lg.debug('Error handling action')
-                lg.debug(str(e))
-                return
+                lg.debug('Error handling action: '+e.message)
+                raise
 
 
     def privatized_game_state_copy(self, player_name):
@@ -468,18 +467,20 @@ class Game(object):
         self.game_log.append(time+msg)
 
     def _pump(self):
+        """Pop the top frame from the stack into self._current_frame
+        and execute the function.
+        """
         if self.stack.stack:
             try:
-                frame = self.stack.stack.pop()
+                self._current_frame = self.stack.stack.pop()
             except IndexError:
                 lg.warning('Tried to pop from empty stack!')
                 raise
 
-            lg.debug('Pop stack frame: ' + str(frame))
-            #print 'Pop stack frame: ' + str(frame)
+            lg.debug('Execute next stack frame: ' + str(self._current_frame))
 
-            func = getattr(self, frame.function_name)
-            func.__call__(*frame.args)
+            func = getattr(self, self._current_frame.function_name)
+            func.__call__(*self._current_frame.args)
 
     def _advance_turn(self):
         """ Moves the leader index, prints game state, saves, and pushes the next turn.
@@ -822,17 +823,17 @@ class Game(object):
 
     def _check_oot_allowed(self, player):
         """Checks if the player can start a site out of town. Here are the
-        conditions for oot being allowed.
+        conditions for oot being allowed:
 
-        There is another perform_role_action stack frame below this with the
-        same player.
+            - There is another perform_role_action stack frame below this with the
+            same player.
 
-        A perform_clientele_action frame of the same role and player.
+            - A perform_clientele_action frame of the same role and player.
 
-        A perform_clientele_action frame of same player, and role Merchant
-        and we have a Ludus Magnus.
+            - A perform_clientele_action frame of same player, and role Merchant
+            and we have a Ludus Magnus.
 
-        We have a Tower.
+            - We have a Tower.
 
         This checks the top stack frame, so call this after popping the action
         in which you want to know if out-of-town is allowed.
@@ -850,7 +851,21 @@ class Game(object):
         if f.function_name == '_perform_role_action':
             p, role = f.args
 
-            if p.name == player.name and role == self.role_led:
+            current_function = self._current_frame.function_name
+            if current_function != '_perform_role_action':
+                lg.warning('Called _check_oot_allowed during action: {0}'
+                        .format(current_function))
+                return False
+
+            current_player = self._current_frame.args[0]
+
+            if current_player.name != player.name:
+                lg.warning('Called _check_oot_allowed for wrong player.')
+                return False
+
+            current_role = self._current_frame.args[1]
+
+            if p.name == player.name and role == current_role:
                 return True
 
         if f.function_name == '_perform_clientele_action':
@@ -1296,6 +1311,7 @@ class Game(object):
             self._log_construct(p, foundation, material, site, ' from hand')
 
             if b.complete:
+                lg.debug('{0} completes {1!s}'.format(p.name, b))
                 self._log('{0} completed.'.format(str(b)))
                 self._resolve_building(p, b)
 
@@ -1806,6 +1822,4 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.stack.push_frame('_perform_craftsman_action', player)
-
-        self._pump()
+                self.stack.push_frame('_perform_role_action', player, 'Craftsman')

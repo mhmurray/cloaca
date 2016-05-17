@@ -5,9 +5,9 @@ from cloaca.player import Player
 from cloaca.building import Building
 from cloaca.zone import Zone
 import cloaca.card_manager as cm
+from cloaca.error import GTRError
 
 import cloaca.message as message
-from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -105,7 +105,8 @@ class TestThinkerOrLead(unittest.TestCase):
         mon.modified(self.game)
 
         # Player 1
-        self.game.handle(b)
+        with self.assertRaises(GTRError):
+            self.game.handle(b)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -240,7 +241,8 @@ class TestLeadRole(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -256,7 +258,8 @@ class TestLeadRole(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -272,7 +275,8 @@ class TestLeadRole(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -288,9 +292,11 @@ class TestLeadRole(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
+
 
 class TestPalace(unittest.TestCase):
     """Test leading multiple actions with Palace.
@@ -377,7 +383,9 @@ class TestPalace(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', n_actions, *cards)
-        self.game.handle(a)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -394,17 +402,20 @@ class TestPalace(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 1, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 2, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
         a = message.GameAction(message.LEADROLE, 'Craftsman', 4, *cards)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -506,7 +517,8 @@ class TestFollow(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -555,13 +567,12 @@ class TestFollow(unittest.TestCase):
         
         a = message.GameAction(message.FOLLOWROLE, False, 1, latrine, insula)
 
-        self.game.handle(a)
-
         # Monitor the gamestate for any changes
         mon = Monitor()
         mon.modified(self.game)
 
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 

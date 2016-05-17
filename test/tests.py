@@ -3,6 +3,7 @@
 import unittest
 import logging
 import logging.config
+import sys
 
 # Set up logging. See logging.json for config
 def setup_logging(
@@ -21,13 +22,20 @@ def setup_logging(
         logging.basicConfig(level=default_level)
 
 
-def main():
+def main(pattern_):
     setup_logging()
 
+    print 'Testing only files matching : \''+str(pattern_)+'\''
+
     loader = unittest.defaultTestLoader
-    suites = loader.discover('.', pattern='*.py')
+    suites = loader.discover('.', pattern=pattern_)
     test_suite = unittest.TestSuite(suites)
     test_runner = unittest.TextTestRunner().run(test_suite)
 
 if __name__ == '__main__':
-    main()
+    try:
+        pattern = sys.argv[1]
+    except IndexError:
+        pattern = '*.py'
+
+    main(pattern)

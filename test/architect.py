@@ -5,11 +5,11 @@ from cloaca.player import Player
 from cloaca.building import Building
 from cloaca.zone import Zone
 from cloaca.card import Card
+from cloaca.error import GTRError
 
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -136,7 +136,8 @@ class TestArchitect(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.ARCHITECT, latrine, None, 'Rubble', False)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -153,7 +154,8 @@ class TestArchitect(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.ARCHITECT, atrium, None, 'Rubble', False)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -170,7 +172,8 @@ class TestArchitect(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.ARCHITECT, foundry, atrium, None, False)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -187,7 +190,8 @@ class TestArchitect(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.ARCHITECT, foundry, atrium, 'Brick', False)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -205,7 +209,8 @@ class TestArchitect(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete', False)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 

@@ -3,11 +3,11 @@
 from cloaca.game import Game
 from cloaca.player import Player
 from cloaca.building import Building
+from cloaca.error import GTRError
 
 import cloaca.card_manager as cm
 
 import cloaca.message as message
-from cloaca.message import GameActionError
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
@@ -135,7 +135,8 @@ class TestLegionary(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEGIONARY, jack)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
@@ -150,7 +151,8 @@ class TestLegionary(unittest.TestCase):
         mon.modified(self.game)
 
         a = message.GameAction(message.LEGIONARY, latrine)
-        self.game.handle(a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 

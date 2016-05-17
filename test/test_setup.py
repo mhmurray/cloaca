@@ -84,7 +84,7 @@ def two_player_lead(role, clientele=[], buildings=[]):
                 others = cm.get_cards_of_material(foundation.material)
                 others.remove(foundation)
                 materials = others[:foundation.value]
-                b = Building(foundation, None, others, None, True)
+                b = Building(foundation, foundation.material, others, None, True)
                 p.buildings.append(b)
             
 

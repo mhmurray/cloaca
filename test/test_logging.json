@@ -40,7 +40,7 @@
     },
 
     "root": {
-        "level": "ERROR",
+        "level": "DEBUG",
         "handlers": ["console"]
     }
 }
