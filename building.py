@@ -61,10 +61,3 @@ class Building:
         site's material and Marble.
         """
         return material == self.site or material == self.foundation.material
-
-    def add_material(self, card):
-        """Add the card to the building materials Zone.
-        
-        Does not check legality.
-        """
-        self.materials.append(card)

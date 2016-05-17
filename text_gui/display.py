@@ -7,6 +7,129 @@ from collections import Counter
 import card_manager as cm
 from gtrutils import get_detailed_zone_summary, get_building_info, get_short_zone_summary, get_detailed_card_summary
 
+def get_short_zone_summary(string_list, n_letters=3):
+    """Return a single-line string with n-letter card abbreviations and numbers
+    of card instances.
+
+    Note that n_letters=3 activates the coloring of the output text. 4-letter
+    strings are not colorized.
+    """
+    counter = collections.Counter(string_list)
+    cards_string = ', '.join(
+            ['{0}[{1:d}]'.format(card[:n_letters], cnt) for card, cnt in counter.items()])
+    return cards_string
+
+def get_detailed_card_summary(card, count=None):
+    """Return a single-line string to describe one card in detail.
+    """
+
+    card_string = '{0:<4}'.format(card.name[:4])
+    if count:
+        card_string += '[{0:d}]'.format(count)
+    if card.name not in ('Jack', 'Card'):
+        function = card.text
+        card_string += ' | {0}'.format(card.material[:3])
+        card_string += '-{0}'.format(card.role[:3])
+        card_string += '-{0}'.format(card.value)
+        card_string += ' | ' + (function if len(function)<50 else function[:47] + '...')
+    return card_string
+
+def get_detailed_zone_summary(zone):
+    """Return a multi-line description of cards in zone.
+    """
+
+    counter = collections.Counter([c.name for c in zone])
+    counter_dict = dict(counter)
+    cards = counter_dict.keys()
+    cards.sort() # alphabetize
+    #zone_string = '  Card      | Mat-Rol-$ | Description \n'
+    zone_string = ''
+    for card in cards:
+        count = counter_dict[card]
+        zone_string += '  * ' + get_detailed_card_summary(cm.get_card(card), count)
+        zone_string += '\n'
+    return zone_string
+
+def get_building_info(building):
+    """ Return a string to describe a building """
+    if not building.foundation:
+        return ''
+    title_card = building.foundation
+    function = title_card.text
+    value = title_card.value
+    title_material = title_card.material
+
+    info = '  * {0!s} | {1}-{2:d} | '.format(title_card, title_material[:3], value)
+    if building.site:
+        info += '{0} site + '.format(building.site)
+
+    # Materials : "Concrete site + C_" for a wall with one concrete added.
+    info += ''.join([c.material for c in building.materials])
+    info += '_' * (value-len(building.materials))
+
+    info += ' | ' + function[:40]
+    return info
+
+def colorize_role(any_string):
+    """ Applies color to the role string (eg. 'Legionary', 'Laborer', etc.)
+    """
+    # The alteration operator | is never greedy. That is, it will take the
+    # first match it finds. Thus, we need to make sure there are no overlaps
+    # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
+    role_regex_color_dict = {
+      r'\b([Ll]egionaries|[Ll]egionary|[Ll]eg|LEGIONARIES|LEGIONARY|LEG)\b' : ('red',None),
+      r'\b([Ll]aborers?|[Ll]ab|LABORERS?|LAB)\b' : ('yellow',None),
+      r'\b([Cc]raftsmen|[Cc]raftsman|[Cc]ra|CRAFTSMEN|CRAFTSMAN|CRA)\b' : ('green',None),
+      r'\b([Aa]rchitects?|[Aa]rc|ARCHITECTS?|ARC)\b' : ('white',None),
+      r'\b([Mm]erchants?|[Mm]er|MERCHANTS?|MER)\b' : ('cyan',None),
+      r'\b([Pp]atrons?|[Pp]at|PATRONS?|PAT)\b' : ('magenta',None),
+      r'\b([Jj]acks?|JACKS?)\b' : ('grey','on_white'),
+    }
+
+    out_string=any_string
+    for k,v in role_regex_color_dict.items():
+        out_string = re.sub(k,lambda x : termcolor.colored(x.group(0),color=v[0],
+          on_color=v[1],attrs=['bold']), out_string)
+
+    return out_string
+
+def colorize_material(any_string):
+    """ Applies color to the material string (eg. 'Stone', 'Rub', etc.)
+    """
+    # The alteration operator | is never greedy. That is, it will take the
+    # first match it finds. Thus, we need to make sure there are no overlaps
+    # with earlier regexes. Eg, "Legionary|Leg", not "Leg|Legionary"
+    material_regex_color_dict = {
+      r'\b([Bb]ricks?|[Bb]ri|BRICKS?|BRI)\b' : ('red',None),
+      r'\b([Rr]ubble|[Rr]ub|RUBBLE|RUB)\b' : ('yellow',None),
+      r'\b([Ww]ood|[Ww]oo|WOOD|WOO)\b' : ('green',None),
+      r'\b([Cc]oncrete|[Cc]on|CONCRETE|CON)\b' : ('white',None),
+      r'\b([Ss]tone|[Ss]to|STONE|STO)\b' : ('cyan',None),
+      r'\b([Mm]arble|[Mm]ar|MARBLE|MAR)\b' : ('magenta',None),
+    }
+
+    out_string=any_string
+    for k,v in material_regex_color_dict.items():
+        out_string = re.sub(k,lambda x : termcolor.colored(x.group(0),color=v[0],
+          on_color=v[1],attrs=['bold']), out_string)
+
+    return out_string
+
+
+class RoleColorFilter(logging.Filter):
+    """ This is a filter which colorizes roles with ANSI color sequences.
+    """
+    def filter(self, record):
+        record.msg = colorize_role(record.msg)
+        return True
+
+class MaterialColorFilter(logging.Filter):
+    """ This is a filter which colorizes roles with ANSI color sequences.
+    """
+    def filter(self, record):
+        record.msg = colorize_material(record.msg)
+        return True
+
 class GameStateTextDisplay(object):
     """Display class for GameState objects.
 

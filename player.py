@@ -77,17 +77,6 @@ class Player:
                 .format(self.name, foundation))
         return b
 
-    def get_building_by_name(self, name):
-        """Gets the Building object from the foundation card name.
-        """
-        b = next( (b for b in self.buildings if b.foundation.name == name), None)
-        try:
-            b = matches[0]
-        except IndexError:
-            raise GTRError('{0} doesn\'t own a {1}.'
-                .format(self.name, foundation_name))
-        return b
-
     @property
     def stairwayed_buildings(self):
         """ Returns a list of Building objects that have a material added
