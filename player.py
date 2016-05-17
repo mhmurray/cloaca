@@ -6,17 +6,12 @@ this class does not enforce anything more than physical limitations,
 like failing to get a card from an empty stack.
 """
 
-from gtrutils import get_card_from_zone, GTRError
-from gtrutils import get_short_zone_summary
-from gtrutils import get_detailed_card_summary
-from gtrutils import get_building_info
-from gtrutils import get_detailed_zone_summary
 import card_manager
 from building import Building
 from zone import Zone
+from error import GTRError
 
 import logging
-import collections
 
 lg = logging.getLogger(__name__)
 lg.addHandler(logging.NullHandler())
@@ -41,10 +36,7 @@ class Player:
         self.performed_craftsman = False
 
     def __repr__(self):
-        rep = ('Player(name={name!r}, hand={hand!r}, stockpile={stockpile!r}, '
-               'clientele={clientele!r}, vault={vault!r}, camp={camp!r}, '
-               'buildings={buildings!r}, influence={influence!r})')
-        return rep.format(**self.__dict__)
+        return 'Player({uid!r}, {name!r})'.format(**self.__dict__)
 
     def __str__(self):
         return self.name

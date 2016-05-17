@@ -5,7 +5,7 @@ from cloaca.player import Player
 from cloaca.building import Building
 
 import cloaca.message as message
-from cloaca.message import parse_action, GameAction, Command
+from cloaca.message import GameAction, Command
 from cloaca.error import GTRError, ParsingError, GameActionError
 
 from cloaca.test.monitor import Monitor

@@ -9,6 +9,10 @@ class Building:
     remain as well. A complete building must retain a memory of its site
     so that we know the material composition in the future.
 
+    Even when the building is complete, the site is left attached, so that
+    the material composition can be tracked. A copy must be made to add
+    to player's influence.
+
     Attributes:
         foundation -- (Card) foundation of the building.
         site -- (str) site the building is built on, eg. 'Wood'.
@@ -48,7 +52,7 @@ class Building:
         """Return True if a material has been added by the Stairway."""
         return len(self.stairway_materials) > 0
 
-    def is_composed_of(self, material):
+    def composed_of(self, material):
         """Return True if the building is composed of the specified material.
 
         That is, this material is allowed to be added to complete it.
@@ -57,12 +61,6 @@ class Building:
         site's material and Marble.
         """
         return material == self.site or material == self.foundation.material
-
-    def pop_site(self):
-        """Remove and return this building's site."""
-        card = self.site
-        self.site = None
-        return card
 
     def add_material(self, card):
         """Add the card to the building materials Zone.

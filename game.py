@@ -1,6 +1,5 @@
 from player import Player
 import gtrutils
-from gtrutils import check_petition_combos, get_card_from_zone
 import card_manager as cm
 from building import Building
 from card import Card
@@ -403,7 +402,7 @@ class Game(object):
         b = next( (b for b in _active_buildings if b.foundation.name == 'Gate'), None)
         if b is not None:
             incomplete_marble = (b for b in player.incomplete_buildings if
-                                 b.is_composed_of('Marble'))
+                                 b.composed_of('Marble'))
             _active_buildings.extend(incomplete_marble)
 
         return _active_buildings
@@ -731,7 +730,8 @@ class Game(object):
             raise invalid_combo_error
 
         # This will allow n_left = n_on = 0 and n_off = []
-        if not check_petition_combos(n_left, n_on, n_off_list, has_circus, True):
+        if not gtrutils.check_petition_combos(n_left, n_on, n_off_list,
+                has_circus, True):
             raise invalid_combo_error
         
 
