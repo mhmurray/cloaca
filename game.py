@@ -1807,13 +1807,6 @@ class Game(object):
     def _end_game(self):
         """ The game is over. This determines a winner.
         """
-        lg.info('      =================  ')
-        lg.info('   ====== GAME OVER =====')
-        lg.info('      =================  ')
-        lg.info('  The only winner is Rome.')
-        lg.info('  Glory to Rome!')
-        lg.info('\n')
-        self._log('Game over.')
         for p in self.players:
             self._log('Player {0} scores {1}'.format(p.name, self._player_score(p)))
         lg.info('\n')
@@ -1828,6 +1821,7 @@ class Game(object):
                     ' and {0} with {1} points.'
                     .format(winners[-1].name, self._player_score(winners[-1])))
 
+        self._log('Game over. Glory to Rome!')
         self.winners = winners
 
         raise GameOver()
