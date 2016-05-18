@@ -1,6 +1,7 @@
 from twisted.application import internet, service
 from twisted.internet import protocol
 from twisted.web import resource, server, static
+from twisted.web.util import redirectTo, Redirect
 from twisted.protocols.basic import NetstringReceiver
 from twisted.python import components
 from twisted.internet.protocol import ServerFactory, Protocol
@@ -293,6 +294,72 @@ class NoPassLogin(resource.Resource):
             lg.debug('Couldn\'t remove session with uid {0!s}'
                     .format(session.uid))
 
+class MockAuthServerPage(resource.Resource):
+    """Fake auth server to test OIDC."""
+
+    def render_POST(self, request):
+        resp_type = request.args['response_type'][0]
+        client_id = request.args['client_id'][0]
+        redirect_uri = request.args['redirect_uri'][0]
+        response_mode = request.args['response_mode'][0]
+        scope = request.args['scope'][0]
+        state = request.args['state'][0]
+        nonce = request.args['nonce'][0]
+
+        print str(request.args)
+        if scope.find('openid') == -1:
+            return 'Error forming OpenID request : scope does not contain "openid"'
+        else:
+            jwt = 'test token'
+
+            page = ('<h1>OpenID Connect Request</h1><p>{0} requests access to {1}. Okay?</p>'
+                    '<form action="{2}", method="post">'
+                        '<input type="submit" value="Allow access"></input>'
+                        '<input type="hidden" name="id_token" value="{3}"</input>'
+                        '<input type="hidden" name="state" value="{4}"</input>"'
+                    '</form>'
+                    .format(client_id, scope, redirect_uri, jwt, state))
+
+            print page
+            return page
+
+    render_GET = render_POST
+
+class MockLoginPage(resource.Resource):
+    """Login page that uses OIDC on the simulated MockAuthServerPage."""
+    
+    def render_GET(self, request):
+        state = 'gen_random_state'
+        nonce = 'gen_random_nonce'
+
+        url = ('/mockauth'
+            '?client_id=MockLogin'
+            '&response_type=id_token'
+            '&scope=openid email'
+            '&redirect_uri=/mocklogincallback'
+            '&response_mode=form_post'+\
+            '&state={0}'
+            '&nonce={1}'
+            .format(state, nonce))
+
+        return redirectTo(url, request)
+
+class MockLoginCallbackPage(resource.Resource):
+    """Callback for the mock OIDC auth provider to send the JWT."""
+
+    def render_POST(self, request):
+        print str(request.args)
+        id_token = request.args['id_token'][0]
+        state = request.args['state'][0]
+
+        if state != 'get_random_state':
+            return ('Got token, but state does not match.'
+                    '<br>token: {0}<br>state: {1}'
+                    .format(id_token, state))
+        else:
+            return ('Got token, and valid "state".'
+                    '<br>token: {0}<br>state: {1}'
+                    .format(id_token, state))
 
 class Logout(resource.Resource):
     def render_GET(self, request):
@@ -309,6 +376,10 @@ root.putChild("js", static.File('site/js'))
 root.putChild('user', GetUser())
 root.putChild('login', NoPassLogin())
 root.putChild('logout', Logout())
+root.putChild('mockauth', MockAuthServerPage())
+root.putChild('mocklogin', MockLoginPage())
+root.putChild('mocklogincallback', MockLoginCallbackPage())
+
 site = server.Site(root)
 
 #reactor.listenTCP(5050, site)
