@@ -154,8 +154,7 @@ _action_args_dict = {
             (Card, 'material'), (str, 'site') ), () ),
 
     STAIRWAY       : GTRActionSpec('stairway',
-        (   (str, 'player'), (Card, 'building'),
-            (Card, 'material'), (bool, 'from_pool') ), () ),
+        (   (Card, 'building'), (Card, 'material'), (bool, 'from_pool') ), () ),
     }
 
 

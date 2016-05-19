@@ -196,6 +196,19 @@ class Game(object):
                          if p.name==player_name]
         return players_match[0] if len(players_match) else None
 
+    def _find_players_building(self, foundation):
+        """Return (player, building) with specified foundation Card.
+        """
+        for p in self.players:
+            try:
+                b = p.get_building(foundation)
+            except GTRError:
+                continue
+            else:
+                return p, b
+
+        return None, None
+
     def _find_player(self, name):
         """Return the Player object with the specified name or None if no
         such player is in the game.
@@ -1359,26 +1372,31 @@ class Game(object):
         """ Handles a Stairway move.
 
         If player, building, or material is None, skip the action.
+        player_name is ignored.
         """
-        player, foundation, material, from_pool = a.args
+        foundation, material, from_pool = a.args
 
         p = self.active_player
 
-        if player is None or foundation is None or material is None:
-            self._log('{0} chooses to skip use of Stairway.'.format(p.name))
-            self._pump()
+        if foundation is None or material is None:
+            self._log('{0} skips Stairway.'.format(p.name))
 
-        b = player.get_building(foundation)
-        zone = self.pool if from_pool else p.stockpile
-
-        zone.move_card(material, b.stairway_materials)
-
-        if from_pool:
-            self._log('{0} uses Stairway to add {1} from the pool to {2}\'s {3}.' 
-                .format(p.name, material, player.name, foundation))
         else:
-            self._log('{0} uses Stairway to add {1} to {2}\'s {3}.' 
-                .format(p.name, material, player.name, foundation))
+            player, b = self._find_players_building(foundation)
+            if b is None or p is None:
+                raise GTRError('Building named for Stairway addition not found: {0}'
+                        .format(foundation.name))
+
+            zone = self.pool if from_pool else p.stockpile
+
+            zone.move_card(material, b.stairway_materials)
+
+            if from_pool:
+                self._log('{0} uses Stairway to add {1} from the pool to {2}\'s {3}.' 
+                    .format(p.name, material, player.name, foundation))
+            else:
+                self._log('{0} uses Stairway to add {1} to {2}\'s {3}.' 
+                    .format(p.name, material, player.name, foundation))
 
         self._pump()
 
