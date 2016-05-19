@@ -42,10 +42,21 @@ def standard_deck():
     return _get_deck()
         
 
-def get_card(name):
-    """Return a card with the specified name, but unspecified id.
+def get_card(name, copy=0):
+    """Return the card of the specified name and relative
+    index. If the first Dock card is 12, say, then 
+    get_card('Dock', 2) returns Card(ident=14).
+
+    Raise IndexError if copy is larger than the number
+    of those cards.
     """
-    return card.Card(standard_deck().index(name))
+    c = card.Card(standard_deck().index(name)+copy)
+    if c.name != name:
+        raise IndexError('There are not {0!s} copies of {1} in the deck.'
+                .format(copy+1, name))
+    else:
+        return c
+
 
 def get_cards(card_names):
     """Return a tuple of cards with the specified names, and the first
