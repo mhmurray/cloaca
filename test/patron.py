@@ -19,8 +19,6 @@ class TestPatron(unittest.TestCase):
     """
 
     def setUp(self):
-        """ This is run prior to every test.
-        """
         self.game = test_setup.two_player_lead('Patron')
         self.p1, self.p2 = self.game.players
 

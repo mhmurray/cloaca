@@ -221,10 +221,10 @@ class TestStairway(unittest.TestCase):
 
         self.p1.hand.set_content([d.circus0])
 
-        a = GameAction(message.ARCHITECT, d.circus0, None, 'Wood', False)
+        a = GameAction(message.ARCHITECT, d.circus0, None, 'Wood')
         self.game.handle(a)
 
-        a = GameAction(message.STAIRWAY, d.shrine0, d.bath0, False)
+        a = GameAction(message.STAIRWAY, d.shrine0, d.bath0)
         self.game.handle(a)
 
         self.assertIn('Bath', self.p2.get_building(d.shrine0).stairway_materials)
@@ -238,10 +238,10 @@ class TestStairway(unittest.TestCase):
 
     def test_stairway_alone(self):
         d = self.deck
-        a = GameAction(message.ARCHITECT, None, None, None, False)
+        a = GameAction(message.ARCHITECT, None, None, None)
         self.game.handle(a)
 
-        a = GameAction(message.STAIRWAY, d.tower0, d.storeroom0, False)
+        a = GameAction(message.STAIRWAY, d.tower0, d.storeroom0)
         self.game.handle(a)
 
         self.assertIn('Storeroom', self.p2.get_building(d.tower0).stairway_materials)
@@ -252,16 +252,244 @@ class TestStairway(unittest.TestCase):
 
 
     def test_skip_stairway(self):
-        a = GameAction(message.ARCHITECT, None, None, None, False)
+        a = GameAction(message.ARCHITECT, None, None, None)
         self.game.handle(a)
 
-        a = GameAction(message.STAIRWAY, None, None, False)
+        a = GameAction(message.STAIRWAY, None, None)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
+class TestPrison(unittest.TestCase):
+    """Test completeing a prison and stealing buildings.
+    """
+    
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
 
+        self.game = test_setup.two_player_lead('Craftsman',
+                buildings=[[],['foundry0', 'temple0']],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.buildings.append(
+                Building(d.prison0, 'Stone', materials=[d.garden, d.garden]))
+
+        self.p1.hand.set_content([d.villa0])
+
+        a = message.GameAction(message.CRAFTSMAN, d.prison0, d.villa0, None)
+        self.game.handle(a)
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Prison'))
+        self.assertEqual(self.game.expected_action, message.PRISON)
+        self.assertIn('Stone', self.p1.influence)
+
+
+    def test_prison_steal(self):
+        """Test completing a prison to steal a building that doesn't do anything.
+        """
+        d = self.deck
+
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Temple'))
+
+        a = message.GameAction(message.PRISON, d.temple0)
+        self.game.handle(a)
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Temple'))
+        self.assertFalse(self.game._player_has_active_building(self.p2, 'Temple'))
+
+        self.assertNotIn('Stone', self.p1.influence)
+        self.assertIn('Stone', self.p2.influence)
+
+
+    def test_prison_no_steal(self):
+        """Test completing a prison and skipping the building steal.
+        """
+        a = message.GameAction(message.PRISON, None)
+        self.game.handle(a)
+
+        self.assertTrue(self.game._player_has_active_building(self.p2, 'Temple'))
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Temple'))
+
+        self.assertIn('Stone', self.p1.influence)
+
+
+    def test_prison_steal_and_resolve_building(self):
+        """Test completing a prison to steal a building with an
+        Upon completion ability, which is triggered again.
+        """
+        d = self.deck
+
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Foundry'))
+
+        a = message.GameAction(message.PRISON, d.foundry0)
+        self.game.handle(a)
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Foundry'))
+        self.assertFalse(self.game._player_has_active_building(self.p2, 'Foundry'))
+
+        self.assertNotIn('Stone', self.p1.influence)
+        self.assertIn('Stone', self.p2.influence)
+
+        self.assertEqual(self.game.active_player, self.p1)
+        self.assertEqual(self.game.expected_action, message.LABORER)
+
+
+class TestAcademy(unittest.TestCase):
+    """Test thinker at the end of the turn with Academy.
+    """
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Craftsman',
+                buildings=[['academy0'],[]],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.dock0])
+
+
+    def test_thinker_after_craftsman(self):
+        d = self.deck
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
+        self.assertEqual(self.game.active_player, self.p1)
+
+        a = message.GameAction(message.SKIPTHINKER, False)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p1)
+
+        # thinker for jack
+        a = message.GameAction(message.THINKERTYPE, True)
+        self.game.handle(a)
+
+        self.assertIn('Jack', self.p1.hand)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_skip_thinker_after_craftsman(self):
+        d = self.deck
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
+        self.assertEqual(self.game.active_player, self.p1)
+
+        a = message.GameAction(message.SKIPTHINKER, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_no_thinker_after_skipping_craftsman(self):
+        d = self.deck
+
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+class TestAqueduct(unittest.TestCase):
+    """Test Aqueduct.
+    """
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Patron',
+                buildings=[['Aqueduct'],[]])
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.influence.append('Concrete') #two_player_lead doesn't set this.
+        self.p1.hand.set_content([d.dock0])
+        self.game.pool.set_content([d.wall0])
+
+
+    def test_patron_from_hand_and_pool(self):
+        d = self.deck
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.wall0)
+        self.game.handle(a)
+
+        self.assertNotIn('Wall', self.game.pool)
+        self.assertIn('Wall', self.p1.clientele)
+
+        a = message.GameAction(message.PATRONFROMHAND, d.dock0)
+        self.game.handle(a)
+
+        self.assertNotIn('Dock', self.p1.hand)
+        self.assertIn('Dock', self.p1.clientele)
+
+        self.assertEqual(self.game._clientele_limit(self.p1), 8)
+
+
+    def test_patron_from_hand_only(self):
+        d = self.deck
+
+        a = message.GameAction(message.PATRONFROMPOOL, None)
+        self.game.handle(a)
+
+        self.assertIn('Wall', self.game.pool)
+        self.assertNotIn('Wall', self.p1.clientele)
+
+        a = message.GameAction(message.PATRONFROMHAND, d.dock0)
+        self.game.handle(a)
+
+        self.assertNotIn('Dock', self.p1.hand)
+        self.assertIn('Dock', self.p1.clientele)
+
+        self.assertEqual(self.game._clientele_limit(self.p1), 8)
+
+
+class TestArchway(unittest.TestCase):
+    """Test Aqueduct.
+    """
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Architect',
+                buildings=[['Archway'],[]])
+
+        self.p1, self.p2 = self.game.players
+
+        self.game.pool.set_content([d.wall0])
+
+        self.p1.buildings.append(Building(d.storeroom0, 'Concrete'))
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Archway'))
+
+    def test_add_material_from_pool(self):
+        d = self.deck
+
+        a = message.GameAction(message.ARCHITECT, d.storeroom0, d.wall0, None)
+        self.game.handle(a)
+
+        self.assertNotIn('Wall', self.game.pool)
+        self.assertIn('Wall', self.p1.buildings[1].materials)
+
+
+
+    
 if __name__ == '__main__':
     unittest.main()
 

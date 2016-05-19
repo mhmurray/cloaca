@@ -49,7 +49,6 @@ class Game(object):
         self.players = []
         self.leader_index = None
         self.turn_number = 0
-        self.is_role_led = False
         self.role_led = None
         self.active_player = None
         self.turn_index = 0
@@ -534,6 +533,10 @@ class Game(object):
             max_hand_size += 4
 
         return max_hand_size
+
+    def _await_prison(self):
+        self.expected_action = message.PRISON
+        return
 
     def _perform_optional_thinker_action(self, player):
         """ Thinker using Academy at the end of turn in which player used Craftsman.
@@ -1333,21 +1336,26 @@ class Game(object):
                 self._log('{0} completed.'.format(str(b)))
                 self._resolve_building(p, b)
 
+            p.performed_craftsman = True
+
             self._pump()
 
 
     def _handle_architect(self, a):
         """Skip the action by making foundation = None.
         """
-        foundation, material, site, from_pool = a.args
+        foundation, material, site = a.args
 
         p = self.active_player
 
         if foundation:
-            if from_pool:
-                material_zone, s = self.pool, ' from pool'
+            if material is None:
+                material_zone, s = None, ''
             else:
-                material_zone, s = p.stockpile, ' from stockpile'
+                if material in self.pool:
+                    material_zone, s = self.pool, ' from pool'
+                else:
+                    material_zone, s = p.stockpile, ' from stockpile'
 
             b = self._construct(p, foundation, material, site, material_zone)
             self._log('{0} performs Architect.'.format(p.name))
@@ -1374,7 +1382,7 @@ class Game(object):
         If player, building, or material is None, skip the action.
         player_name is ignored.
         """
-        foundation, material, from_pool = a.args
+        foundation, material = a.args
 
         p = self.active_player
 
@@ -1386,6 +1394,8 @@ class Game(object):
             if b is None or p is None:
                 raise GTRError('Building named for Stairway addition not found: {0}'
                         .format(foundation.name))
+
+            from_pool = material in self.pool
 
             zone = self.pool if from_pool else p.stockpile
 
@@ -1762,6 +1772,35 @@ class Game(object):
             self._do_kids_in_pool(self.players[kip_next])
 
 
+    def _handle_prison(self, a):
+        building = a.args[0]
+        player = self.active_player
+
+        if building is None:
+            self._log('{0} doesn\'t steal anything with Prison, keeping the '
+                    'influence points.'
+                    .format(player.name))
+        else:
+            p, b = self._find_players_building(building)
+            if p is None or b is None:
+                raise GTRError('Building chosen for Prison doesn\'t exist: {0}'
+                        .format(building.name))
+
+            else:
+                i = p.buildings.index(b)
+                player.buildings.append(p.buildings.pop(i))
+                
+                i = player.influence.index('Stone')
+                p.influence.append(player.influence.pop(i))
+
+                self._log('{0} steals {1}\'s {2} with Prison.'
+                        .format(player.name, p.name, str(b)))
+
+                self._resolve_building(player, b)
+
+        self._pump()
+
+
     def _end_turn(self):
         # players in reverse order
         players = self._players_in_turn_order()[::-1]
@@ -1780,7 +1819,7 @@ class Game(object):
 
         if p.performed_craftsman and has_academy:
             p.peformed_craftsman = False
-            self.perform_optional_thinker(p)
+            self.stack.push_frame('_perform_optional_thinker_action', p)
 
         self._pump()
 
@@ -1889,3 +1928,8 @@ class Game(object):
 
             for _ in range(n):
                 self.stack.push_frame('_perform_role_action', player, 'Craftsman')
+
+        elif str(building_obj) == 'Prison':
+            self.stack.push_frame('_await_prison')
+
+

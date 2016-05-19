@@ -40,6 +40,7 @@ STARTGAME       = 31
 REQGAMELIST     = 32
 GAMELIST        = 33
 SERVERERROR     = 34
+PRISON          = 35
 
 # A dictionary of the number of arguments for each action type
 # and their signature.
@@ -130,12 +131,13 @@ _action_args_dict = {
     GIVECARDS      : GTRActionSpec('givecards',      (), (Card, 'cards') ),
     USESEWER       : GTRActionSpec('usesewer',       (), (Card, 'c1') ),
     LEGIONARY      : GTRActionSpec('legionary',      (), (Card, 'from_hand') ),
+    PRISON         : GTRActionSpec('prison',         ( (Card, 'building_to_steal'), ), () ),
     LABORER        : GTRActionSpec('laborer',
         ( (Card, 'from_hand'), (Card, 'from_pool') ), () ),
 
     ARCHITECT      : GTRActionSpec('architect',
         (   (Card, 'building'), (Card, 'material'),
-            (str, 'site'), (bool, 'from_pool') ), () ),
+            (str, 'site') ), () ),
 
     CRAFTSMAN      : GTRActionSpec('craftsman',
         (   (Card, 'building'), (Card, 'material'), (str, 'site') ), () ),
@@ -154,7 +156,7 @@ _action_args_dict = {
             (Card, 'material'), (str, 'site') ), () ),
 
     STAIRWAY       : GTRActionSpec('stairway',
-        (   (Card, 'building'), (Card, 'material'), (bool, 'from_pool') ), () ),
+        (   (Card, 'building'), (Card, 'material') ), () ),
     }
 
 

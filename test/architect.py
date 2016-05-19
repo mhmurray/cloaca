@@ -21,8 +21,6 @@ class TestArchitect(unittest.TestCase):
     """
 
     def setUp(self):
-        """ This is run prior to every test.
-        """
         self.game = test_setup.two_player_lead('Architect')
         self.p1, self.p2 = self.game.players
 
@@ -36,7 +34,7 @@ class TestArchitect(unittest.TestCase):
     def test_skip_action(self):
         """ An action with (None, None, None, False) skips.
         """
-        a = message.GameAction(message.ARCHITECT, None, None, None, False)
+        a = message.GameAction(message.ARCHITECT, None, None, None)
         self.game.handle(a)
 
         self.assertEqual(self.game.leader_index, 1)
@@ -49,7 +47,7 @@ class TestArchitect(unittest.TestCase):
         latrine = cm.get_card('Latrine')
         self.p1.hand.set_content([latrine])
 
-        a = message.GameAction(message.ARCHITECT, latrine, None, 'Rubble', False)
+        a = message.GameAction(message.ARCHITECT, latrine, None, 'Rubble')
         self.game.handle(a)
 
         self.assertNotIn(latrine, self.p1.hand)
@@ -67,7 +65,7 @@ class TestArchitect(unittest.TestCase):
         self.p1.stockpile.set_content([atrium])
         self.p1.buildings = [Building(foundry, 'Brick')]
 
-        a = message.GameAction(message.ARCHITECT, foundry, atrium, None, False)
+        a = message.GameAction(message.ARCHITECT, foundry, atrium, None)
         self.game.handle(a)
 
         self.assertNotIn('Atrium', self.p1.stockpile)
@@ -91,7 +89,7 @@ class TestArchitect(unittest.TestCase):
         self.p1.stockpile.set_content([statue])
         self.p1.buildings = [Building(temple, 'Marble', materials=[stairway])]
 
-        a = message.GameAction(message.ARCHITECT, temple, statue, None, False)
+        a = message.GameAction(message.ARCHITECT, temple, statue, None)
         self.game.handle(a)
 
         self.assertNotIn(statue, self.p1.stockpile)
@@ -110,7 +108,7 @@ class TestArchitect(unittest.TestCase):
         self.p1.stockpile.set_content([statue])
         self.p1.buildings = [Building(temple, 'Marble', materials=[fountain,stairway])]
 
-        a = message.GameAction(message.ARCHITECT, temple, statue, None, False)
+        a = message.GameAction(message.ARCHITECT, temple, statue, None)
         self.game.handle(a)
 
         self.assertNotIn(statue, self.p1.stockpile)
@@ -135,7 +133,7 @@ class TestArchitect(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.ARCHITECT, latrine, None, 'Rubble', False)
+        a = message.GameAction(message.ARCHITECT, latrine, None, 'Rubble')
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -153,7 +151,7 @@ class TestArchitect(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.ARCHITECT, atrium, None, 'Rubble', False)
+        a = message.GameAction(message.ARCHITECT, atrium, None, 'Rubble')
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -171,7 +169,7 @@ class TestArchitect(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.ARCHITECT, foundry, atrium, None, False)
+        a = message.GameAction(message.ARCHITECT, foundry, atrium, None)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -189,7 +187,7 @@ class TestArchitect(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.ARCHITECT, foundry, atrium, 'Brick', False)
+        a = message.GameAction(message.ARCHITECT, foundry, atrium, 'Brick')
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -208,7 +206,7 @@ class TestArchitect(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete', False)
+        a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete')
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -229,7 +227,7 @@ class TestArchitectClientele(unittest.TestCase):
     def test_skip_client(self):
         """ Skip action and client action for p1.
         """
-        a = message.GameAction(message.ARCHITECT, None, None, None, False)
+        a = message.GameAction(message.ARCHITECT, None, None, None)
         self.game.handle(a)
 
         self.assertEqual(self.game.active_player, self.p1)
@@ -249,13 +247,13 @@ class TestArchitectClientele(unittest.TestCase):
         self.p1.stockpile.set_content([wall, storeroom])
         self.p1.buildings = [Building(tower, 'Concrete')]
 
-        a = message.GameAction(message.ARCHITECT, tower, wall, None, False)
+        a = message.GameAction(message.ARCHITECT, tower, wall, None)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0],
                 Building(tower, 'Concrete', materials=[wall]))
 
-        a = message.GameAction(message.ARCHITECT, tower, storeroom, None, False)
+        a = message.GameAction(message.ARCHITECT, tower, storeroom, None)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0],
@@ -269,12 +267,12 @@ class TestArchitectClientele(unittest.TestCase):
         self.p1.stockpile.set_content([wall])
         self.p1.hand.set_content([tower])
 
-        a = message.GameAction(message.ARCHITECT, tower, None, 'Concrete', False)
+        a = message.GameAction(message.ARCHITECT, tower, None, 'Concrete')
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0], Building(tower, 'Concrete'))
 
-        a = message.GameAction(message.ARCHITECT, tower, wall, None, False)
+        a = message.GameAction(message.ARCHITECT, tower, wall, None)
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0],
@@ -287,13 +285,13 @@ class TestArchitectClientele(unittest.TestCase):
         tower, bridge = cm.get_cards(['Tower', 'Bridge'])
         self.p1.hand.set_content([tower, bridge])
 
-        a = message.GameAction(message.ARCHITECT, tower, None, 'Concrete', False)
+        a = message.GameAction(message.ARCHITECT, tower, None, 'Concrete')
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0], Building(tower, 'Concrete'))
         self.assertEqual(self.game.expected_action, message.ARCHITECT)
 
-        a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete', False)
+        a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete')
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[1],
@@ -316,7 +314,7 @@ class TestArchitectClientele(unittest.TestCase):
 
         self.game.oot_allowed = True
 
-        a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete', False)
+        a = message.GameAction(message.ARCHITECT, bridge, None, 'Concrete')
         self.game.handle(a)
 
         self.assertEqual(self.p1.buildings[0], Building(bridge, 'Concrete'))
@@ -336,12 +334,12 @@ class TestArchitectClientele(unittest.TestCase):
         self.p2.buildings = [Building(tower, 'Concrete')]
 
         # Skip p1 architects
-        a = message.GameAction(message.ARCHITECT, None, None, None, False)
+        a = message.GameAction(message.ARCHITECT, None, None, None)
         self.game.handle(a)
         self.game.handle(a)
 
 
-        a = message.GameAction(message.ARCHITECT, tower, wall, None, False)
+        a = message.GameAction(message.ARCHITECT, tower, wall, None)
         self.game.handle(a)
 
         self.assertEqual(self.p2.buildings[0],
