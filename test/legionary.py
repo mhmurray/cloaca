@@ -204,6 +204,9 @@ class TestLegionary(unittest.TestCase):
 
 
 class TestLegionaryPalisade(unittest.TestCase):
+    """The Palisade allows you to not give cards with legionary.
+    You still may.
+    """
 
     def setUp(self):
         self.deck = TestDeck()
@@ -225,18 +228,38 @@ class TestLegionaryPalisade(unittest.TestCase):
 
 
     def test_legionary_palisade(self):
-        """Palisade makes p2 immune.
+        """Palisade makes p2 immune, but a GIVECARDS action is still
+        necessary, since it's an option to lose cards even if immune
+        to Legionary.
         """
         d = self.deck
 
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
         self.assertIn(d.bar0, self.p2.hand)
+        self.assertIn(d.insula0, self.p1.stockpile)
+
+
+    def test_legionary_palisade_give_cards_anyway(self):
+        d = self.deck
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.bar0)
+        self.game.handle(a)
+
+        self.assertIn(d.bar0, self.p1.stockpile)
         self.assertIn(d.insula0, self.p1.stockpile)
 
 
 class TestLegionaryWall(unittest.TestCase):
     """Tests the Wall for immunity to legionary, not for interaction with
     Bridge and not for the extra points from the stockpile.
+
+    It is allowed to give cards even if you are immune with a Wall.
     """
 
     def setUp(self):
@@ -263,8 +286,26 @@ class TestLegionaryWall(unittest.TestCase):
         """
         d = self.deck
 
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
         self.assertIn(d.bar0, self.p2.hand)
+        self.assertIn(d.insula0, self.p1.stockpile)
+
+
+    def test_legionary_wall_give_cards_anyway(self):
+        """Wall makes p2 immune, but p2 chooses to give cards in hand.
+        """
+        d = self.deck
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.bar0)
+        self.game.handle(a)
+
+        self.assertIn(d.bar0, self.p1.stockpile)
         self.assertIn(d.insula0, self.p1.stockpile)
 
 
@@ -310,25 +351,6 @@ class TestLegionaryBridgePalisade(unittest.TestCase):
         self.assertIn(d.latrine0, self.p1.stockpile)
 
 
-    def test_legionary_palisade(self):
-        """Even if no cards are given from the hand, a GIVECARDS action
-        is necessary if the player is not immune.
-        """
-        d = self.deck
-
-        self.p1.hand.set_content([d.road0])
-        self.p2.stockpile.set_content([d.latrine0])
-
-        a = message.GameAction(message.LEGIONARY, d.road0)
-        self.game.handle(a)
-
-        a = message.GameAction(message.GIVECARDS)
-        self.game.handle(a)
-
-        self.assertNotIn(d.latrine0, self.p2.stockpile)
-        self.assertIn(d.latrine0, self.p1.stockpile)
-
-
     def test_bridge_multiple_choices(self):
         """Bridge takes a card from stockpile. It doesn't matter which
         one if there's a choice.
@@ -370,6 +392,7 @@ class TestLegionaryBridgeWall(unittest.TestCase):
         self.game.pool.set_content([d.insula0])
 
         self.p2.hand.set_content([d.bar0])
+        self.p2.stockpile.set_content([d.bar1])
 
         a = message.GameAction(message.LEGIONARY, d.road0)
         self.game.handle(a)
@@ -380,8 +403,27 @@ class TestLegionaryBridgeWall(unittest.TestCase):
         """
         d = self.deck
 
-        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
         self.assertIn(d.bar0, self.p2.hand)
+        self.assertIn(d.insula0, self.p1.stockpile)
+
+
+    def test_legionary_bridge_wall_give_cards_anyway(self):
+        """Wall makes p2 immune, but p2 gives cards anyway,
+        including from stockpile.
+        """
+        d = self.deck
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.bar0, d.bar1)
+        self.game.handle(a)
+
+        self.assertIn(d.bar0, self.p1.stockpile)
         self.assertIn(d.insula0, self.p1.stockpile)
 
 
