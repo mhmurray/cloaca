@@ -123,7 +123,7 @@ _action_args_dict = {
     USELATRINE     : GTRActionSpec('uselatrine',     ( (Card, 'to_discard'), ), () ),
     USEVOMITORIUM  : GTRActionSpec('usevomitorium',  ( (bool, 'discard_all'), ), () ),
     USEFOUNTAIN    : GTRActionSpec('usefountain',    ( (bool, 'use_fountain'), ), () ),
-    USESENATE      : GTRActionSpec('usesenate',      ( (bool, 'use_senate'), ), () ),
+    USESENATE      : GTRActionSpec('usesenate',      (), (Card, 'jacks') ),
     BARORAQUEDUCT  : GTRActionSpec('baroraqueduct',  ( (bool, 'bar_first'), ), () ),
     PATRONFROMPOOL : GTRActionSpec('patronfrompool', ( (Card, 'from_pool'), ), () ),
     PATRONFROMDECK : GTRActionSpec('patronfromdeck', ( (bool, 'from_deck'), ), () ),

@@ -1635,6 +1635,114 @@ class TestScriptorium(unittest.TestCase):
         self.assertIn('Stone', p1.influence)
 
 
+class TestSenate(unittest.TestCase):
+
+    def test_take_jack_with_senate(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Laborer',
+                buildings=[[],['Senate']],
+                deck = d)
+
+        p1, p2 = game.players
+        p2.hand.set_content([])
+        jack_led = p1.camp.cards[0]
+
+        self.assertTrue(game._player_has_active_building(p2, 'Senate'))
+        self.assertEqual(len(p2.hand), 0)
+
+        a = message.GameAction(message.LABORER, None, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.USESENATE)
+        self.assertEqual(game.active_player, p2)
+
+        a = message.GameAction(message.USESENATE, True)
+        game.handle(a)
+
+        self.assertIn(jack_led, p2.hand)
+
+
+    def test_skip_take_jack_with_senate(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Laborer',
+                buildings=[[],['Senate']],
+                deck = d)
+
+        p1, p2 = game.players
+        p2.hand.set_content([])
+        jack_led = p1.camp.cards[0]
+
+        self.assertTrue(game._player_has_active_building(p2, 'Senate'))
+        self.assertEqual(len(p2.hand), 0)
+
+        a = message.GameAction(message.LABORER, None, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.USESENATE)
+        self.assertEqual(game.active_player, p2)
+
+        a = message.GameAction(message.USESENATE, False)
+        game.handle(a)
+
+        self.assertIn(jack_led, game.jacks)
+        self.assertNotIn('Jack', p2.hand)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+    
+    def test_three_players_one_with_senate(self):
+        """Three players, only one has Senate.
+        """
+        d = TestDeck()
+
+        game = test_setup.n_player_lead(3, 'Laborer',
+                buildings=[[],['Senate'], []],
+                deck = d)
+
+        p1, p2, p3 = game.players
+
+        # n_player_lead has the others think for a Jack
+        p2.hand.set_content([])
+        p3.hand.set_content([])
+        jack_led = p1.camp.cards[0]
+
+        self.assertTrue(game._player_has_active_building(p2, 'Senate'))
+        self.assertFalse(game._player_has_active_building(p3, 'Senate'))
+        self.assertEqual(len(p2.hand), 0)
+        self.assertEqual(len(p3.hand), 0)
+
+        a = message.GameAction(message.LABORER, None, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.USESENATE)
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(len(game.senate_resp_indices), 1)
+
+        a = message.GameAction(message.USESENATE, False)
+        game.handle(a)
+
+        print game.senate_resp_indices
+
+        self.assertEqual(len(game.senate_resp_indices), 0)
+
+        self.assertIn(jack_led, game.jacks)
+        self.assertNotIn('Jack', p2.hand)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+        self.assertEqual(game.expected_action, message.USESENATE)
+        self.assertEqual(game.active_player, p2)
+
+        a = message.GameAction(message.USESENATE, True)
+        game.handle(a)
+
+        self.assertIn(jack_led, p2.hand)
+        self.assertNotIn('Jack', game.jacks)
+
+
 class TestStatue(unittest.TestCase):
 
     def test_statue_start_on_marble(self):
