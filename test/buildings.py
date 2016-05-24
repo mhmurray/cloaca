@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""Tests related to buildings. Some buildings are tested in 
+separate modules.
+
+Legionary buildings Bridge, Coliseum, and Palisade are in legionary.py.
+Circus is in turn.py.
+
+"""
+
 from cloaca.game import Game
 from cloaca.player import Player
 from cloaca.building import Building
@@ -16,8 +24,9 @@ from cloaca.test.test_setup import TestDeck
 
 import unittest
 
+
 class TestBuilding(unittest.TestCase):
-    """Test Building objects.
+    """Test Building code objects, rather than specific building rules.
     """
 
     def test_create_building(self):
@@ -406,8 +415,6 @@ class TestAcademy(unittest.TestCase):
 
 
 class TestAqueduct(unittest.TestCase):
-    """Test Aqueduct.
-    """
 
     def setUp(self):
         self.deck = TestDeck()
@@ -460,8 +467,6 @@ class TestAqueduct(unittest.TestCase):
 
 
 class TestArchway(unittest.TestCase):
-    """Test Aqueduct.
-    """
 
     def setUp(self):
         self.deck = TestDeck()
@@ -488,8 +493,1502 @@ class TestArchway(unittest.TestCase):
         self.assertIn('Wall', self.p1.buildings[1].materials)
 
 
+class TestAtrium(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Merchant',
+                buildings=[['Atrium'],[]])
+
+        self.p1, self.p2 = self.game.players
+
+        self.game.library.set_content([d.dock0, d.road0, d.road1])
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Atrium'))
+
+
+    def test_merchant_from_deck(self):
+        d = self.deck
+        a = message.GameAction(message.MERCHANT, None, None, True)
+        self.game.handle(a)
+
+        self.assertNotIn(d.dock0, self.game.library)
+        self.assertIn(d.dock0, self.p1.vault)
+    
+
+class TestBar(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Patron',
+                buildings=[['Bar'],[]])
+
+        self.p1, self.p2 = self.game.players
+
+        self.game.library.set_content([d.dock0])
+        self.game.pool.set_content([d.wall0])
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Bar'))
+
+    def test_patron_from_pool_and_deck(self):
+        d = self.deck
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.wall0)
+        self.game.handle(a)
+
+        self.assertNotIn(d.wall0, self.game.pool)
+        self.assertIn(d.wall0, self.p1.clientele)
+
+        a = message.GameAction(message.PATRONFROMDECK, True)
+        self.game.handle(a)
+
+        self.assertNotIn(d.dock0, self.game.library)
+        self.assertIn(d.dock0, self.p1.clientele)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_patron_from_deck_only(self):
+        d = self.deck
+
+        a = message.GameAction(message.PATRONFROMPOOL, None)
+        self.game.handle(a)
+
+        self.assertIn(d.wall0, self.game.pool)
+        self.assertNotIn(d.wall0, self.p1.clientele)
+
+        a = message.GameAction(message.PATRONFROMDECK, True)
+        self.game.handle(a)
+
+        self.assertNotIn(d.dock0, self.game.library)
+        self.assertIn(d.dock0, self.p1.clientele)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
 
     
+    def test_skip_all_patrons(self):
+        d = self.deck
+
+        a = message.GameAction(message.PATRONFROMPOOL, None)
+        self.game.handle(a)
+
+        self.assertIn(d.wall0, self.game.pool)
+        self.assertNotIn(d.wall0, self.p1.clientele)
+
+        a = message.GameAction(message.PATRONFROMDECK, False)
+        self.game.handle(a)
+
+        self.assertIn(d.dock0, self.game.library)
+        self.assertNotIn(d.dock0, self.p1.clientele)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+class TestBasilica(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Merchant',
+                buildings=[['Basilica'],[]])
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.stockpile.set_content([d.dock0])
+        self.p1.hand.set_content([d.road0])
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Basilica'))
+
+
+    def test_merchant_from_hand_and_stockpile(self):
+        d = self.deck
+        a = message.GameAction(message.MERCHANT, d.dock0, d.road0, False)
+        self.game.handle(a)
+
+        self.assertNotIn(d.dock0, self.p1.stockpile)
+        self.assertIn(d.dock0, self.p1.vault)
+
+        self.assertNotIn(d.road0, self.p1.hand)
+        self.assertIn(d.road0, self.p1.vault)
+
+
+    def test_merchant_from_hand_only(self):
+        d = self.deck
+        a = message.GameAction(message.MERCHANT, None, d.road0, False)
+        self.game.handle(a)
+
+        self.assertIn(d.dock0, self.p1.stockpile)
+        self.assertNotIn(d.dock0, self.p1.vault)
+
+        self.assertNotIn(d.road0, self.p1.hand)
+        self.assertIn(d.road0, self.p1.vault)
+    
+
+    def test_merchant_from_stockpile_only(self):
+        d = self.deck
+        a = message.GameAction(message.MERCHANT, d.dock0, None, False)
+        self.game.handle(a)
+
+        self.assertNotIn(d.dock0, self.p1.stockpile)
+        self.assertIn(d.dock0, self.p1.vault)
+
+        self.assertIn(d.road0, self.p1.hand)
+        self.assertNotIn(d.road0, self.p1.vault)
+
+
+class TestCircusMaximus(unittest.TestCase):
+
+    def nothing(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Patron',
+                buildings=[['Circus Maximus'],['Circus Maximus']])
+
+        self.p1, self.p2 = self.game.players
+
+        self.game.library.set_content([d.dock0])
+        self.game.pool.set_content([d.wall0])
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Bar'))
+
+
+    def test_double_clientele_actions_leading(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Laborer',
+                buildings=[['Circus Maximus'],[]],
+                clientele=[['Insula'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        game.pool.set_content([d.road0, d.road1, d.road2])
+
+        for card in [d.road0, d.road1, d.road2]:
+            a = message.GameAction(message.LABORER, None, card)
+            game.handle(a)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+
+    def test_double_clientele_actions_following(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Laborer',
+                buildings=[[], ['Circus Maximus']],
+                clientele=[[], ['Bar', 'Bar']],
+                follow = True,
+                deck = d)
+
+        p1, p2 = game.players
+
+        game.pool.set_content([d.road0, d.road1, d.road2, d.road3, d.road4])
+
+        self.assertEqual(game.expected_action, message.LABORER)
+        self.assertEqual(game.active_player, p1)
+
+        # Laborer for nothing with p1
+        a = message.GameAction(message.LABORER, None, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.LABORER)
+        self.assertEqual(game.active_player, p2)
+
+        for card in [d.road0, d.road1, d.road2, d.road3, d.road4]:
+            a = message.GameAction(message.LABORER, None, card)
+            game.handle(a)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+
+    def test_single_clientele_actions_not_following(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Laborer',
+                buildings=[[], ['Circus Maximus']],
+                clientele=[[], ['Bar', 'Bar']],
+                deck = d)
+
+        p1, p2 = game.players
+
+        game.pool.set_content([d.road0, d.road1, d.road2])
+
+        self.assertTrue(game._player_has_active_building(p2, 'Circus Maximus'))
+        self.assertEqual(game.expected_action, message.LABORER)
+        self.assertEqual(game.active_player, p1)
+
+        # Laborer for nothing with p1
+        a = message.GameAction(message.LABORER, None, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.LABORER)
+        self.assertEqual(game.active_player, p2)
+
+        # Only two clients, but Circus Maximus isn't active when not following.
+        for card in [d.road0, d.road1]:
+            a = message.GameAction(message.LABORER, None, card)
+            game.handle(a)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+
+    def test_complete_circus_maximus_on_lead_doubles_clientele(self):
+        """Completing the Circus Maximus with the lead action
+        causes the clientele to be doubled.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Craftsman',
+                buildings=[[], []],
+                clientele=[['Dock'], []],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.garden0, d.bar0, d.bar1])
+        p1.buildings.append(Building(d.circusmaximus0, 'Stone',
+                materials = [d.villa, d.villa]))
+
+        self.assertFalse(game._player_has_active_building(p1, 'Circus Maximus'))
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(game.active_player, p1)
+
+        # Finish with lead action
+        a = message.GameAction(message.CRAFTSMAN, d.circusmaximus0, d.garden0, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Circus Maximus'))
+
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(game.active_player, p1)
+        
+        # Start and finish a Bar
+        a = message.GameAction(message.CRAFTSMAN, d.bar0, None, 'Rubble')
+        game.handle(a)
+        a = message.GameAction(message.CRAFTSMAN, d.bar0, d.bar1, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+
+    def test_complete_circus_maximus_doubles_remaining_clientele(self):
+        """Completing the Circus Maximus with a clientele action
+        causes the remaining clientele to be doubled, but not the one
+        that just completed the action.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Craftsman',
+                buildings=[[], []],
+                clientele=[['Dock', 'Dock'], []],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.garden0, d.garden1, d.bar0, d.bar1])
+        p1.buildings.append(Building(d.circusmaximus0, 'Stone',
+                materials = [d.villa]))
+
+        self.assertFalse(game._player_has_active_building(p1, 'Circus Maximus'))
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(game.active_player, p1)
+
+        # Finish CM with lead action and first clientele
+        a = message.GameAction(message.CRAFTSMAN, d.circusmaximus0, d.garden0, None)
+        game.handle(a)
+        a = message.GameAction(message.CRAFTSMAN, d.circusmaximus0, d.garden1, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Circus Maximus'))
+
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(game.active_player, p1)
+        
+        # Start and finish a Bar
+        a = message.GameAction(message.CRAFTSMAN, d.bar0, None, 'Rubble')
+        game.handle(a)
+        a = message.GameAction(message.CRAFTSMAN, d.bar0, d.bar1, None)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(game.active_player, p2)
+
+
+    def test_circus_maximus_legionary_count(self):
+        """Legionary rolls all actions into one demand, revealing many
+        cards at once. To do this, it needs to know if the Circus Maximus
+        is in effect.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Legionary',
+                buildings=[['Circus Maximus'], []],
+                clientele=[['Shrine'], []],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.garden0, d.garden1, d.bar0])
+        p2.hand.set_content([d.villa0, d.villa1, d.road0])
+
+        self.assertTrue(game._player_has_active_building(p1, 'Circus Maximus'))
+        self.assertEqual(game.expected_action, message.LEGIONARY)
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.legionary_count, 3)
+
+        # Demand three materials with legionary + doubled client
+        a = message.GameAction(message.LEGIONARY, d.garden0, d.garden1, d.bar0)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.GIVECARDS)
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.legionary_count, 3)
+
+        # Give three cards
+        a = message.GameAction(message.GIVECARDS, d.villa0, d.villa1, d.road0)
+        game.handle(a)
+
+
+    def test_circus_maximus_exceed_legionary_count(self):
+        """Legionary rolls all actions into one demand, revealing many
+        cards at once. To do this, it needs to know if the Circus Maximus
+        is in effect. Try to illegally demand too many cards.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Legionary',
+                buildings=[['Circus Maximus'], []],
+                clientele=[['Shrine'], []],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.garden0, d.garden1, d.bar0, d.bar1])
+        p2.hand.set_content([d.villa0, d.villa1, d.road0])
+
+        self.assertTrue(game._player_has_active_building(p1, 'Circus Maximus'))
+        self.assertEqual(game.expected_action, message.LEGIONARY)
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.legionary_count, 3)
+
+        mon = Monitor()
+        mon.modified(game)
+
+        # Demand three materials with legionary + doubled client
+        a = message.GameAction(message.LEGIONARY, d.garden0, d.garden1, d.bar0, d.bar1)
+        with self.assertRaises(GTRError):
+            game.handle(a)
+
+        self.assertFalse(mon.modified(game))
+
+
+class TestGate(unittest.TestCase):
+
+    def test_gate_activates_marble_buildings(self):
+        d = TestDeck()
+        game = test_setup.simple_two_player()
+        p1, p2 = game.players
+
+        p1.buildings.append(Building(d.temple0, 'Marble'))
+        p1.buildings.append(Building(d.statue0, 'Rubble'))
+        p1.buildings.append(Building(d.basilica0, 'Basilica'))
+
+        self.assertFalse(game._player_has_active_building(p1, 'Temple'))
+        self.assertFalse(game._player_has_active_building(p1, 'Statue'))
+        self.assertFalse(game._player_has_active_building(p1, 'Basilica'))
+
+        p1.buildings.append(Building(d.gate, 'Brick', complete=True))
+
+        self.assertTrue(game._player_has_active_building(p1, 'Temple'))
+        self.assertTrue(game._player_has_active_building(p1, 'Statue'))
+        self.assertTrue(game._player_has_active_building(p1, 'Basilica'))
+
+        self.assertEqual(game._max_hand_size(p1), 9)
+        self.assertEqual(game._player_score(p1), 5) # Statue points
+
+
+    def test_complete_buidling_already_active_with_gate(self):
+        """Complete a building that's already active because of Gate.
+        """
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman',
+                buildings=[['Gate'],[]],
+                deck=d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.stairway0])
+        
+        b_temple = Building(d.temple0, 'Marble', materials=[d.temple1, d.statue0])
+        p1.buildings.append(b_temple)
+
+        p1.buildings.append(Building(d.gate, 'Brick', complete=True))
+
+        self.assertTrue(game._player_has_active_building(p1, 'Temple'))
+        self.assertNotIn(b_temple, p1.complete_buildings)
+
+        a = message.GameAction(message.CRAFTSMAN, d.temple0, d.stairway0, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Temple'))
+        self.assertIn(b_temple, p1.complete_buildings)
+
+
+class TestForum(unittest.TestCase):
+    """Forum is continuously active once constructed. The cases where conditions
+    change such that the Forum could be active are:
+
+    *)  Patron a new client (from hand, deck, or pool)
+    *)  Finish a Forum building.
+    *)  Finish a Gate, activating an incomplete Forum.
+    *)  Finish a Ludus Magna or Storeroom that allows a combination
+        of clients satisfying the Forum.
+    *)  Stairway an opponent's forum
+    *)  Stairway a Gate, activating an incomplete Forum.
+    *)  Stairway a Ludus Magna or Storeroom, allowing the correct
+        clientele combination
+    *)  Stealing a Forum with a Prison.
+    *)  Stealing a Gate, activating an incomplete Forum.
+    *)  Stealing a Ludus Magna or Storeroom, allowing the correct
+        clientele combination
+    *)  Starting a Forum with an active Gate.
+
+    """
+    
+    def test_patron_from_pool_satisfying_forum(self):
+        """Patron the final client to satisfy a Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa']
+        g = test_setup.two_player_lead('Patron',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        g.pool.set_content([d.temple0])
+
+        p1.influence.extend(['Stone', 'Marble']) # Need room in clientele
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.temple0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_patron_from_hand_satisfying_forum(self):
+        """Patron the final client to satisfy a Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa']
+        g = test_setup.two_player_lead('Patron',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum', 'Aqueduct'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.temple0])
+
+        p1.influence.extend(['Stone', 'Marble']) # Need room in clientele
+
+        a = message.GameAction(message.PATRONFROMPOOL, None)
+        g.handle(a)
+
+        a = message.GameAction(message.PATRONFROMHAND, d.temple0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_patron_from_deck_satisfying_forum(self):
+        """Patron the final client to satisfy a Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa']
+        g = test_setup.two_player_lead('Patron',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum', 'Bar'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        g.library.set_content([d.temple0, d.road0])
+
+        p1.influence.extend(['Stone', 'Marble']) # Need room in clientele
+
+        a = message.GameAction(message.PATRONFROMPOOL, None)
+        g.handle(a)
+
+        a = message.GameAction(message.PATRONFROMDECK, True)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_forum_building_resolution(self):
+        """Finish a Forum building, winning the game.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.stairway0])
+        p1.buildings.append(Building(d.forum0, 'Marble', materials=[d.basilica, d.basilica]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.forum0, d.stairway0, None)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_gate_building_resolution(self):
+        """Finish a Gate building, activating Forum, winning the game.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.shrine0])
+        p1.buildings.append(Building(d.forum0, 'Marble', materials=[d.basilica, d.basilica]))
+        p1.buildings.append(Building(d.gate0, 'Brick', materials=[d.shrine]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.gate0, d.shrine0, None)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_build_ludus_satisfying_forum(self):
+        """Build a Ludus so Merchants can fill out other roles,
+        winning with a Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Villa', 'Villa', 'Garden']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.temple0])
+        p1.buildings.append(Building(d.ludusmagna0, 'Marble',
+                materials=[d.temple, d.temple]))
+
+        p1.influence.extend(['Stone', 'Marble']) # Need room in clientele
+
+        a = message.GameAction(message.CRAFTSMAN, d.ludusmagna0, d.temple0, None)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_build_storeroom_satisfying_forum(self):
+        """Build a Storeroom so Laborer can be filled by another client,
+        winning with a Forum.
+        """
+
+        d = TestDeck()
+
+        p1_clientele = ['Temple', 'Dock', 'Wall', 'Bath', 'Villa', 'Garden']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.wall0])
+        p1.buildings.append(Building(d.storeroom0, 'Concrete',
+                materials=[d.bridge]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.storeroom0, d.wall0, None)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_prison_stealing_forum(self):
+        """Finish a Prison, stealing a Forum with all clientele.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                buildings=[[],['forum0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.garden0])
+        p1.buildings.append(Building(d.prison0, 'Stone', materials=[d.villa, d.villa]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.prison0, d.garden0, None)
+        g.handle(a)
+
+        a = message.GameAction(message.PRISON, d.forum0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_prison_stealing_gate_activating_forum(self):
+        """Finish a Prison, stealing a Gate, activating an incomplete Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                buildings=[[],['gate0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.garden0])
+        p1.buildings.append(Building(d.forum0, 'Marble', materials=[d.basilica, d.basilica]))
+        p1.buildings.append(Building(d.prison0, 'Stone', materials=[d.villa, d.villa]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.prison0, d.garden0, None)
+        g.handle(a)
+
+        a = message.GameAction(message.PRISON, d.gate0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_prison_stealing_storeroom_activating_forum(self):
+        """Finish a Prison, stealing a Storeroom, activating Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Temple', 'Dock', 'Wall', 'Bath', 'Villa', 'Garden']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum'],['storeroom0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.garden0])
+        p1.buildings.append(Building(d.prison0, 'Stone', materials=[d.villa, d.villa]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.prison0, d.garden0, None)
+        g.handle(a)
+
+        a = message.GameAction(message.PRISON, d.storeroom0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_prison_stealing_ludus_activating_forum(self):
+        """Finish a Prison, stealing a Ludus Magna, activating
+        Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Villa', 'Garden', 'Garden']
+        g = test_setup.two_player_lead('Craftsman',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum'],['ludusmagna0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.garden0])
+        p1.buildings.append(Building(d.prison0, 'Stone', materials=[d.villa, d.villa]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.prison0, d.garden0, None)
+        g.handle(a)
+
+        a = message.GameAction(message.PRISON, d.ludusmagna0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_stairway_forum(self):
+        """Add to Forum with Stairway with all client roles.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Architect',
+                clientele=[p1_clientele,[]],
+                buildings=[['Stairway'],['forum0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.stockpile.set_content([d.temple0])
+
+        a = message.GameAction(message.ARCHITECT, None, None, None)
+        g.handle(a)
+
+        a = message.GameAction(message.STAIRWAY, d.forum0, d.temple0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_stairway_gate_activating_forum(self):
+        """Add to Gate with Stairway with all client roles and an
+        incomplete Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Architect',
+                clientele=[p1_clientele,[]],
+                buildings=[['Stairway'],['gate0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.stockpile.set_content([d.bath0])
+        p1.buildings.append(Building(d.forum0, 'Marble', materials=[d.basilica, d.basilica]))
+
+        a = message.GameAction(message.ARCHITECT, None, None, None)
+        g.handle(a)
+
+        a = message.GameAction(message.STAIRWAY, d.gate0, d.bath0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_stairway_ludus_activating_forum(self):
+        """Add to Ludus with Stairway with all client roles and an
+        incomplete Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Villa', 'Villa', 'Garden']
+        g = test_setup.two_player_lead('Architect',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum', 'Stairway'],['ludusmagna0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.stockpile.set_content([d.temple0])
+
+        a = message.GameAction(message.ARCHITECT, None, None, None)
+        g.handle(a)
+
+        a = message.GameAction(message.STAIRWAY, d.ludusmagna0, d.temple0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_stairway_storeroom_activating_forum(self):
+        """Add to Storeroom with Stairway with all client roles and an
+        incomplete Forum.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Temple', 'Dock', 'Wall', 'Bath', 'Villa', 'Garden']
+        g = test_setup.two_player_lead('Architect',
+                clientele=[p1_clientele,[]],
+                buildings=[['Forum', 'Stairway'],['storeroom0']],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.stockpile.set_content([d.wall0])
+
+        a = message.GameAction(message.ARCHITECT, None, None, None)
+        g.handle(a)
+
+        a = message.GameAction(message.STAIRWAY, d.storeroom0, d.wall0)
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_start_forum_with_active_gate(self):
+        """Start Forum with an active Gate.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Architect',
+                clientele=[p1_clientele,[]],
+                buildings=[['Stairway'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.forum0])
+
+        # Active Gate through Stairway
+        p2.buildings.append(Building(d.gate0, 'Brick', stairway_materials=[d.shrine0]))
+
+        a = message.GameAction(message.ARCHITECT, d.forum0, None, 'Marble')
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+    def test_start_forum_on_last_site_with_active_gate(self):
+        """Start Forum with an active Gate.
+        """
+        d = TestDeck()
+
+        p1_clientele = ['Road', 'Dock', 'Wall', 'Bath', 'Villa', 'Temple']
+        g = test_setup.two_player_lead('Architect',
+                clientele=[p1_clientele,[]],
+                buildings=[['Stairway'],[]],
+                deck = d)
+
+        p1, p2 = g.players
+
+        p1.hand.set_content([d.forum0])
+
+        g.in_town_sites = ['Marble']
+
+        # Active Gate through Stairway
+        p2.buildings.append(Building(d.gate0, 'Brick', stairway_materials=[d.shrine0]))
+
+        a = message.GameAction(message.ARCHITECT, d.forum0, None, 'Marble')
+
+        with self.assertRaises(GameOver):
+            g.handle(a)
+
+        self.assertIn(p1, g.winners)
+
+
+class TestLatrine(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.simple_two_player()
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.buildings.append(Building(d.latrine, 'Rubble', complete=True))
+
+        self.p1.hand.set_content([d.road0, d.jack0])
+        self.p2.hand.set_content([d.road1, d.jack1])
+
+
+    def test_discard_on_lead(self):
+        d = self.deck
+
+        a = message.GameAction(message.THINKERORLEAD, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.USELATRINE)
+
+        a = message.GameAction(message.USELATRINE, d.road0)
+        self.game.handle(a)
+
+        self.assertIn(d.road0, self.game.pool)
+        self.assertNotIn(d.road0, self.p1.hand)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p1)
+
+
+    def test_discard_jack(self):
+        d = self.deck
+
+        a = message.GameAction(message.THINKERORLEAD, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.USELATRINE)
+
+        a = message.GameAction(message.USELATRINE, d.jack0)
+        self.game.handle(a)
+
+        self.assertIn(d.jack0, self.game.jacks)
+        self.assertNotIn(d.jack0, self.p1.hand)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p1)
+
+
+    def test_discard_following(self):
+        d = self.deck
+
+        self.p2.buildings.append(Building(d.latrine, 'Rubble', complete=True))
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.FOLLOWROLE, True, 0, None)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.USELATRINE)
+        self.assertEqual(self.game.active_player, self.p2)
+
+        a = message.GameAction(message.USELATRINE, d.road1)
+        self.game.handle(a)
+
+        self.assertIn(d.road1, self.game.pool)
+        self.assertNotIn(d.road1, self.p2.hand)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+class TestMarket(unittest.TestCase):
+
+    def test_initial_limit(self):
+        """Test limit at beginning of game.
+        """
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        self.assertEqual(g._vault_limit(p1), 2)
+        self.assertEqual(g._vault_limit(p2), 2)
+
+
+    def test_limit_with_influence(self):
+        """Test limit with some completed buildings.
+        """
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        p1.influence = ['Stone']
+        p2.influence = ['Rubble']
+
+        self.assertEqual(g._vault_limit(p1), 5)
+        self.assertEqual(g._vault_limit(p2), 3)
+ 
+        p1.influence = ['Wood']
+        p2.influence = ['Marble']
+
+        self.assertEqual(g._vault_limit(p1), 3)
+        self.assertEqual(g._vault_limit(p2), 5)
+ 
+        p1.influence = ['Brick']
+        p2.influence = ['Concrete']
+
+        self.assertEqual(g._vault_limit(p1), 4)
+        self.assertEqual(g._vault_limit(p2), 4)
+ 
+        p1.influence = ['Brick', 'Concrete', 'Marble']
+        p2.influence = ['Concrete', 'Stone', 'Rubble', 'Rubble', 'Rubble']
+
+        self.assertEqual(g._vault_limit(p1), 9)
+        self.assertEqual(g._vault_limit(p2), 10)
+ 
+
+    def test_limit_with_market(self):
+        """Test limit with completed Market.
+        """
+        d = TestDeck()
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        self.assertEqual(g._vault_limit(p1), 2)
+
+        p1.buildings.append(Building(d.market, 'Wood', complete=True))
+
+        self.assertEqual(g._vault_limit(p1), 4)
+
+        p1.influence = ['Stone']
+
+        self.assertEqual(g._vault_limit(p1), 7)
+
+
+class TestRoad(unittest.TestCase):
+
+    def test_add_non_matching_matrials(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Road'],[]],
+                clientele=[['Wall', 'Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.stockpile.set_content([d.road0, d.dock0, d.statue0])
+
+        b = Building(d.coliseum0, 'Stone')
+        p1.buildings.append(b)
+
+        for card in [d.road0, d.dock0, d.statue0]:
+            a = message.GameAction(message.ARCHITECT, d.coliseum0, card, None)
+            game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Coliseum'))
+
+
+class TestScriptorium(unittest.TestCase):
+
+    def test_finish_marble_building_with_one_marble(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Craftsman',
+                buildings=[['Scriptorium'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+        p1.buildings.append(Building(d.basilica0, 'Marble'))
+
+        a = message.GameAction(message.CRAFTSMAN, d.basilica0, d.statue0, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Basilica'))
+        self.assertEqual(len(p1.buildings[1].materials), 1)
+        self.assertIn('Marble', p1.influence)
+
+
+    def test_finish_stone_building_with_one_marble(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Craftsman',
+                buildings=[['Scriptorium'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+        p1.buildings.append(Building(d.villa0, 'Stone'))
+
+        a = message.GameAction(message.CRAFTSMAN, d.villa0, d.statue0, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Villa'))
+        self.assertEqual(len(p1.buildings[1].materials), 1)
+        self.assertIn('Stone', p1.influence)
+
+
+class TestStatue(unittest.TestCase):
+
+    def test_statue_start_on_marble(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                clientele=[['Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+
+        game.in_town_sites = ['Marble', 'Rubble']
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, None, 'Marble')
+        game.handle(a)
+
+        self.assertEqual(p1.buildings[0], Building(d.statue0, 'Marble'))
+        self.assertNotIn('Marble', game.in_town_sites)
+
+
+    def test_statue_start_on_rubble(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                clientele=[['Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+
+        game.in_town_sites = ['Marble', 'Rubble']
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, None, 'Rubble')
+        game.handle(a)
+
+        self.assertEqual(p1.buildings[0], Building(d.statue0, 'Rubble'))
+        self.assertNotIn('Rubble', game.in_town_sites)
+
+
+    def test_statue_start_out_of_town_on_rubble(self):
+        """Start Statue out of town on non-Marble material with
+        remaining in-town Marble sites.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                clientele=[['Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+
+        game.in_town_sites = ['Marble', 'Wood']
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, None, 'Rubble')
+        game.handle(a)
+
+        self.assertEqual(p1.buildings[0], Building(d.statue0, 'Rubble'))
+
+
+    def test_start_and_finish_statue_with_rubble(self):
+        """Start Statue on Rubble and finish it with one Rubble.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                clientele=[['Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+        p1.stockpile.set_content([d.road0])
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, None, 'Rubble')
+        game.handle(a)
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, d.road0, None)
+        game.handle(a)
+
+        self.assertEqual(p1.buildings[0], Building(d.statue0, 'Rubble',
+                materials=[d.road0], complete=True))
+
+        self.assertEqual(game._player_score(p1), 6) # Statue + Rubble site
+
+
+    def test_start_and_finish_rubble_statue_with_marble(self):
+        """Start Statue on Rubble and finish it with one Marble.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                clientele=[['Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.statue0])
+        p1.stockpile.set_content([d.temple0])
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, None, 'Rubble')
+        game.handle(a)
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, d.temple0, None)
+        game.handle(a)
+
+        self.assertEqual(p1.buildings[0], Building(d.statue0, 'Rubble',
+                materials=[d.temple0], complete=True))
+
+
+    def test_statue_score(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Statue'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+        p1.influence.append('Marble') # two_player_lead doesn't add site
+
+        self.assertEqual(game._player_score(p1), 8)
+
+
+    def test_unfinished_statue_score(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[[],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.buildings.append(Building(d.statue0, 'Brick'))
+
+        self.assertEqual(game._player_score(p1), 2)
+
+
+class TestTower(unittest.TestCase):
+
+    def test_add_rubble_to_nonrubble_buildings(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Tower'],[]],
+                clientele=[['Wall', 'Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.stockpile.set_content([d.road0, d.bar0, d.insula0])
+
+        coliseum = Building(d.coliseum0, 'Stone')
+        statue = Building(d.statue0, 'Marble')
+        dock = Building(d.dock0, 'Wood')
+        p1.buildings.extend([coliseum, statue, dock])
+
+        a = message.GameAction(message.ARCHITECT, d.coliseum0, d.road0, None)
+        game.handle(a)
+
+        a = message.GameAction(message.ARCHITECT, d.statue0, d.bar0, None)
+        game.handle(a)
+
+        a = message.GameAction(message.ARCHITECT, d.dock0, d.insula0, None)
+        game.handle(a)
+
+        self.assertIn(d.road0, coliseum.materials)
+        self.assertIn(d.bar0, statue.materials)
+        self.assertIn(d.insula0, dock.materials)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Dock'))
+
+
+    def test_start_out_of_town(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Tower'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.road0])
+        game.in_town_sites = ['Wood']
+
+        a = message.GameAction(message.ARCHITECT, d.road0, None, 'Rubble')
+        game.handle(a)
+
+        self.assertIn('Road', p1.building_names)
+
+
+    def test_finish_tower_then_start_out_of_town(self):
+        """Finish the Tower with the camp action then start out of town
+        with a single client.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Craftsman',
+                clientele=[['Dock'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.buildings.append(Building(d.tower0, 'Concrete', materials=[d.aqueduct]))
+
+        p1.hand.set_content([d.road0, d.storeroom0])
+        game.in_town_sites = ['Wood']
+
+        a = message.GameAction(message.CRAFTSMAN, d.tower0, d.storeroom0, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Tower'))
+
+        a = message.GameAction(message.CRAFTSMAN, d.road0, None, 'Rubble')
+        game.handle(a)
+
+        self.assertIn('Road', p1.building_names)
+
+
+class TestVilla(unittest.TestCase):
+
+    def test_complete_villa_with_architect_using_one_material(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect')
+
+        p1, p2 = game.players
+
+        p1.stockpile.set_content([d.garden0])
+        b = Building(d.villa0, 'Stone')
+        p1.buildings.append(b)
+
+        a = message.GameAction(message.ARCHITECT, d.villa0, d.garden0, None)
+        game.handle(a)
+
+        self.assertTrue(game._player_has_active_building(p1, 'Villa'))
+        self.assertEqual(len(b.materials), 1)
+        self.assertIn('Stone', p1.influence)
+
+
+    def test_add_to_villa_with_craftsman(self):
+        """Adding to Villa with Craftsman will not finish the building.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Craftsman')
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.garden0])
+        p1.buildings.append(Building(d.villa0, 'Stone'))
+
+        a = message.GameAction(message.CRAFTSMAN, d.villa0, d.garden0, None)
+        game.handle(a)
+
+        self.assertFalse(game._player_has_active_building(p1, 'Villa'))
+        self.assertNotIn('Stone', p1.influence)
+
+
+class TestVomitorium(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.simple_two_player()
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.buildings.append(Building(d.vomitorium, 'Concrete', complete=True))
+
+        self.p1.hand.set_content([d.road0, d.jack0])
+        self.p2.hand.set_content([d.road1, d.jack1])
+
+
+    def test_discard_on_lead(self):
+        d = self.deck
+
+        a = message.GameAction(message.THINKERORLEAD, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.USEVOMITORIUM)
+
+        a = message.GameAction(message.USEVOMITORIUM, True)
+        self.game.handle(a)
+
+        self.assertIn(d.road0, self.game.pool)
+        self.assertIn(d.jack0, self.game.jacks)
+        self.assertNotIn(d.road0, self.p1.hand)
+        self.assertNotIn(d.jack0, self.p1.hand)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p1)
+
+
+    def test_discard_following(self):
+        d = self.deck
+
+        self.p2.buildings.append(Building(d.vomitorium, 'Concrete', complete=True))
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.FOLLOWROLE, True, 0, None)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.USEVOMITORIUM)
+        self.assertEqual(self.game.active_player, self.p2)
+
+        a = message.GameAction(message.USEVOMITORIUM, True)
+        self.game.handle(a)
+
+        self.assertIn(d.road1, self.game.pool)
+        self.assertIn(d.jack1, self.game.jacks)
+        self.assertNotIn(d.road1, self.p2.hand)
+        self.assertNotIn(d.jack1, self.p2.hand)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+class TestWall(unittest.TestCase):
+    """Test the extra points from the Wall. The legionary immunity
+    is tested in legionary.py.
+    """
+
+    def test_wall_points(self):
+        d = TestDeck()
+
+        game = test_setup.simple_two_player()
+
+        p1, p2 = game.players
+
+        p1.stockpile.set_content([d.road0, d.road1, d.road2, d.statue0])
+
+        self.assertEqual(game._player_score(p1), 2)
+
+        p1.buildings.append(Building(d.wall, 'Concrete', complete=True))
+
+        self.assertEqual(game._player_score(p1), 4)
+
+        # Round down
+        p1.stockpile.set_content([d.road0, d.road1, d.road2])
+        self.assertEqual(game._player_score(p1), 3)
+
+
+
+
 if __name__ == '__main__':
     unittest.main()
 

@@ -7,10 +7,13 @@ from cloaca.zone import Zone
 from cloaca.card import Card
 import cloaca.card_manager as cm
 
-import test_setup
+import cloaca.test.test_setup as test_setup
+from test_setup import TestDeck
+
+from cloaca.test.monitor import Monitor
 
 import cloaca.message as message
-from cloaca.message import GameActionError
+from cloaca.error import GameActionError, GTRError, GameOver
 
 import unittest
 from cloaca import gtrutils
@@ -362,7 +365,162 @@ class TestCheckPetitionCombos(unittest.TestCase):
         self.assertTrue(  f(6, 1, [2,3,6], True, True))
         self.assertFalse( f(7, 1, [2,3,6], True, True))
 
+
+class TestClienteleLimit(unittest.TestCase):
+
+    def test_initial_limit(self):
+        """Test limit at beginning of game.
+        """
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        self.assertEqual(g._clientele_limit(p1), 2)
+        self.assertEqual(g._clientele_limit(p2), 2)
+
+
+    def test_limit_with_influence(self):
+        """Test limit with some completed buildings.
+        """
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        p1.influence = ['Stone']
+        p2.influence = ['Rubble']
+
+        self.assertEqual(g._clientele_limit(p1), 5)
+        self.assertEqual(g._clientele_limit(p2), 3)
  
+        p1.influence = ['Wood']
+        p2.influence = ['Marble']
+
+        self.assertEqual(g._clientele_limit(p1), 3)
+        self.assertEqual(g._clientele_limit(p2), 5)
+ 
+        p1.influence = ['Brick']
+        p2.influence = ['Concrete']
+
+        self.assertEqual(g._clientele_limit(p1), 4)
+        self.assertEqual(g._clientele_limit(p2), 4)
+ 
+        p1.influence = ['Brick', 'Concrete', 'Marble']
+        p2.influence = ['Concrete', 'Stone', 'Rubble', 'Rubble', 'Rubble']
+
+        self.assertEqual(g._clientele_limit(p1), 9)
+        self.assertEqual(g._clientele_limit(p2), 10)
+ 
+
+    def test_limit_with_insula(self):
+        """Test limit with completed Insula.
+        """
+        d = TestDeck()
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        self.assertEqual(g._clientele_limit(p1), 2)
+
+        p1.buildings.append(Building(d.insula, 'Rubble', complete=True))
+
+        self.assertEqual(g._clientele_limit(p1), 4)
+
+        p1.influence = ['Stone']
+
+        self.assertEqual(g._clientele_limit(p1), 7)
+
+
+    def test_limit_with_aqueduct(self):
+        """Test limit with completed Aqueduct.
+        """
+        d = TestDeck()
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        self.assertEqual(g._clientele_limit(p1), 2)
+
+        p1.buildings.append(Building(d.aqueduct, 'Concrete', complete=True))
+
+        self.assertEqual(g._clientele_limit(p1), 4)
+
+        p1.influence = ['Stone']
+
+        self.assertEqual(g._clientele_limit(p1), 10)
+
+
+    def test_limit_with_insula_and_aqueduct(self):
+        """Test limit with completed Aqueduct.
+        """
+        d = TestDeck()
+
+        g = test_setup.simple_two_player()
+
+        p1, p2 = g.players
+
+        self.assertEqual(g._clientele_limit(p1), 2)
+
+        p1.buildings.append(Building(d.aqueduct, 'Concrete', complete=True))
+        p1.buildings.append(Building(d.insula, 'Rubble', complete=True))
+
+        self.assertEqual(g._clientele_limit(p1), 8)
+
+        p1.influence = ['Stone']
+
+        self.assertEqual(g._clientele_limit(p1), 14)
+
+
+class TestSites(unittest.TestCase):
+    """Test mechanics of sites.
+    """
+
+    def test_start_last_site_ends_game(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.road0])
+        game.in_town_sites = ['Rubble']
+
+        a = message.GameAction(message.ARCHITECT, d.road0, None, 'Rubble')
+        with self.assertRaises(GameOver):
+            game.handle(a)
+
+        self.assertIn('Road', p1.building_names)
+        self.assertIsNotNone(game.winners)
+
+
+    def test_no_more_out_of_town_sites(self):
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Tower'], []],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.dock0])
+
+        game.in_town_sites = ['Rubble']
+        game.out_of_town_sites = ['Rubble']
+
+        mon = Monitor()
+        mon.modified(game)
+
+        a = message.GameAction(message.ARCHITECT, d.dock0, None, 'Wood')
+        with self.assertRaises(GTRError):
+            game.handle(a)
+
+        self.assertFalse(mon.modified(game))
+
+
 
 if __name__ == '__main__':
     unittest.main()

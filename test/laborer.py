@@ -10,29 +10,25 @@ import cloaca.message as message
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
+from test_setup import TestDeck
 
 import unittest
 
 class TestLaborer(unittest.TestCase):
-    """ Test handling laborer responses.
-    """
 
     def setUp(self):
-        """ This is run prior to every test.
+        """This is run prior to every test.
         """
         self.game = test_setup.two_player_lead('Laborer')
         self.p1, self.p2 = self.game.players
 
 
     def test_expects_laborer(self):
-        """ The Game should expect a LABORER action.
-        """
         self.assertEqual(self.game.expected_action, message.LABORER)
 
 
     def test_laborer_one_from_pool(self):
-        """ Take one card from the pool with laborer action.
-        """
+
         atrium = cm.get_card('Atrium')
         self.game.pool.set_content([atrium])
 
@@ -44,7 +40,7 @@ class TestLaborer(unittest.TestCase):
 
     
     def test_laborer_non_existent_card(self):
-        """ Take a non-existent card from the pool with laborer action.
+        """Take a non-existent card from the pool with laborer action.
 
         This invalid game action should leave the game state unchanged.
         """
@@ -58,6 +54,79 @@ class TestLaborer(unittest.TestCase):
             self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
+
+
+class TestLaborerWithDock(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Laborer',
+                buildings=[['Dock'],[]],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+
+    def test_laborer_from_pool_and_hand(self):
+        d = self.deck
+
+        self.game.pool.set_content([d.shrine0])
+        self.p1.hand.set_content([d.foundry0])
+
+        a = message.GameAction(message.LABORER, d.foundry0, d.shrine0)
+        self.game.handle(a)
+
+        self.assertIn(d.shrine0, self.p1.stockpile)
+        self.assertIn(d.foundry0, self.p1.stockpile)
+        
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+
+
+    def test_laborer_hand_only(self):
+        d = self.deck
+
+        self.game.pool.set_content([d.shrine0])
+        self.p1.hand.set_content([d.foundry0])
+
+        a = message.GameAction(message.LABORER, d.foundry0, None)
+        self.game.handle(a)
+
+        self.assertIn(d.shrine0, self.game.pool)
+        self.assertIn(d.foundry0, self.p1.stockpile)
+        
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+
+
+class TestStoreroom(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Laborer',
+                clientele=[['Temple'],[]],
+                buildings=[['Storeroom'],[]],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+
+    def test_laborer_with_storeroom_client(self):
+        d = self.deck
+
+        self.assertTrue(self.game._player_has_active_building(self.p1, 'Storeroom'))
+
+        self.game.pool.set_content([d.shrine0, d.foundry0])
+
+        a = message.GameAction(message.LABORER, None, d.shrine0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LABORER, None, d.foundry0)
+        self.game.handle(a)
+
+        self.assertIn(d.shrine0, self.p1.stockpile)
+        self.assertIn(d.foundry0, self.p1.stockpile)
+        
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+
 
 
 if __name__ == '__main__':

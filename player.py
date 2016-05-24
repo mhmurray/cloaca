@@ -84,26 +84,6 @@ class Player:
         """
         return [b for b in self.buildings if b.is_stairwayed]
 
-    def n_clients(self, role=None, active_buildings=[]):
-        """ Return the number of clients of the specified role. This counts
-        the effect of Storeroom and Ludus Magna, but not Circus Maximus.
-
-        If role is not specified or is None, returns the number of clients
-        of all roles.
-        """
-        if role is None:
-            n_clients = len(self.clientele)
-        elif role == 'Laborer' and 'Storeroom' in active_buildings:
-            n_clients = len(self.clientele)
-        else:
-            n_clients = len(filter(lambda c: c.role == role, self.clientele))
-
-            # Ludus Magna adds to any non-Merchant count.
-            if role != 'Merchant' and 'Ludus Magna' in active_buildings:
-                n_clients += len(filter(lambda c: c.role == 'Merchant', self.clientele))
-
-        return n_clients
-
     @property
     def is_following_or_leading(self):
         return len(self.camp) > 0

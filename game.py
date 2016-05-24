@@ -412,13 +412,13 @@ class Game(object):
         this list might contain buildings with the same name.
         """
         _active_buildings = player.complete_buildings
-        for player in self.players:
-            _active_buildings.extend(player.stairwayed_buildings)
+        for player_ in self.players:
+            _active_buildings.extend(player_.stairwayed_buildings)
 
         b = next( (b for b in _active_buildings if b.foundation.name == 'Gate'), None)
         if b is not None:
-            incomplete_marble = (b for b in player.incomplete_buildings if
-                                 b.composed_of('Marble'))
+            incomplete_marble = [b for b in player.incomplete_buildings if
+                                 b.composed_of('Marble')]
             _active_buildings.extend(incomplete_marble)
 
         return _active_buildings
@@ -587,7 +587,7 @@ class Game(object):
         do_discard = a.args[0]
         if do_discard:
             self._log('{0} discards their entire hand with Vomitorium: {1}.'
-                .format(p.name, ', '.join(p.hand)))
+                .format(p.name, ', '.join(map(str, p.hand))))
 
             self._discard_all_for_player(p)
             a = message.GameAction(message.USELATRINE, None)
@@ -788,6 +788,30 @@ class Game(object):
         self._pump()
 
 
+    def _player_client_count(self, player, role):
+        """Return the number of active clients this player has of the specified
+        role, accounting for Storeroom, and Ludus Magna.
+
+        This does not count doubling of clientele actions with Circus Maximus, 
+        since the number of *clients* is returned, not the number of *client actions*.
+
+        If role is None, return the size of clientele.
+        """
+        if role is None:
+            n_clients = len(player.clientele)
+        elif role == 'Laborer' and self._player_has_active_building(player, 'Storeroom'):
+            n_clients = len(player.clientele)
+        else:
+            n_clients = len(filter(lambda c: c.role == role, player.clientele))
+
+            # Ludus Magna adds to any non-Merchant count.
+            if role != 'Merchant' and self._player_has_active_building(player, 'Ludus Magna'):
+                n_clients += len(filter(lambda c: c.role == 'Merchant', player.clientele))
+
+        return n_clients
+
+
+
     def _perform_role_being_led(self, player):
         """
         Stack up all Merchants then clients of the appropriate role.
@@ -803,8 +827,8 @@ class Game(object):
         role = self.role_led
         self._log('Player {} is performing {}'.format(player.name, role))
 
-        n_merchants = player.n_clients('Merchant')
-        n_role = player.n_clients(role)
+        n_merchants = self._player_client_count(player, 'Merchant')
+        n_role = self._player_client_count(player, role)
 
         if role != 'Merchant':
             for _ in range(n_merchants):
@@ -1035,6 +1059,8 @@ class Game(object):
                     '{0} performs Patron, hiring {1} from pool.'
                     .format(p.name, card))
 
+            self._check_forum()
+
         self._pump()
 
 
@@ -1064,6 +1090,8 @@ class Game(object):
                     '{0} performs Patron, hiring {1} from deck.'
                     .format(p.name, card))
 
+        self._check_forum()
+
         self._pump()
 
 
@@ -1092,7 +1120,46 @@ class Game(object):
                     '{0} performs Patron, hiring {1} from hand.'
                     .format(p.name, card))
 
+        self._check_forum()
+
         self._pump()
+
+
+    def _check_forum(self):
+        """Checks all players for a Forum win. It's possible for multiple players
+        to have a Forum win if it's Stairway, so we have to check everyone.
+        """
+        forum_winners = []
+        for p in self.players:
+            if self._player_has_active_building(p, 'Forum'):
+                has_ludus = self._player_has_active_building(p, 'Ludus Magna')
+                has_storeroom = self._player_has_active_building(p, 'Storeroom')
+
+                # With a ludus, the extra Merchants count for missing roles.
+                extra_merchant_count = 0
+                roles = set()
+                for c in p.clientele:
+                    if c.role not in roles:
+                        roles.add(c.role)
+                    elif c.role == 'Merchant':
+                        extra_merchant_count += 1
+                    elif has_storeroom:
+                        roles.add('Laborer')
+
+
+                ludus_win = has_ludus and (len(roles) + extra_merchant_count) >= 6
+                normal_win = len(roles) >= 6
+
+                # We might have an extra merchant and no Ludus. That Merchant
+                # should count with Storeroom
+                storeroom_win = has_storeroom and \
+                        (len(roles) + (1 if extra_merchant_count > 0 else 0)) >=6 
+
+                if ludus_win or normal_win or storeroom_win:
+                    forum_winners.append(p)
+
+        if forum_winners:
+            self._forum_win(forum_winners)
 
 
     def _check_building_start_legal(self, player, building, site):
@@ -1186,6 +1253,11 @@ class Game(object):
             self._log('{0} reveals {1} with Fountain.'
                 .format(p.name, p.fountain_card))
 
+            if len(self.library) == 0:
+                self._log('{0} has drawn the last Orders card with Fountain. Game Over.'
+                        .format(p.name))
+                self._end_game()
+
         else:
             self.expected_action = message.CRAFTSMAN
 
@@ -1196,14 +1268,16 @@ class Game(object):
         p = self.active_player
 
         fountain_card = p.fountain_card
-        p.hand.append(p.fountain_card)
-        p.fountain_card = None
 
         if skip:
             self._log('{0} skips Fountain, drawing {1}.'
                 .format(p.name, fountain_card))
+            p.hand.append(p.fountain_card)
+            p.fountain_card = None
         else:
-            b = self._construct(p, building, material, site, p.hand)
+            # Construct moves the fountain card to foundation or materials and
+            # sets player.fountain_card to None
+            b = self._construct(p, building, material, site, None, fountain=True)
             self._log('{0} performs Craftsman using card revealed with Fountain.')
             self._log_construct(p, building, material, site, ' using Fountain card')
 
@@ -1234,8 +1308,8 @@ class Game(object):
                 .format(player.name, building, site))
 
 
-    def _construct(self, player, foundation, material, site, material_zone):
-        """ Handles building construction with validity checking.
+    def _construct(self, player, foundation, material, site, material_zone, fountain=False):
+        """Handles building construction with validity checking.
 
         Does not move the material or building card. This function's
         caller must grab them.
@@ -1245,6 +1319,10 @@ class Game(object):
         (The perform_role_action() function consumes this flag.)
 
         Else, if the site is None, add the material to the building.
+
+        If the fountain flag is True, then material_zone is ignored, and the card
+        is taken from player.fountain_card, which is set to None if the operation
+        succeeds.
 
         Returns the modified building.
         """
@@ -1271,16 +1349,31 @@ class Game(object):
                 if site not in sites:
                     raise GTRError('{0} not available in town.'.format(site))
 
-            if foundation not in player.hand:
-                raise GTRError('{0!s} card not in {1}\'s hand.'
-                    .format(foundation, player.name))
+            if fountain:
+                if foundation != player.fountain_card:
+                    raise GTRError('{0!s} is not {1}\'s Fountain card.'
+                        .format(foundation, player.name))
+            else:
+                if foundation not in player.hand:
+                    raise GTRError('{0!s} card not in {1}\'s hand.'
+                        .format(foundation, player.name))
 
             site_card = gtrutils.get_card_from_zone(site, sites)
-            foundation_card = player.hand.pop(player.hand.index(foundation))
+            if fountain:
+                foundation_card = player.fountain_card
+                player.fountain_card = None
+            else:
+                foundation_card = player.hand.pop(player.hand.index(foundation))
+
             b = Building(foundation_card, site_card)
             player.buildings.append(b)
 
             self.used_oot = is_oot
+
+            # Check Forum before ending the game via sites, since starting a Forum
+            # on the last in-town site with an active Gate and all client roles is
+            # a win.
+            self._check_forum()
 
             if len(self.in_town_sites) == 0:
                 self._end_game()
@@ -1298,7 +1391,11 @@ class Game(object):
                     .format(foundation))
 
             # Raises if material doesn't exist
-            material_zone.move_card(material, b.materials)
+            if fountain:
+                b.materials.append(player.fountain_card)
+                player.fountain_card = None
+            else:
+                material_zone.move_card(material, b.materials)
 
             has_scriptorium = self._player_has_active_building(player, 'Scriptorium')
 
@@ -1307,9 +1404,18 @@ class Game(object):
                 self._log('Player {} completed building {} using Scriptorium'.format(
                   player.name, str(b)))
                 complete = True
+           
             elif len(b.materials) == cm.get_value_of_material(b.site):
                 self._log('Player {} completed building {}'.format(player.name, str(b)))
                 complete = True
+            
+            # This is an Architect action if the material comes from the stockpile.
+            elif material_zone is player.stockpile and foundation.name == 'Villa':
+                self._log('Player {} completed Villa with one material '
+                        'using Architect.'
+                        .format(player.name))
+                complete = True
+
 
             if complete:
                 b.complete = True
@@ -1408,6 +1514,8 @@ class Game(object):
                 self._log('{0} uses Stairway to add {1} to {2}\'s {3}.' 
                     .format(p.name, material, player.name, foundation))
 
+            self._check_forum()
+
         self._pump()
 
 
@@ -1430,7 +1538,7 @@ class Game(object):
 
         has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
         has_cm = self._player_has_active_building(player, 'Circus Maximus')
-        is_leading_or_following = player.is_following_or_leading
+        is_following_or_leading = player.is_following_or_leading
         role_led = self.role_led
 
         self.legionary_count = 1
@@ -1471,7 +1579,13 @@ class Game(object):
 
         if not p.hand.contains(cards):
             raise GTRError('Demanding with cards not in hand: {0}.'
-                .format(', '.join(map(str,cards))))
+                    .format(', '.join(map(str,cards))))
+
+        if len(cards) > self.legionary_count:
+            raise GTRError('Too many cards specified for Legionary demand: {0} '
+                    '({1:d} allowed)'
+                    .format(', '.join(map(str,cards)), self.legionary_count))
+
 
 
         # Player.revealed isn't a zone, but a list of revealed cards in the hand
@@ -1498,28 +1612,45 @@ class Game(object):
 
 
         # Get cards from other players
-        n = len(self.players)
-        p_index = self.players.index(p)
-
-        self.legionary_index = p_index
+        self.legionary_index = self.players.index(p)
 
         has_bridge = self._player_has_active_building(p, 'Bridge')
 
         if has_bridge:
-            r = range(n)
-            indices = r[n+1:] + r[:n]
+            r = range(len(self.players))
+            indices = r[self.legionary_index+1:] + r[:self.legionary_index]
         else:
-            indices = [(self.legionary_index + 1) % n]
-            if n > 2:
-                indices.append((self.legionary_index - 1) % n)
+            indices = [(self.legionary_index + 1) % len(self.players)]
+            if len(self.players) > 2:
+                indices.append((self.legionary_index - 1) % len(self.players))
+                
+        # Filter indices by who's immune
+        immune = []
+        for i in indices:
+            p = self.players[i]
+            if(self._player_has_active_building(p, 'Wall') or
+                    self._player_has_active_building(p, 'Palisade') and not has_bridge):
+
+                immune.append(i)
+
+        for i in immune:
+            indices.remove(i)
 
         self.legionary_resp_indices = indices
 
-        self.active_player = self.players[indices[0]]
-        self.expected_action = message.GIVECARDS
+        if indices:
+            self.active_player = self.players[indices[0]]
+            self.expected_action = message.GIVECARDS
+        else:
+            self._pump()
 
 
     def _handle_givecards(self, a):
+        """Handle action that gives cards for Legionary. This includes
+        only cards from the hand. Cards from stockpile (Bridge) or
+        clientele (Coliseum) are taken automatically.
+        """
+
         cards = a.args
         lg.debug('Received GIVECARDS(' + ','.join(map(str, cards))+')')
 
@@ -1536,7 +1667,8 @@ class Game(object):
         is_immune = has_wall or (has_palisade and not has_bridge)
 
         if is_immune:
-            self._log('{0} is immune to legionary.'.format(p.name))
+            raise GTRError('{0} is immune to legionary.'.format(p.name))
+            #self._log('{0} is immune to legionary.'.format(p.name))
         else:
             self._move_legionary_cards(p, leg_p, cards, has_bridge, has_coliseum)
 
@@ -1606,10 +1738,10 @@ class Game(object):
                         break
 
             for c in cards_moved_from_stockpile:
-                p.stockpile.move_card(given_card, leg_p.stockpile)
+                p.stockpile.move_card(c, leg_p.stockpile)
 
             self._log('{0} gives cards from their stockpile: {1}'
-                .format(p.name, ', '.join(cards_moved_from_stockpile)))
+                .format(p.name, ', '.join(map(str, cards_moved_from_stockpile))))
 
         clientele_copy = list(p.clientele)
         cards_moved_from_clientele = []
@@ -1618,14 +1750,14 @@ class Game(object):
                 for card in clientele_copy:
                     if card.material == c.material:
                         cards_moved_from_clientele.append(card)
-                        clientele_copy.remove(given_card)
+                        clientele_copy.remove(card)
                         break
 
             for c in cards_moved_from_clientele:
-                p.clientele.move_card(given_card, leg_p.vault)
+                p.clientele.move_card(c, leg_p.vault)
 
             self._log('{0} feeds clientele to the lions: {1}'
-                .format(p.name, ', '.join(cards_moved_from_clientele)))
+                .format(p.name, ', '.join(map(str, cards_moved_from_clientele))))
 
 
     def _perform_merchant_action(self, player):
@@ -1664,7 +1796,7 @@ class Game(object):
             p.hand.move_card(hand_card, p.vault)
 
         if from_deck:
-            gtrutils.add_card_to_zone(self._draw_cards(1)[0], player.vault)
+            gtrutils.add_card_to_zone(self._draw_cards(1)[0], p.vault)
 
         # Logging
         if stockpile_card:
@@ -1712,6 +1844,7 @@ class Game(object):
 
     def _do_senate(self):
         if self.senate_resp_indices:
+            self.active_player = self.players[self.senate_resp_indices[0]]
             self.expected_action = message.USESENATE
             return
 
@@ -1726,7 +1859,7 @@ class Game(object):
 
 
     def _handle_usesenate(self, a):
-        take_jack = a.args[0]
+        jacks = a.args[0]
         p_index = self.senate_resp_indices.pop(0)
         p_kip = self.players[self.kip_index]
 
@@ -1823,12 +1956,21 @@ class Game(object):
 
         self._pump()
 
-    def _calc_winners(self):
+    def _calc_winners(self, players=None):
+        """Calculate the winners using score and cards in hand among
+        the specified players. If players isn't specified, all players
+        are considered.
+        """
+        if players is None:
+            players = self.players
 
-        max_score = self._player_score(self.players[0])
-        winners = [self.players[0]]
+        if len(players) <= 1:
+            return players
 
-        for p in self.players[1:]:
+        max_score = self._player_score(players[0])
+        winners = [players[0]]
+
+        for p in players[1:]:
             score = self._player_score(p)
 
             if score > max_score:
@@ -1862,7 +2004,7 @@ class Game(object):
 
 
     def _end_game(self):
-        """ The game is over. This determines a winner.
+        """The game is over. This determines a winner.
         """
         for p in self.players:
             self._log('Player {0} scores {1}'.format(p.name, self._player_score(p)))
@@ -1880,6 +2022,36 @@ class Game(object):
 
         self._log('Game over. Glory to Rome!')
         self.winners = winners
+
+        raise GameOver()
+
+
+    def _forum_win(self, winners):
+        """All players in winners have an active Forum with all client roles.
+
+        If there are multiple players with a winning Forum, the tie is broken
+        by scoring those players normally.
+
+        Return a list of winning players
+        """
+        if len(winners) < 1:
+            raise GTRError('No Forum winners specified')
+        elif len(winners) == 1:
+            real_winners = winners
+        else:
+            real_winners = self._calc_winners(winners)
+
+        if len(real_winners) == 1:
+            self._log('{0} has won the game by building a Forum ({1} points).'
+                    .format(winners[0].name, self._player_score(winners[0])))
+        elif len(winners) > 1:
+            self._log('There is a TIE between players {0}'
+                    ', all of whom have built a Forum and have {1} points.'
+                    .format(', '.join([p.name for p in real_winners]),
+                        self._player_score(real_winners[0])))
+
+        self._log('Game over. Glory to Rome!')
+        self.winners = real_winners
 
         raise GameOver()
 
@@ -1931,5 +2103,8 @@ class Game(object):
 
         elif str(building_obj) == 'Prison':
             self.stack.push_frame('_await_prison')
+
+        elif str(building_obj) in ('Forum', 'Ludus Magna', 'Gate', 'Storeroom'):
+            self._check_forum()
 
 

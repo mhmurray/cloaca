@@ -220,8 +220,10 @@ class TestArchitectClientele(unittest.TestCase):
     def setUp(self):
         """This is run prior to every test.
         """
-        self.game = test_setup.two_player_lead('Architect', (['Storeroom'], ['Storeroom']))
+        self.game = test_setup.two_player_lead('Architect',
+                clientele=(['Storeroom'], ['Storeroom']))
         self.p1, self.p2 = self.game.players
+        self.assertIn('Storeroom', self.p1.clientele)
 
 
     def test_skip_client(self):

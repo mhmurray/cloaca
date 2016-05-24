@@ -6,23 +6,28 @@ from cloaca.building import Building
 import cloaca.message as message
 import cloaca.card_manager as cm
 from cloaca.card import Card
+from cloaca.error import GTRError, GameOver
 
 import cloaca.test.test_setup as test_setup
+from test_setup import TestDeck
+from cloaca.test.monitor import Monitor
 
 import unittest
 
 class TestHandleThinker(unittest.TestCase):
-    """ Test handling Thinker responses
-    """
 
     def setUp(self):
         """ This is run prior to every test.
         """
+        self.deck = TestDeck()
+
         self.game = test_setup.simple_two_player()
         self.p1, self.p2 = self.game.players
 
         a = message.GameAction(message.THINKERORLEAD, True)
         self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
 
 
     def test_card_piles_full(self):
@@ -39,7 +44,8 @@ class TestHandleThinker(unittest.TestCase):
 
         a = message.GameAction(message.SKIPTHINKER, False)
 
-        self.assertRaises(Exception, self.game.handle, a)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
         
 
     def test_thinker_for_five(self):
@@ -106,8 +112,89 @@ class TestHandleThinker(unittest.TestCase):
 
         self.assertEqual(len(self.p1.hand), 5)
 
-    # Thinker to empty deck ends game
-    # Thinker from empty Jack pile not allowed
+    def test_empty_deck_ends_game(self):
+        """An empty deck ends the game immediately. Test thinker
+        to empty deck. (The other way is using a Fountain.)
+        """
+        d = self.deck
+
+        self.game.library.set_content([d.road, d.road, d.road, d.road, d.road])
+        self.p1.hand.set_content([])
+
+        a = message.GameAction(message.THINKERTYPE, False)
+
+        with self.assertRaises(GameOver):
+            self.game.handle(a)
+
+        self.assertIsNotNone(self.game.winners)
+
+
+    def test_thinker_from_empty_jack_pile(self):
+        """Raise GTRError if thinker from empty Jack pile is requested.
+        """
+        d = self.deck
+
+        self.game.jacks.set_content([])
+        a = message.GameAction(message.THINKERTYPE, True)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
+    def test_temple_hand_limit(self):
+        d = self.deck
+
+        self.p1.hand.set_content([])
+        self.p1.buildings.append(Building(d.temple, 'Marble', complete=True))
+
+        a = message.GameAction(message.THINKERTYPE, False)
+        self.game.handle(a)
+
+        self.assertEqual(len(self.p1.hand), 9)
+
+    def test_shrine_hand_limit(self):
+        d = self.deck
+
+        self.p1.hand.set_content([])
+        self.p1.buildings.append(Building(d.shrine, 'Brick', complete=True))
+
+        a = message.GameAction(message.THINKERTYPE, False)
+        self.game.handle(a)
+
+        self.assertEqual(len(self.p1.hand), 7)
+
+    def test_shrine_and_temple_hand_limit(self):
+        d = self.deck
+
+        self.p1.hand.set_content([])
+        self.p1.buildings.append(Building(d.shrine, 'Brick', complete=True))
+        self.p1.buildings.append(Building(d.temple, 'Marble', complete=True))
+
+        a = message.GameAction(message.THINKERTYPE, False)
+        self.game.handle(a)
+
+        self.assertEqual(len(self.p1.hand), 11)
+
+    def test_think_past_higher_hand_limit(self):
+        d = self.deck
+
+        self.p1.hand.set_content([
+                d.road, d.road, d.road,
+                d.road, d.road, d.road,
+                d.wall, d.wall, d.wall])
+
+        self.p1.buildings.append(Building(d.temple, 'Marble', complete=True))
+
+        a = message.GameAction(message.THINKERTYPE, False)
+        self.game.handle(a)
+
+        self.assertEqual(len(self.p1.hand), 10)
+
 
 
 if __name__ == '__main__':
