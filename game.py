@@ -63,7 +63,6 @@ class Game(object):
         self.legionary_count = 0
         self.legionary_index = 0
         self.legionary_resp_indices = []
-        self.kip_index = 0
         self.senate_resp_indices = []
         self.expected_action = None
         self.game_id = 0
@@ -1819,76 +1818,77 @@ class Game(object):
     def _kids_in_pool(self):
         """ Place cards in camp into the pool.
         1) If Sewer, ask to move cards into stockpile.
-        2) If dropping a Jack, ask players_with_senate in order.
+        2) If player has Senate, ask to take people's Jacks
         """
         self._log('Kids in the pool.')
-        self._do_kids_in_pool(self.leader)
+        for p in self._players_in_turn_order()[::-1]:
+            self.stack.push_frame('_do_kids_in_pool', p)
+
+        for p in self._players_in_turn_order()[::-1]:
+            if self._player_has_active_building(p, 'Senate'):
+                self.stack.push_frame('_do_senate', p)
+
+        self._pump()
 
 
     def _do_kids_in_pool(self, p):
-        p_index = self.players.index(p)
-        self.kip_index = p_index
-
-        p_in_order = self._players_in_turn_order(p)
-        p_in_order.pop(0) # skip this player
-
-        indices = []
-        for _p in p_in_order:
-            if self._player_has_active_building(_p, 'Senate'):
-                indices.append(self.players.index(_p))
-
-        self.senate_resp_indices = indices
-
-        self._do_senate()
-
-
-    def _do_senate(self):
-        if self.senate_resp_indices:
-            self.active_player = self.players[self.senate_resp_indices[0]]
-            self.expected_action = message.USESENATE
-            return
+        if self._player_has_active_building(p, 'Sewer'):
+            self.active_player = p
+            self.expected_action = message.USESEWER
 
         else:
-            p = self.players[self.kip_index]
-            if self._player_has_active_building(p, 'Sewer'):
-                self.expected_action = message.USESEWER
-                return
+            self._handle_usesewer(message.GameAction(message.USESEWER))
 
-            else:
-                self._handle_usesewer(message.GameAction(message.USESEWER, None))
+
+    def _do_senate(self, p):
+        self.active_player = p
+        self.expected_action = message.USESENATE
 
 
     def _handle_usesenate(self, a):
-        jacks = a.args[0]
-        p_index = self.senate_resp_indices.pop(0)
-        p_kip = self.players[self.kip_index]
+        jacks = a.args
+        p = self.active_player
 
-        if take_jack and 'Jack' in p_kip.camp:
-            p = self.players[p_index]
+        jacks_in_camps = [] # list of (player, jack) tuples
 
-            jack = p_kip.camp.get_cards(['Jack'])[0]
-            p_kip.camp.move_card(jack, p.hand)
+        players = self._players_in_turn_order(p)
+        players.pop(0)
 
-            self._log('{0} takes {1}\'s Jack with Senate.'
-                .format(p.name, p_kip.name))
+        for player in players:
+            camp_jacks = [j for j in jacks if j in player.camp]
+            for j in camp_jacks:
+                jacks_in_camps.append( (player, j) )
 
-            self.senate_resp_indices = []
+        if len(jacks) > len(jacks_in_camps):
+            raise GTRError('Too many Jacks specified with Senate ({0:d}).'
+                    .format(len(jacks)))
+        else:
+            for player, jack in jacks_in_camps:
+                self._log('{0} takes {1}\'s Jack with Senate.'
+                        .format(p.name, player.name))
+                player.camp.move_card(jack, p.hand)
 
-        self._do_senate()
+        if self._player_has_active_building(p, 'Sewer'):
+            self.active_player = p
+            self.expected_action = message.USESEWER
+
+        self._pump()
 
 
     def _handle_usesewer(self, a):
         cards = a.args
-        p = self.players[self.kip_index]
+        p = self.active_player
 
-        if cards[0] is not None:
-            for c in cards:
-                if c.name == 'Jack':
-                    raise GTRError('Can\'t move Jacks with Sewer')
-                p.camp.move_card(c, p.stockpile)
+        for c in cards:
+            if c.name == 'Jack':
+                raise GTRError('Can\'t move Jacks with Sewer')
 
+        for c in cards:
+            p.camp.move_card(c, p.stockpile)
+
+        if len(cards):
             self._log('{0} flushes cards down the Sewer: {1}'
-                    .format(p.name, ', '.join(map(lambda x: x.name, cards))))
+                    .format(p.name, ', '.join(map(str, cards))))
 
         for c in p.camp.cards[:]: # Copy since we're removing
             if c.name == 'Jack':
@@ -1896,13 +1896,7 @@ class Game(object):
             else:
                 p.camp.move_card(c, self.pool)
 
-        kip_next = (self.kip_index + 1) % len(self.players)
-
-        if kip_next == self.leader_index:
-            self._pump()
-
-        else:
-            self._do_kids_in_pool(self.players[kip_next])
+        self._pump()
 
 
     def _handle_prison(self, a):

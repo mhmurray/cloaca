@@ -1657,7 +1657,7 @@ class TestSenate(unittest.TestCase):
         self.assertEqual(game.expected_action, message.USESENATE)
         self.assertEqual(game.active_player, p2)
 
-        a = message.GameAction(message.USESENATE, True)
+        a = message.GameAction(message.USESENATE, jack_led)
         game.handle(a)
 
         self.assertIn(jack_led, p2.hand)
@@ -1683,7 +1683,7 @@ class TestSenate(unittest.TestCase):
         self.assertEqual(game.expected_action, message.USESENATE)
         self.assertEqual(game.active_player, p2)
 
-        a = message.GameAction(message.USESENATE, False)
+        a = message.GameAction(message.USESENATE)
         game.handle(a)
 
         self.assertIn(jack_led, game.jacks)
@@ -1693,7 +1693,8 @@ class TestSenate(unittest.TestCase):
 
     
     def test_three_players_one_with_senate(self):
-        """Three players, only one has Senate.
+        """Three players, only one has Senate. Skip taking Jack
+        from the leader.
         """
         d = TestDeck()
 
@@ -1718,29 +1719,15 @@ class TestSenate(unittest.TestCase):
 
         self.assertEqual(game.expected_action, message.USESENATE)
         self.assertEqual(game.active_player, p2)
-        self.assertEqual(len(game.senate_resp_indices), 1)
 
-        a = message.GameAction(message.USESENATE, False)
+        a = message.GameAction(message.USESENATE)
         game.handle(a)
-
-        print game.senate_resp_indices
-
-        self.assertEqual(len(game.senate_resp_indices), 0)
 
         self.assertIn(jack_led, game.jacks)
         self.assertNotIn('Jack', p2.hand)
 
         self.assertEqual(game.expected_action, message.THINKERORLEAD)
         self.assertEqual(game.active_player, p2)
-
-        self.assertEqual(game.expected_action, message.USESENATE)
-        self.assertEqual(game.active_player, p2)
-
-        a = message.GameAction(message.USESENATE, True)
-        game.handle(a)
-
-        self.assertIn(jack_led, p2.hand)
-        self.assertNotIn('Jack', game.jacks)
 
 
 class TestStatue(unittest.TestCase):
