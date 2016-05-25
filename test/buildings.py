@@ -1733,6 +1733,129 @@ class TestSenate(unittest.TestCase):
         self.assertEqual(game.active_player, p2)
 
 
+class TestSewer(unittest.TestCase):
+
+    def setUp(self):
+        d = TestDeck()
+        self.deck = d
+
+        self.game = test_setup.simple_two_player()
+        self.p1, self.p2 = self.game.players
+
+        self.p1.buildings.append(Building(d.sewer, 'Stone', complete=True))
+        self.p1.buildings.append(Building(d.palace, 'Marble', complete=True))
+        self.p2.buildings.append(Building(d.palace, 'Marble', complete=True))
+
+        self.p1.hand.set_content([d.jack0, d.villa0, d.villa1, d.villa2, d.road0])
+        self.p2.hand.set_content([d.jack1])
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 3,
+                d.jack0, d.villa0, d.villa1, d.villa2, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.FOLLOWROLE, False, 1, d.jack1)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LABORER, None, None)
+
+        for i in range(4):
+            self.game.handle(a)
+
+    
+    def test_sewer_required(self):
+        self.assertEqual(self.game.expected_action, message.USESEWER)
+        self.assertEqual(self.game.active_player, self.p1)
+
+
+    def test_use_sewer_all_cards(self):
+        """Move all cards to stockpile with Sewer.
+        """
+        d = self.deck
+
+        a = message.GameAction(message.USESEWER,
+                d.villa0, d.villa1, d.villa2, d.road0)
+        self.game.handle(a)
+
+        self.assertItemsEqual(self.p1.stockpile,
+                [d.villa0, d.villa1, d.villa2, d.road0])
+
+        self.assertIn(d.jack0, self.game.jacks)
+        self.assertIn(d.jack1, self.game.jacks)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_use_sewer_some_cards(self):
+        """Move some cards to stockpile with Sewer.
+        """
+        d = self.deck
+
+        a = message.GameAction(message.USESEWER,
+                d.villa1, d.road0)
+        self.game.handle(a)
+
+        self.assertItemsEqual(self.p1.stockpile,
+                [d.villa1, d.road0])
+
+        self.assertIn(d.jack0, self.game.jacks)
+        self.assertIn(d.jack1, self.game.jacks)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_use_sewer_no_cards(self):
+        """Skip sewer altogether.
+        """
+        d = self.deck
+
+        a = message.GameAction(message.USESEWER)
+        self.game.handle(a)
+
+        self.assertEqual(len(self.p1.stockpile), 0)
+
+        self.assertIn(d.jack0, self.game.jacks)
+        self.assertIn(d.jack1, self.game.jacks)
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_illegal_sewer_raises(self):
+        d = self.deck
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        a = message.GameAction(message.USESEWER, d.garden0)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.USESEWER, d.jack0)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.USESEWER, d.jack1)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.USESEWER, d.villa0, d.garden0)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
+
+
+
 class TestStatue(unittest.TestCase):
 
     def test_statue_start_on_marble(self):

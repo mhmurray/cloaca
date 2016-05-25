@@ -1883,6 +1883,9 @@ class Game(object):
         for c in cards:
             if c.name == 'Jack':
                 raise GTRError('Can\'t move Jacks with Sewer')
+            elif c not in p.camp:
+                raise GTRError('Card not in camp for use with Sewer ({0})'
+                        .format(c.name))
 
         for c in cards:
             p.camp.move_card(c, p.stockpile)
