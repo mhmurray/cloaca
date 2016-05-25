@@ -77,6 +77,42 @@ class Zone(object):
             return False
 
 
+    def matches(self, items, compare=None):
+        """Return list of cards in this Zone that match
+        search items. Equality is compared unless
+        a comparison function is provided as compare.
+        The matched cards are not removed from this Zone.
+
+        Bad things might happen if the compare function
+        isn't transitive.
+
+        If a match isn't found, no card is returned.
+        If only some matches are found, only those cards
+        are returned.
+
+        Arguments:
+        cards - iterable of items to search for
+        compare - function(<search_item>, <card>) --> Bool that
+                tests for equality.
+        """
+        if compare is None:
+            compare = lambda search_item, card: search_item == card
+
+        search_cards = list(items)
+        matched_cards = []
+
+        for card in self.cards:
+            matched_card = next( 
+                    (c for c in search_cards if compare(c, card)),
+                    None)
+
+            if matched_card is not None:
+                search_cards.remove(matched_card)
+                matched_cards.append(card)
+
+        return matched_cards
+
+
     def intersection(self, cards):
         """Return the intersection of this zone and the iterable of Card objects as
         a collections.Counter object.

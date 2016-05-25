@@ -1592,24 +1592,11 @@ class Game(object):
         # so the cards are not removed from the players hand
         p.revealed.extend(p.hand.get_cards(cards))
 
-        revealed_materials = [c.material for c in  p.revealed]
+        revealed_materials = [c.material for c in p.revealed]
 
         self._log('Rome demands {0}! (revealing {1})'
             .format(', '.join(revealed_materials), 
                 ', '.join(map(str,p.revealed))))
-
-        # Get cards from pool
-        pool_cards = []
-        for card in cards:
-            for _c in self.pool:
-                if _c.material == card.material:
-                    self.pool.move_card(_c, p.stockpile)
-                    pool_cards.append(_c)
-
-        if pool_cards:
-            self._log('{0} collected {1} from the pool.'
-                .format(p.name, ', '.join([c.material for c in  pool_cards])))
-
 
         # Get cards from other players
         self.legionary_index = self.players.index(p)
@@ -1624,33 +1611,41 @@ class Game(object):
             if len(self.players) > 2:
                 indices.append((self.legionary_index - 1) % len(self.players))
                 
-        # Filter indices by who's immune
-        immune = []
-        for i in indices:
-            p = self.players[i]
-            if(self._player_has_active_building(p, 'Wall') or
-                    self._player_has_active_building(p, 'Palisade') and not has_bridge):
-
-                immune.append(i)
-
-        for i in immune:
-            indices.remove(i)
-
         self.legionary_resp_indices = indices
 
-        if indices:
-            self.active_player = self.players[indices[0]]
+        self.expected_action = message.TAKEPOOLCARDS
+
+    def _handle_takepoolcards(self, a):
+        pool_cards = a.args
+
+        revealed_materials = [c.material for c in self.active_player.revealed]
+
+        pool_matches = self.pool.matches(pool_cards)
+        if len(pool_matches) < len(pool_cards):
+            raise GTRError('Cards specified that aren\'t in pool ({0}).'
+                    .format(', '.join(map(str, pool_matches))))
+
+        for c in pool_matches:
+            self.pool.move_card(c, self.leader.stockpile)
+
+        if pool_matches:
+            self._log('{0} collected {1} from the pool.'
+                .format(self.leader.name,
+                    ', '.join([c.material for c in pool_matches])))
+
+        if self.legionary_resp_indices:
+            self.active_player = self.players[self.legionary_resp_indices[0]]
             self.expected_action = message.GIVECARDS
         else:
             self._pump()
 
 
     def _handle_givecards(self, a):
-        """Handle action that gives cards for Legionary. This includes
-        only cards from the hand. Cards from stockpile (Bridge) or
-        clientele (Coliseum) are taken automatically.
+        """Handle action that gives cards for Legionary. Cards from stockpile
+        (Bridge) or clientele (Coliseum) must also be specified If the player
+        is immune because of a Wall or Palisade, they need not provide cards
+        from stockpile or clientele.
         """
-
         cards = a.args
         lg.debug('Received GIVECARDS(' + ','.join(map(str, cards))+')')
 
@@ -1666,11 +1661,8 @@ class Game(object):
 
         is_immune = has_wall or (has_palisade and not has_bridge)
 
-        if is_immune:
-            raise GTRError('{0} is immune to legionary.'.format(p.name))
-            #self._log('{0} is immune to legionary.'.format(p.name))
-        else:
-            self._move_legionary_cards(p, leg_p, cards, has_bridge, has_coliseum)
+        self._move_legionary_cards(p, leg_p, cards, is_immune,
+                has_bridge, has_coliseum)
 
         self.legionary_resp_indices.pop(0)
         if len(self.legionary_resp_indices):
@@ -1685,79 +1677,88 @@ class Game(object):
             self._pump()
 
 
-    def _move_legionary_cards(self, p, leg_p, cards, has_bridge, has_coliseum):
-        """ Moves the cards from p's zones according to leg_p's revealed
+    def _move_legionary_cards(self, p, leg_p, cards, immune, has_bridge, has_coliseum):
+        """Moves the cards from p's zones according to leg_p's revealed
         cards and the flags for Bridge and Coliseum.
-
-        The cards provided should be in order, lose from hand, then stockpile,
-        then clientele
         """
-        rev_cards = leg_p.revealed
-        given_cards = list(cards)
+        cards_in_hand = [c for c in cards if c in p.hand]
+        cards_in_stockpile = [c for c in cards if c in p.stockpile]
+        cards_in_clientele = [c for c in cards if c in p.clientele]
 
-        lg.debug('Moving cards for legionary. Revealed: ' + str(rev_cards) +
-                ' Given: ' + str(given_cards))
+        if cards_in_stockpile and not has_bridge:
+            raise GTRError('Cannot give cards from stockpile if '
+                    'Legionary leader has no Bridge ({0}).'
+                    .format(', '.join(map(str, cards_in_stockpile))))
 
-        cards_moved_from_hand = []
+        if cards_in_clientele and not has_coliseum:
+            raise GTRError('Cannot give cards from clientele if '
+                    'Legionary leader has no Coliseum ({0}).'
+                    .format(', '.join(map(str, cards_in_clientele))))
 
-        # Check that all required cards were offered.
-        revealed = Counter([c.material for c in rev_cards])
-        given = Counter([c.material for c in given_cards])
-        hand = Counter([c.material for c in p.hand])
+        if (len(cards_in_hand)+len(cards_in_stockpile)+
+                len(cards_in_clientele)) > len(cards):
+            raise GTRError('Cards given that aren\'t in '
+                    'stockpile, hand, or clientele ({0}).'
+                    .format(', '.join(map(str, cards))))
 
-        unmatched = revealed - given
-        extras = given - revealed
-        remaining = hand - given
-        ungiven = unmatched & remaining # Set intersection
+        def legionary_zone(demanded, given, zone):
+            """Check cards from zone that are both demanded
+            and given. Raise GTRError if the cards aren't in
+            the zone, are given but not demanded, or are demanded
+            and not given but are in the zone.
+            """
+            # Check that all required cards were offered.
+            demanded_mats = Counter([c.material for c in demanded])
+            given_mats = Counter([c.material for c in given])
+            zone_mats = Counter([c.material for c in zone])
 
-        if len(extras):
-            lg.debug('Too many cards given : ' + str(extras))
-            raise GTRError('Extra cards given for legionary.')
+            unmatched_mats = demanded_mats - given_mats
+            extra_mats = given_mats - demanded_mats
+            remaining_mats = zone_mats - given_mats
+            ungiven_mats = unmatched_mats & remaining_mats # Set intersection
 
-        if len(ungiven):
-            lg.debug('Require more cards : ' + str(ungiven))
-            raise GTRError('Not enough cards given for legionary.')
+            if len(extra_mats):
+                lg.debug('Too many cards given : ' + str(extra_mats))
+                raise GTRError('Extra cards given for Legionary.')
 
-        for c in given_cards:
+            if len(ungiven_mats) and not immune:
+                lg.debug('Require more cards : ' + str(ungiven_mats))
+                raise GTRError('Not enough cards given for Legionary.')
+
+            return given
+
+        hand_cards_to_move = legionary_zone(
+                leg_p.revealed, cards_in_hand, p.hand)
+        stockpile_cards_to_move = legionary_zone(
+                leg_p.revealed, cards_in_stockpile, p.stockpile)
+        clientele_cards_to_move = legionary_zone(
+                leg_p.revealed, cards_in_clientele, p.clientele)
+
+        if hand_cards_to_move or stockpile_cards_to_move or \
+                clientele_cards_to_move:
+            if len(hand_cards_to_move):
+                self._log('{0} gives {1} from their hand.'
+                        .format(p.name,
+                            ', '.join(map(str, hand_cards_to_move))))
+            if len(stockpile_cards_to_move):
+                self._log('{0} gives {1} from their stockpile.'
+                        .format(p.name,
+                            ', '.join(map(str, stockpile_cards_to_move))))
+            if len(clientele_cards_to_move):
+                self._log('{0} feeds {1} to the lions.'
+                        .format(p.name,
+                            ', '.join(map(str, clientele_cards_to_move))))
+        else:
+            self._log('{0}: "Glory to Rome!"')
+
+        for c in hand_cards_to_move:
             p.hand.move_card(c, leg_p.stockpile)
 
-        if len(given_cards):
-            self._log('{0} gives cards from their hand: {1}'
-                .format(p.name, ', '.join(map(str, given_cards))))
-        else:
-            self._log('{0}: "Glory to Rome!"'.format(p.name))
+        for c in stockpile_cards_to_move:
+            p.stockpile.move_card(c, leg_p.stockpile)
 
-        stockpile_copy = list(p.stockpile)
-        cards_moved_from_stockpile = []
-        if has_bridge:
-            for c in leg_p.revealed:
-                for card in stockpile_copy:
-                    if card.material == c.material:
-                        cards_moved_from_stockpile.append(card)
-                        stockpile_copy.remove(card)
-                        break
-
-            for c in cards_moved_from_stockpile:
-                p.stockpile.move_card(c, leg_p.stockpile)
-
-            self._log('{0} gives cards from their stockpile: {1}'
-                .format(p.name, ', '.join(map(str, cards_moved_from_stockpile))))
-
-        clientele_copy = list(p.clientele)
-        cards_moved_from_clientele = []
-        if has_coliseum:
-            for c in leg_p.revealed:
-                for card in clientele_copy:
-                    if card.material == c.material:
-                        cards_moved_from_clientele.append(card)
-                        clientele_copy.remove(card)
-                        break
-
-            for c in cards_moved_from_clientele:
-                p.clientele.move_card(c, leg_p.vault)
-
-            self._log('{0} feeds clientele to the lions: {1}'
-                .format(p.name, ', '.join(map(str, cards_moved_from_clientele))))
+        for c in clientele_cards_to_move:
+            p.clientele.move_card(c, leg_p.vault)
 
 
     def _perform_merchant_action(self, player):

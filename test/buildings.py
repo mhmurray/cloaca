@@ -853,6 +853,9 @@ class TestCircusMaximus(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.garden0, d.garden1, d.bar0)
         game.handle(a)
 
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        game.handle(a)
+
         self.assertEqual(game.expected_action, message.GIVECARDS)
         self.assertEqual(game.active_player, p2)
         self.assertEqual(game.legionary_count, 3)

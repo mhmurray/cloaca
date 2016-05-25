@@ -43,6 +43,9 @@ class TestMultiLegionary(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.atrium0, d.shrine0)
         self.game.handle(a)
 
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
         a = message.GameAction(message.GIVECARDS, d.foundry0)
         self.game.handle(a)
 
@@ -74,6 +77,34 @@ class TestMultiLegionary(unittest.TestCase):
         self.assertFalse(mon.modified(self.game))
 
 
+    def test_skip_one_legionary_from_pool(self):
+        """Skip taking one card from the pool but do take
+        the other.
+        """
+        d = self.deck
+        self.p1.hand.set_content([d.atrium0, d.shrine0])
+        self.game.pool.set_content([d.foundry0, d.bath0])
+
+        a = message.GameAction(message.LEGIONARY, d.atrium0, d.shrine0)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.TAKEPOOLCARDS)
+
+        a = message.GameAction(message.TAKEPOOLCARDS, d.bath0)
+        self.game.handle(a)
+
+        self.assertIn(d.foundry0, self.game.pool)
+        self.assertNotIn(d.foundry0, self.p1.stockpile)
+
+        self.assertNotIn(d.bath0, self.game.pool)
+        self.assertIn(d.bath0, self.p1.stockpile)
+
+        self.assertIn(d.atrium0, self.p1.revealed) 
+        self.assertIn(d.shrine0, self.p1.revealed) 
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+
 class TestLegionary(unittest.TestCase):
 
     def setUp(self):
@@ -90,7 +121,7 @@ class TestLegionary(unittest.TestCase):
         self.assertEqual(self.game.expected_action, message.LEGIONARY)
 
 
-    def test_legionary(self):
+    def test_legionary_from_pool(self):
         """Take one card from the pool with legionary action.
         """
         d = self.deck
@@ -100,8 +131,36 @@ class TestLegionary(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.atrium0)
         self.game.handle(a)
 
+        self.assertEqual(self.game.expected_action, message.TAKEPOOLCARDS)
+
+        a = message.GameAction(message.TAKEPOOLCARDS, d.foundry0)
+        self.game.handle(a)
+
         self.assertNotIn(d.foundry0, self.game.pool)
         self.assertIn(d.foundry0, self.p1.stockpile)
+
+        self.assertIn(d.atrium0, self.p1.revealed) 
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+
+    def test_skip_legionary_from_pool(self):
+        """Taking cards from the pool is optional, so skip it.
+        """
+        d = self.deck
+        self.p1.hand.set_content([d.atrium0])
+        self.game.pool.set_content([d.foundry0])
+
+        a = message.GameAction(message.LEGIONARY, d.atrium0)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.TAKEPOOLCARDS)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        self.assertIn(d.foundry0, self.game.pool)
+        self.assertNotIn(d.foundry0, self.p1.stockpile)
 
         self.assertIn(d.atrium0, self.p1.revealed) 
 
@@ -116,6 +175,9 @@ class TestLegionary(unittest.TestCase):
         self.p2.hand.set_content([d.foundry0])
 
         a = message.GameAction(message.LEGIONARY, d.atrium0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
         self.game.handle(a)
 
         a = message.GameAction(message.GIVECARDS, d.foundry0)
@@ -139,6 +201,9 @@ class TestLegionary(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.atrium0)
         self.game.handle(a)
 
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
         a = message.GameAction(message.GIVECARDS)
 
         mon = Monitor()
@@ -158,6 +223,9 @@ class TestLegionary(unittest.TestCase):
         self.p2.hand.set_content([d.latrine0])
 
         a = message.GameAction(message.LEGIONARY, d.atrium0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
         self.game.handle(a)
 
         a = message.GameAction(message.GIVECARDS)
@@ -226,6 +294,9 @@ class TestLegionaryPalisade(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.road0)
         self.game.handle(a)
 
+        a = message.GameAction(message.TAKEPOOLCARDS, d.insula0)
+        self.game.handle(a)
+
 
     def test_legionary_palisade(self):
         """Palisade makes p2 immune, but a GIVECARDS action is still
@@ -278,6 +349,9 @@ class TestLegionaryWall(unittest.TestCase):
         self.p2.hand.set_content([d.bar0])
 
         a = message.GameAction(message.LEGIONARY, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS, d.insula0)
         self.game.handle(a)
 
 
@@ -341,9 +415,12 @@ class TestLegionaryBridgePalisade(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.road0)
         self.game.handle(a)
 
+        a = message.GameAction(message.TAKEPOOLCARDS, d.insula0)
+        self.game.handle(a)
+
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
 
-        a = message.GameAction(message.GIVECARDS, d.bar0)
+        a = message.GameAction(message.GIVECARDS, d.bar0, d.latrine0)
         self.game.handle(a)
 
         self.assertIn(d.bar0, self.p1.stockpile)
@@ -352,8 +429,7 @@ class TestLegionaryBridgePalisade(unittest.TestCase):
 
 
     def test_bridge_multiple_choices(self):
-        """Bridge takes a card from stockpile. It doesn't matter which
-        one if there's a choice.
+        """Bridge takes a card from stockpile.
         """
         d = self.deck
 
@@ -364,13 +440,16 @@ class TestLegionaryBridgePalisade(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.road0)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action, message.GIVECARDS)
-
-        a = message.GameAction(message.GIVECARDS)
+        a = message.GameAction(message.TAKEPOOLCARDS)
         self.game.handle(a)
 
-        self.assertTrue(d.latrine0 in self.p1.stockpile or d.road1 in self.p1.stockpile)
-        self.assertTrue(d.latrine0 in self.p2.stockpile or d.road1 in self.p2.stockpile)
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.latrine0)
+        self.game.handle(a)
+
+        self.assertTrue(d.latrine0 in self.p1.stockpile)
+        self.assertTrue(d.road1 in self.p2.stockpile)
 
 
 class TestLegionaryBridgeWall(unittest.TestCase):
@@ -395,6 +474,9 @@ class TestLegionaryBridgeWall(unittest.TestCase):
         self.p2.stockpile.set_content([d.bar1])
 
         a = message.GameAction(message.LEGIONARY, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS, d.insula0)
         self.game.handle(a)
 
 
@@ -455,9 +537,12 @@ class TestLegionaryColiseum(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.road0)
         self.game.handle(a)
 
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
 
-        a = message.GameAction(message.GIVECARDS, d.bar0)
+        a = message.GameAction(message.GIVECARDS, d.bar0, d.latrine0)
         self.game.handle(a)
 
         self.assertIn(d.bar0, self.p1.stockpile)
@@ -465,8 +550,7 @@ class TestLegionaryColiseum(unittest.TestCase):
 
 
     def test_coliseum_multiple_choices(self):
-        """Coliseum takes a card from clientele. It doesn't matter which
-        one if there's a choice.
+        """Coliseum takes a card from clientele.
         """
         d = self.deck
 
@@ -477,13 +561,16 @@ class TestLegionaryColiseum(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.road0)
         self.game.handle(a)
 
-        self.assertEqual(self.game.expected_action, message.GIVECARDS)
-
-        a = message.GameAction(message.GIVECARDS)
+        a = message.GameAction(message.TAKEPOOLCARDS)
         self.game.handle(a)
 
-        self.assertTrue(d.latrine0 in self.p1.vault or d.road1 in self.p1.vault)
-        self.assertTrue(d.latrine0 in self.p2.clientele or d.road1 in self.p2.clientele)
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.road1)
+        self.game.handle(a)
+
+        self.assertTrue(d.road1 in self.p1.vault)
+        self.assertTrue(d.latrine0 in self.p2.clientele)
 
     
 if __name__ == '__main__':
