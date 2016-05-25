@@ -1620,7 +1620,7 @@ class Game(object):
 
         revealed_materials = [c.material for c in self.active_player.revealed]
 
-        pool_matches = self.pool.matches(pool_cards)
+        pool_matches = [c for c in pool_cards if c in self.pool]
         if len(pool_matches) < len(pool_cards):
             raise GTRError('Cards specified that aren\'t in pool ({0}).'
                     .format(', '.join(map(str, pool_matches))))
