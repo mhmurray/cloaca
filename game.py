@@ -789,7 +789,7 @@ class Game(object):
 
     def _player_client_count(self, player, role):
         """Return the number of active clients this player has of the specified
-        role, accounting for Storeroom, and Ludus Magna.
+        role, accounting for Storeroom, but not Ludus Magna.
 
         This does not count doubling of clientele actions with Circus Maximus, 
         since the number of *clients* is returned, not the number of *client actions*.
@@ -804,8 +804,8 @@ class Game(object):
             n_clients = len(filter(lambda c: c.role == role, player.clientele))
 
             # Ludus Magna adds to any non-Merchant count.
-            if role != 'Merchant' and self._player_has_active_building(player, 'Ludus Magna'):
-                n_clients += len(filter(lambda c: c.role == 'Merchant', player.clientele))
+#            if role != 'Merchant' and self._player_has_active_building(player, 'Ludus Magna'):
+#                n_clients += len(filter(lambda c: c.role == 'Merchant', player.clientele))
 
         return n_clients
 
@@ -844,7 +844,7 @@ class Game(object):
 
     def _perform_clientele_action(self, player, role):
         role_led = self.role_led
-        has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
+        has_ludus = self._player_has_active_building(player, 'Ludus Magna')
         has_cm = self._player_has_active_building(player, 'Circus Maximus')
         is_leading_or_following = player.is_following_or_leading
 
