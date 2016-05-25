@@ -1572,6 +1572,206 @@ class TestMarket(unittest.TestCase):
         self.assertEqual(g._vault_limit(p1), 7)
 
 
+class AmericasTestPalace(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.simple_two_player()
+        self.p1, self.p2 = self.game.players
+
+        self.p1.buildings.append(Building(d.palace, 'Marble', complete=True))
+        self.p2.buildings.append(Building(d.palace, 'Marble', complete=True))
+
+        self.p1.hand.set_content([d.road0, d.bar0, d.insula0,
+                d.villa0, d.villa1, d.villa2, d.jack0])
+        self.p2.hand.set_content([d.jack1, d.jack2, d.jack3])
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+
+
+    def test_lead_multiple_orders(self):
+        d = self.deck
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 3,
+                d.road0, d.bar0, d.insula0)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.n_camp_actions, 3)
+        self.assertItemsEqual(self.p1.camp, [d.road0, d.bar0, d.insula0])
+
+        a = message.GameAction(message.FOLLOWROLE, False, 1,
+                d.jack1)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 1)
+        self.assertIn(d.jack1, self.p2.camp)
+
+
+    def test_lead_multiple_orders_and_jacks(self):
+        d = self.deck
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 4,
+                d.road0, d.bar0, d.insula0, d.jack0)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.n_camp_actions, 4)
+        self.assertItemsEqual(self.p1.camp, [d.jack0, d.road0, d.bar0, d.insula0])
+
+        a = message.GameAction(message.FOLLOWROLE, False, 3,
+                d.jack1, d.jack2, d.jack3)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 3)
+        self.assertItemsEqual(self.p2.camp, [d.jack1, d.jack2, d.jack3])
+
+
+    def test_lead_multiple_orders_jacks_and_petitions(self):
+        d = self.deck
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 3,
+                d.road0, d.bar0, d.insula0, d.jack0, d.villa0, d.villa1, d.villa2)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.n_camp_actions, 3)
+        self.assertItemsEqual(self.p1.camp,
+                [d.road0, d.bar0, d.insula0, d.jack0, d.villa0, d.villa1, d.villa2])
+
+        a = message.GameAction(message.FOLLOWROLE, False, 3,
+                d.jack1, d.jack2, d.jack3)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 3)
+        self.assertItemsEqual(self.p2.camp, [d.jack1, d.jack2, d.jack3])
+
+
+    def test_lead_multiple_petitions(self):
+        d = self.deck
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 2,
+                d.road0, d.bar0, d.insula0, d.villa0, d.villa1, d.villa2)
+        self.game.handle(a)
+
+        self.assertEqual(self.p1.n_camp_actions, 2)
+        self.assertItemsEqual(self.p1.camp,
+                [d.road0, d.bar0, d.insula0, d.villa0, d.villa1, d.villa2])
+
+        a = message.GameAction(message.FOLLOWROLE, False, 3,
+                d.jack1, d.jack2, d.jack3)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 3)
+        self.assertItemsEqual(self.p2.camp, [d.jack1, d.jack2, d.jack3])
+
+
+    def test_illegal_lead(self):
+        d = self.deck
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 2,
+                d.road0, d.bar0, d.villa0, d.villa1, d.villa2)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.LEADROLE, 'Legionary', 3,
+                d.road0, d.bar0, d.insula0, d.villa0, d.villa1, d.villa2)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
+class TestPalaceCircus(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.simple_two_player()
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.jack1, d.jack2, d.jack3])
+        self.p2.hand.set_content([d.road0, d.road1, d.road2,
+                d.road3, d.road4, d.road5, d.jack0])
+
+        self.p1.buildings.append(Building(d.palace, 'Marble', complete=True))
+        self.p2.buildings.append(Building(d.palace, 'Marble', complete=True))
+        self.p2.buildings.append(Building(d.circus, 'Wood', complete=True))
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, d.jack1)
+                
+        self.game.handle(a)
+
+
+    def test_multiple_three_card_petitions(self):
+        d = self.deck
+
+        a = message.GameAction(message.FOLLOWROLE, False, 2,
+                d.road0, d.road1, d.road2, d.road3, d.road4, d.road5)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 2)
+        self.assertItemsEqual(self.p2.camp,
+                [d.road0, d.road1, d.road2, d.road3, d.road4, d.road5])
+
+
+    def test_multiple_two_card_petitions(self):
+        d = self.deck
+
+        a = message.GameAction(message.FOLLOWROLE, False, 3,
+                d.road0, d.road1, d.road2, d.road3, d.road4, d.road5)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 3)
+        self.assertItemsEqual(self.p2.camp,
+                [d.road0, d.road1, d.road2, d.road3, d.road4, d.road5])
+
+
+    def test_mixed_petitions(self):
+        d = self.deck
+
+        a = message.GameAction(message.FOLLOWROLE, False, 4,
+                d.road0, d.road1, d.road2, d.road3, d.road4, d.road5)
+        self.game.handle(a)
+
+        self.assertEqual(self.p2.n_camp_actions, 4)
+        self.assertItemsEqual(self.p2.camp,
+                [d.road0, d.road1, d.road2, d.road3, d.road4, d.road5])
+
+
+    def test_illegal_petitions(self):
+        d = self.deck
+
+        self.p2.hand.set_content([d.bath0, d.bath1, d.bath2,
+                d.dock0, d.dock1, d.dock2, d.jack0])
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        a = message.GameAction(message.FOLLOWROLE, False, 3,
+                d.bath0, d.bath1, d.bath2, d.dock0, d.dock1, d.dock2)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.FOLLOWROLE, False, 2, d.bath0, d.dock0)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+
+        self.assertFalse(mon.modified(self.game))
+
+
 class TestRoad(unittest.TestCase):
 
     def test_add_non_matching_matrials(self):
@@ -1851,9 +2051,6 @@ class TestSewer(unittest.TestCase):
             self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
-
-
-
 
 
 class TestStatue(unittest.TestCase):
