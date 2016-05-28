@@ -1287,7 +1287,9 @@ class Game(object):
 
 
     def _handle_fountain(self, a):
-        skip, building, material, site = a.args
+        building, material, site = a.args
+
+        skip = building is None
 
         p = self.active_player
 

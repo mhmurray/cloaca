@@ -241,7 +241,7 @@ class TestFountain(unittest.TestCase):
         self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, True, None, None, None)
+        a = message.GameAction(message.FOUNTAIN, None, None, None)
         self.game.handle(a)
 
         self.assertIn(bath, self.p1.hand)
@@ -262,7 +262,7 @@ class TestFountain(unittest.TestCase):
         self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, False, bath, None, 'Brick')
+        a = message.GameAction(message.FOUNTAIN, bath, None, 'Brick')
         self.game.handle(a)
 
         self.assertNotIn(bath, self.p1.hand)
@@ -288,7 +288,7 @@ class TestFountain(unittest.TestCase):
         self.assertEqual(self.p1.fountain_card, bath)
         self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, False, atrium, bath, None)
+        a = message.GameAction(message.FOUNTAIN, atrium, bath, None)
         self.game.handle(a)
 
         self.assertNotIn(bath, self.p1.hand)
@@ -346,7 +346,7 @@ class TestFountainOutOfTown(unittest.TestCase):
         self.assertEqual(p1.fountain_card, d.dock0)
         self.assertEqual(game.expected_action, message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, False, d.dock0, None, 'Wood')
+        a = message.GameAction(message.FOUNTAIN, d.dock0, None, 'Wood')
         game.handle(a)
 
         self.assertNotIn(d.dock0, p1.hand)
@@ -384,7 +384,7 @@ class TestFountainOutOfTown(unittest.TestCase):
         mon = Monitor()
         mon.modified(game)
 
-        a = message.GameAction(message.FOUNTAIN, False, d.dock0, None, 'Wood')
+        a = message.GameAction(message.FOUNTAIN, d.dock0, None, 'Wood')
 
         with self.assertRaises(GTRError):
             game.handle(a)

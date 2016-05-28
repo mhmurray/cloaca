@@ -153,8 +153,7 @@ _action_args_dict = {
         (   (int, 'n_actions'), ), (Card, 'cards') ),
 
     FOUNTAIN       : GTRActionSpec('fountain',
-        (   (bool, 'skip'), (Card, 'building'),
-            (Card, 'material'), (str, 'site') ), () ),
+        (   (Card, 'building'), (Card, 'material'), (str, 'site') ), () ),
 
     STAIRWAY       : GTRActionSpec('stairway',
         (   (Card, 'building'), (Card, 'material') ), () ),
