@@ -759,10 +759,16 @@ class Game(object):
         
 
     def _handle_followrole(self, a):
-        think, n_actions = a.args[0], a.args[1]
-        cards = a.args[2:]
+        n_actions = a.args[0]
+        cards = a.args[1:]
 
         p = self.active_player
+
+        think = n_actions == 0
+
+        if think and len(cards)>0:
+            raise GTRError('Thinker (n_actions == 0) requested but cards received ({0}).'
+                    .format(', '.join(map(str, cards))))
 
         if think:
             p.n_camp_actions = 0

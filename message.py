@@ -150,7 +150,7 @@ _action_args_dict = {
         (   (str, 'role'), (int, 'n_actions') ), (Card, 'cards') ),
 
     FOLLOWROLE     : GTRActionSpec('followrole',
-        (   (bool, 'think'), (int, 'n_actions') ), (Card, 'cards') ),
+        (   (int, 'n_actions'), ), (Card, 'cards') ),
 
     FOUNTAIN       : GTRActionSpec('fountain',
         (   (bool, 'skip'), (Card, 'building'),

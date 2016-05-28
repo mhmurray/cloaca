@@ -1526,7 +1526,7 @@ class TestLatrine(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, d.road0)
         self.game.handle(a)
 
-        a = message.GameAction(message.FOLLOWROLE, True, 0, None)
+        a = message.GameAction(message.FOLLOWROLE, 0)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.USELATRINE)
@@ -1852,8 +1852,7 @@ class AmericasTestPalace(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 3)
         self.assertItemsEqual(self.p1.camp, [d.road0, d.bar0, d.insula0])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 1,
-                d.jack1)
+        a = message.GameAction(message.FOLLOWROLE, 1, d.jack1)
         self.game.handle(a)
 
         self.assertEqual(self.p2.n_camp_actions, 1)
@@ -1870,7 +1869,7 @@ class AmericasTestPalace(unittest.TestCase):
         self.assertEqual(self.p1.n_camp_actions, 4)
         self.assertItemsEqual(self.p1.camp, [d.jack0, d.road0, d.bar0, d.insula0])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 3,
+        a = message.GameAction(message.FOLLOWROLE, 3,
                 d.jack1, d.jack2, d.jack3)
         self.game.handle(a)
 
@@ -1889,7 +1888,7 @@ class AmericasTestPalace(unittest.TestCase):
         self.assertItemsEqual(self.p1.camp,
                 [d.road0, d.bar0, d.insula0, d.jack0, d.villa0, d.villa1, d.villa2])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 3,
+        a = message.GameAction(message.FOLLOWROLE, 3,
                 d.jack1, d.jack2, d.jack3)
         self.game.handle(a)
 
@@ -1908,7 +1907,7 @@ class AmericasTestPalace(unittest.TestCase):
         self.assertItemsEqual(self.p1.camp,
                 [d.road0, d.bar0, d.insula0, d.villa0, d.villa1, d.villa2])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 3,
+        a = message.GameAction(message.FOLLOWROLE, 3,
                 d.jack1, d.jack2, d.jack3)
         self.game.handle(a)
 
@@ -1965,7 +1964,7 @@ class TestPalaceCircus(unittest.TestCase):
     def test_multiple_three_card_petitions(self):
         d = self.deck
 
-        a = message.GameAction(message.FOLLOWROLE, False, 2,
+        a = message.GameAction(message.FOLLOWROLE, 2,
                 d.road0, d.road1, d.road2, d.road3, d.road4, d.road5)
         self.game.handle(a)
 
@@ -1977,7 +1976,7 @@ class TestPalaceCircus(unittest.TestCase):
     def test_multiple_two_card_petitions(self):
         d = self.deck
 
-        a = message.GameAction(message.FOLLOWROLE, False, 3,
+        a = message.GameAction(message.FOLLOWROLE, 3,
                 d.road0, d.road1, d.road2, d.road3, d.road4, d.road5)
         self.game.handle(a)
 
@@ -1989,7 +1988,7 @@ class TestPalaceCircus(unittest.TestCase):
     def test_mixed_petitions(self):
         d = self.deck
 
-        a = message.GameAction(message.FOLLOWROLE, False, 4,
+        a = message.GameAction(message.FOLLOWROLE, 4,
                 d.road0, d.road1, d.road2, d.road3, d.road4, d.road5)
         self.game.handle(a)
 
@@ -2007,14 +2006,14 @@ class TestPalaceCircus(unittest.TestCase):
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.FOLLOWROLE, False, 3,
+        a = message.GameAction(message.FOLLOWROLE, 3,
                 d.bath0, d.bath1, d.bath2, d.dock0, d.dock1, d.dock2)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
         self.assertFalse(mon.modified(self.game))
 
-        a = message.GameAction(message.FOLLOWROLE, False, 2, d.bath0, d.dock0)
+        a = message.GameAction(message.FOLLOWROLE, 2, d.bath0, d.dock0)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -2206,7 +2205,7 @@ class TestSewer(unittest.TestCase):
                 d.jack0, d.villa0, d.villa1, d.villa2, d.road0)
         self.game.handle(a)
 
-        a = message.GameAction(message.FOLLOWROLE, False, 1, d.jack1)
+        a = message.GameAction(message.FOLLOWROLE, 1, d.jack1)
         self.game.handle(a)
 
         a = message.GameAction(message.LABORER)
@@ -2612,7 +2611,7 @@ class TestVomitorium(unittest.TestCase):
         a = message.GameAction(message.LEADROLE, 'Laborer', 1, d.road0)
         self.game.handle(a)
 
-        a = message.GameAction(message.FOLLOWROLE, True, 0, None)
+        a = message.GameAction(message.FOLLOWROLE, 0)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.USEVOMITORIUM)

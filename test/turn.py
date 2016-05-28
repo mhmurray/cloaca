@@ -334,6 +334,7 @@ class TestFollow(unittest.TestCase):
     def setUp(self):
         """ This is run prior to every test.
         """
+        d = self.deck = test_setup.TestDeck()
         self.game = test_setup.simple_two_player()
         self.p1, self.p2 = self.game.players
         
@@ -341,11 +342,10 @@ class TestFollow(unittest.TestCase):
         a = message.GameAction(message.THINKERORLEAD, False)
         self.game.handle(a)
 
-        jack = cm.get_card('Jack')
-        self.p1.hand.set_content([jack])
+        self.p1.hand.set_content([d.jack0])
 
         # p1 leads Laborer
-        a = message.GameAction(message.LEADROLE, 'Laborer', 1, jack)
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1, d.jack0)
         self.game.handle(a)
 
 
@@ -358,7 +358,7 @@ class TestFollow(unittest.TestCase):
     def test_do_thinker(self):
         """ Responding with True should do expect THINKERTYPE response.
         """
-        a = message.GameAction(message.FOLLOWROLE, True, 0, None)
+        a = message.GameAction(message.FOLLOWROLE, 0)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.THINKERTYPE)
@@ -371,7 +371,7 @@ class TestFollow(unittest.TestCase):
         jack = cm.get_card('Jack')
         self.p2.hand.set_content([jack])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 1, jack)
+        a = message.GameAction(message.FOLLOWROLE, 1, jack)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.LABORER)
@@ -383,16 +383,37 @@ class TestFollow(unittest.TestCase):
     def test_follow_role_with_orders(self):
         """ Follow Laborer with a Latrine.
         """
-        latrine = cm.get_card('Latrine')
-        self.p2.hand.set_content([latrine])
+        d = self.deck
+        self.p2.hand.set_content([d.latrine0])
 
-        a = message.GameAction(message.FOLLOWROLE, False, 1, latrine)
+        a = message.GameAction(message.FOLLOWROLE, 1, d.latrine0)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.LABORER)
-        self.assertIn(latrine, self.p2.camp)
-        self.assertNotIn(latrine, self.p2.hand)
+        self.assertIn(d.latrine0, self.p2.camp)
+        self.assertNotIn(d.latrine0, self.p2.hand)
         self.assertEqual(self.p2.n_camp_actions, 1)
+
+    def test_follow_with_too_few_cards_and_actions(self):
+        """Follow with not enough cards or action specified
+        """
+        d = self.deck
+        self.p2.hand.set_content([d.latrine0])
+
+        a = message.GameAction(message.FOLLOWROLE, 0, d.latrine0)
+        mon = Monitor()
+        mon.modified(self.game)
+        with self.assertRaises(GTRError) as cm:
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.FOLLOWROLE, 1)
+        with self.assertRaises(GTRError) as cm:
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
 
     def test_follow_role_with_nonexistent_card(self):
         """Follow Laborer specifying a non-existent card.
@@ -402,7 +423,7 @@ class TestFollow(unittest.TestCase):
         latrine = cm.get_card('Latrine')
         self.p2.hand.set_content([])
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, latrine)
+        a = message.GameAction(message.FOLLOWROLE, 1, latrine)
         
         # Monitor the gamestate for any changes
         mon = Monitor()
@@ -418,7 +439,7 @@ class TestFollow(unittest.TestCase):
         atrium = cm.get_card('Atrium')
         self.p2.hand.set_content([atrium])
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, atrium)
+        a = message.GameAction(message.FOLLOWROLE, 1, atrium)
         
         # Monitor the gamestate for any changes
         mon = Monitor()
@@ -435,7 +456,7 @@ class TestFollow(unittest.TestCase):
         cards = atrium, school1, school2 = cm.get_cards(['Atrium', 'School', 'School'])
         self.p2.hand.set_content(cards)
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, *cards)
+        a = message.GameAction(message.FOLLOWROLE, 1, *cards)
         
         self.game.handle(a)
 
@@ -452,7 +473,7 @@ class TestFollow(unittest.TestCase):
         cards = latrine, insula1, insula2 = cm.get_cards(['Latrine', 'Insula', 'Insula'])
         self.p2.hand.set_content(cards)
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, *cards)
+        a = message.GameAction(message.FOLLOWROLE, 1, *cards)
 
         self.game.handle(a)
 
@@ -472,7 +493,7 @@ class TestFollow(unittest.TestCase):
         cards = latrine, road, insula = cm.get_cards(['Latrine', 'Road', 'Insula'])
         self.p2.hand.set_content(cards)
         
-        a = message.GameAction(message.FOLLOWROLE, False, 1, latrine, insula)
+        a = message.GameAction(message.FOLLOWROLE, 1, latrine, insula)
 
         # Monitor the gamestate for any changes
         mon = Monitor()

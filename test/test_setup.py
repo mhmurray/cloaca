@@ -222,11 +222,11 @@ def n_player_lead(n, role, clientele=[], buildings=[], deck=None, follow=False):
         if follow:
             jack = getattr(d, 'jack'+str(i+1))
             p.hand.set_content([jack])
-            a = message.GameAction(message.FOLLOWROLE, False, 1, jack)
+            a = message.GameAction(message.FOLLOWROLE, 1, jack)
             g.handle(a)
 
         else:
-            a = message.GameAction(message.FOLLOWROLE, True, 0, None)
+            a = message.GameAction(message.FOLLOWROLE, 0)
             g.handle(a)
             a = message.GameAction(message.THINKERTYPE, True)
             g.handle(a)
