@@ -33,6 +33,7 @@ class Player:
         self.buildings = []
         self.influence = []
         self.revealed = Zone()
+        self.prev_revealed = Zone()
         self.performed_craftsman = False
 
     def __repr__(self):

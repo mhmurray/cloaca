@@ -270,6 +270,25 @@ class TestStairway(unittest.TestCase):
         self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
 
+    def test_add_to_incomplete_building(self):
+        d = self.deck
+
+        self.p2.buildings.append(Building(d.wall0, 'Concrete'))
+
+        a = GameAction(message.ARCHITECT, None, None, None)
+        self.game.handle(a)
+
+        a = GameAction(message.STAIRWAY, d.wall0, d.storeroom0)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
 class TestPrison(unittest.TestCase):
     """Test completeing a prison and stealing buildings.
     """
@@ -345,6 +364,24 @@ class TestPrison(unittest.TestCase):
 
         self.assertEqual(self.game.active_player, self.p1)
         self.assertEqual(self.game.expected_action, message.LABORER)
+
+
+    def test_prison_incomplete_building(self):
+        """Try to illegally steal an incomplete building with Prison.
+        """
+        d = self.deck
+
+        self.p2.buildings.append(Building(d.shrine0, 'Brick'))
+
+        a = message.GameAction(message.PRISON, d.shrine0)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
 
 
 class TestAcademy(unittest.TestCase):

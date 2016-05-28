@@ -130,10 +130,10 @@ _action_args_dict = {
     PATRONFROMDECK : GTRActionSpec('patronfromdeck', ( (bool, 'from_deck'), ), () ),
     PATRONFROMHAND : GTRActionSpec('patronfromhand', ( (Card, 'from_hand'), ), () ),
     GIVECARDS      : GTRActionSpec('givecards',      (), (Card, 'cards') ),
-    USESEWER       : GTRActionSpec('usesewer',       (), (Card, 'c1') ),
+    USESEWER       : GTRActionSpec('usesewer',       (), (Card, 'cards') ),
     LEGIONARY      : GTRActionSpec('legionary',      (), (Card, 'from_hand') ),
     TAKEPOOLCARDS  : GTRActionSpec('takepoolcards',  (), (Card, 'from_pool') ),
-    PRISON         : GTRActionSpec('prison',         ( (Card, 'building_to_steal'), ), () ),
+    PRISON         : GTRActionSpec('prison',         ( (Card, 'building'), ), () ),
     LABORER        : GTRActionSpec('laborer',
         ( (Card, 'from_hand'), (Card, 'from_pool') ), () ),
 
@@ -264,13 +264,20 @@ class GameAction(object):
             card_arg_match = _type is Card and type(arg) is int
             bad_arg_match = type(arg) is not _type
             arg_is_none = arg is None
+            arg_invalid_bool = type(arg) is not bool and _type is bool
             str_unicode_error = type(arg) is str and _type is unicode \
                     or type(arg) is unicode and _type is str
 
-            if bad_arg_match and not arg_is_none and not str_unicode_error and not card_arg_match:
+            if bad_arg_match and not arg_is_none and not\
+                    str_unicode_error and not card_arg_match:
                 raise GameActionError(
                     'Argument {0} ("{1}"), {2} doesn\'t match type ({3} != {4})'
                     .format(i, name, str(arg), str(_type), str(type(arg))))
+
+            if arg_invalid_bool:
+                raise GameActionError(
+                    'Argument {0} ("{1}") must be boolean (received {2})'
+                    .format(i, name, str(arg)))
 
         # Extended args
         for i, arg in izip(count(spec.n_req_args), self.args[spec.n_req_args:]):
@@ -279,13 +286,21 @@ class GameAction(object):
             card_arg_match = _type is Card and type(arg) is int
             bad_arg_match = type(arg) is not _type
             arg_is_none = arg is None
+            arg_invalid_bool = type(arg) is not bool and _type is bool
             str_unicode_error = type(arg) is str and _type is unicode \
                     or type(arg) is unicode and _type is str
 
-            if bad_arg_match and not arg_is_none and not str_unicode_error and not card_arg_match:
+            if bad_arg_match and not arg_is_none and not\
+                    str_unicode_error and not card_arg_match\
+                    and not arg_invalid_bool:
                 raise GameActionError(
                     'Argument {0} ("{1}"), {2} doesn\'t match type ({3} != {4})'
                     .format(i, name, str(arg), str(_type), str(type(arg))))
+
+            if arg_invalid_bool:
+                raise GameActionError(
+                    'Argument {0} ("{1}") must be boolean (received {2})'
+                    .format(i, name, str(arg)))
 
 
     def convert_args(self):

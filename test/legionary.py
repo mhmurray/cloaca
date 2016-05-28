@@ -105,6 +105,86 @@ class TestMultiLegionary(unittest.TestCase):
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
 
 
+class TestLegionaryFivePlayers(unittest.TestCase):
+
+
+    def setUp(self):
+        d = self.deck = TestDeck()
+        self.game = test_setup.n_player_lead(5, 'Legionary', deck=d,
+                clientele=[['Atrium']])
+        self.p1 = self.game.players[0]
+        self.others = self.game.players[1:]
+
+
+        self.p1.hand.set_content([d.road0, d.dock0])
+        for i, p in enumerate(self.game.players):
+            p.hand.set_content([getattr(d, 'road'+str(i)),
+                getattr(d, 'dock'+str(i))])
+
+
+    def test_legionary_hits_only_neighbors(self):
+        d = self.deck
+        a = message.GameAction(message.LEGIONARY, d.dock0, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.game.players[1])
+
+        a = message.GameAction(message.GIVECARDS, d.road1, d.dock1)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.game.players[4])
+
+        a = message.GameAction(message.GIVECARDS, d.road4, d.dock4)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.game.players[1])
+
+
+    def test_legionary_hits_all_with_bridge(self):
+        d = self.deck
+        self.p1.buildings.append(Building(d.bridge, 'Concrete', complete=True))
+
+        a = message.GameAction(message.LEGIONARY, d.dock0, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.game.players[1])
+
+        a = message.GameAction(message.GIVECARDS, d.road1, d.dock1)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.game.players[2])
+
+        a = message.GameAction(message.GIVECARDS, d.road2, d.dock2)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.game.players[3])
+
+        a = message.GameAction(message.GIVECARDS, d.road3, d.dock3)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.game.players[4])
+
+        a = message.GameAction(message.GIVECARDS, d.road4, d.dock4)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.game.players[1])
+
+
+
 class TestLegionary(unittest.TestCase):
 
     def setUp(self):
@@ -205,6 +285,31 @@ class TestLegionary(unittest.TestCase):
         self.game.handle(a)
 
         a = message.GameAction(message.GIVECARDS)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
+    def test_give_cards_not_in_hand(self):
+        """A GIVECARDS action with cards not in the player's hand.
+        """
+        d = self.deck
+
+        self.p1.hand.set_content([d.atrium0])
+        self.p2.hand.set_content([d.foundry0])
+
+        a = message.GameAction(message.LEGIONARY, d.atrium0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS, d.shrine0)
 
         mon = Monitor()
         mon.modified(self.game)

@@ -184,6 +184,8 @@ class Game(object):
             if p.name != player_name:
                 p.hand.set_content([c if c.name == 'Jack' else Card(-1) for c in p.hand ])
                 p.fountain_card = Card(-1) if p.fountain_card else None
+                p.revealed.set_content([cm.get_card(c.name) for c in p.revealed])
+                p.prev_revealed.set_content([cm.get_card(c.name) for c in p.prev_revealed])
 
         return gs
 
@@ -1500,6 +1502,9 @@ class Game(object):
                 raise GTRError('Building named for Stairway addition not found: {0}'
                         .format(foundation.name))
 
+            if not b.complete:
+                raise GTRError('Cannot use Stairway on incomplete building.')
+
             from_pool = material in self.pool
 
             zone = self.pool if from_pool else p.stockpile
@@ -1575,8 +1580,11 @@ class Game(object):
             raise GTRError('Cannot demand material with Jack.')
 
         p = self.active_player
+        hand = Zone([c for c in p.hand if c.name !='Jack'])
+        for c in p.prev_revealed:
+            hand.cards.remove(c)
 
-        if not p.hand.contains(cards):
+        if not hand.contains(cards):
             raise GTRError('Demanding with cards not in hand: {0}.'
                     .format(', '.join(map(str,cards))))
 
@@ -1585,17 +1593,14 @@ class Game(object):
                     '({1:d} allowed)'
                     .format(', '.join(map(str,cards)), self.legionary_count))
 
-
-
-        # Player.revealed isn't a zone, but a list of revealed cards in the hand
-        # so the cards are not removed from the players hand
-        p.revealed.extend(p.hand.get_cards(cards))
+        p.revealed.set_content(hand.get_cards(cards))
+        p.prev_revealed.extend(p.revealed)
 
         revealed_materials = [c.material for c in p.revealed]
 
         self._log('Rome demands {0}! (revealing {1})'
             .format(', '.join(revealed_materials), 
-                ', '.join(map(str,p.revealed))))
+                ', '.join(map(str, p.revealed))))
 
         # Get cards from other players
         self.legionary_index = self.players.index(p)
@@ -1695,7 +1700,7 @@ class Game(object):
                     .format(', '.join(map(str, cards_in_clientele))))
 
         if (len(cards_in_hand)+len(cards_in_stockpile)+
-                len(cards_in_clientele)) > len(cards):
+                len(cards_in_clientele)) < len(cards):
             raise GTRError('Cards given that aren\'t in '
                     'stockpile, hand, or clientele ({0}).'
                     .format(', '.join(map(str, cards))))
@@ -1916,6 +1921,9 @@ class Game(object):
             if p is None or b is None:
                 raise GTRError('Building chosen for Prison doesn\'t exist: {0}'
                         .format(building.name))
+
+            if not b.complete:
+                raise GTRError('Cannot use Prison on incomplete building.')
 
             else:
                 i = p.buildings.index(b)
