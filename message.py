@@ -134,8 +134,7 @@ _action_args_dict = {
     LEGIONARY      : GTRActionSpec('legionary',      (), (Card, 'from_hand') ),
     TAKEPOOLCARDS  : GTRActionSpec('takepoolcards',  (), (Card, 'from_pool') ),
     PRISON         : GTRActionSpec('prison',         ( (Card, 'building'), ), () ),
-    LABORER        : GTRActionSpec('laborer',
-        (), ( (Card, 'cards') ) ),
+    LABORER        : GTRActionSpec('laborer',        (), ( (Card, 'cards') ) ),
 
     ARCHITECT      : GTRActionSpec('architect',
         (   (Card, 'building'), (Card, 'material'),
@@ -145,7 +144,7 @@ _action_args_dict = {
         (   (Card, 'building'), (Card, 'material'), (str, 'site') ), () ),
 
     MERCHANT       : GTRActionSpec('merchant',
-        (   (Card, 'from_stockpile'), (Card, 'from_hand'), (bool, 'from_deck') ), () ),
+        (   (bool, 'from_deck'), ), (Card, 'cards') ),
 
     LEADROLE       : GTRActionSpec('leadrole',
         (   (str, 'role'), (int, 'n_actions'), (Card, 'c1') ), (Card, 'cards') ),

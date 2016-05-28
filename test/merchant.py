@@ -11,6 +11,7 @@ import cloaca.message as message
 
 from cloaca.test.monitor import Monitor
 import cloaca.test.test_setup as test_setup
+from test_setup import TestDeck
 
 import unittest
 
@@ -21,7 +22,8 @@ class TestMerchant(unittest.TestCase):
     def setUp(self):
         """ This is run prior to every test.
         """
-        self.game = test_setup.two_player_lead('Merchant')
+        self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Merchant', deck=self.deck)
         self.p1, self.p2 = self.game.players
 
 
@@ -34,14 +36,14 @@ class TestMerchant(unittest.TestCase):
     def test_merchant_one_from_stockpile(self):
         """ Take one card from the stockpile with merchant action.
         """
-        atrium = cm.get_card('Atrium')
-        self.p1.stockpile.set_content([atrium])
+        d = self.deck
+        self.p1.stockpile.set_content([d.atrium0])
 
-        a = message.GameAction(message.MERCHANT, atrium, None, False)
+        a = message.GameAction(message.MERCHANT, False, d.atrium0)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.p1.stockpile)
-        self.assertIn('Atrium', self.p1.vault)
+        self.assertNotIn(d.atrium0, self.p1.stockpile)
+        self.assertIn(d.atrium0, self.p1.vault)
 
     
     def test_merchant_non_existent_card(self):
@@ -49,10 +51,11 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
+        d = self.deck
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.MERCHANT, cm.get_card('Atrium'), None, False)
+        a = message.GameAction(message.MERCHANT, False, d.atrium0)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -64,14 +67,14 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        atrium, insula, dock = cm.get_cards(['Atrium', 'Insula', 'Dock'])
-        self.p1.stockpile.set_content([atrium])
-        self.p1.vault.set_content([insula, dock])
+        d = self.deck
+        self.p1.stockpile.set_content([d.atrium0])
+        self.p1.vault.set_content([d.insula, d.dock])
 
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.MERCHANT, atrium, None, False)
+        a = message.GameAction(message.MERCHANT, False, d.atrium0)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -83,15 +86,15 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        atrium, insula, dock, palisade = cm.get_cards(['Atrium', 'Insula', 'Dock', 'Palisade'])
-        self.p1.stockpile.set_content([atrium])
-        self.p1.vault.set_content([insula, dock, palisade])
+        d = self.deck
+        self.p1.stockpile.set_content([d.atrium0])
+        self.p1.vault.set_content([d.insula, d.dock, d.palisade])
         self.p1.influence.append('Wood')
 
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.MERCHANT, atrium, None, False)
+        a = message.GameAction(message.MERCHANT, False, d.atrium0)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -103,16 +106,16 @@ class TestMerchant(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        atrium, insula, dock, palisade = cm.get_cards(['Atrium', 'Insula', 'Dock', 'Palisade'])
-        self.p1.stockpile.set_content([atrium])
-        self.p1.vault.set_content([insula, dock])
+        d = self.deck
+        self.p1.stockpile.set_content([d.atrium0])
+        self.p1.vault.set_content([d.insula, d.dock])
         self.p1.influence.append('Wood')
 
-        a = message.GameAction(message.MERCHANT, atrium, None, False)
+        a = message.GameAction(message.MERCHANT, False, d.atrium0)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.p1.stockpile)
-        self.assertIn('Atrium', self.p1.vault)
+        self.assertNotIn(d.atrium0, self.p1.stockpile)
+        self.assertIn(d.atrium0, self.p1.vault)
 
 
 if __name__ == '__main__':

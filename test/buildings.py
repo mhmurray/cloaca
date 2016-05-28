@@ -548,7 +548,7 @@ class TestAtrium(unittest.TestCase):
 
     def test_merchant_from_deck(self):
         d = self.deck
-        a = message.GameAction(message.MERCHANT, None, None, True)
+        a = message.GameAction(message.MERCHANT, True)
         self.game.handle(a)
 
         self.assertNotIn(d.dock0, self.game.library)
@@ -647,7 +647,7 @@ class TestBasilica(unittest.TestCase):
 
     def test_merchant_from_hand_and_stockpile(self):
         d = self.deck
-        a = message.GameAction(message.MERCHANT, d.dock0, d.road0, False)
+        a = message.GameAction(message.MERCHANT, False, d.dock0, d.road0)
         self.game.handle(a)
 
         self.assertNotIn(d.dock0, self.p1.stockpile)
@@ -659,7 +659,7 @@ class TestBasilica(unittest.TestCase):
 
     def test_merchant_from_hand_only(self):
         d = self.deck
-        a = message.GameAction(message.MERCHANT, None, d.road0, False)
+        a = message.GameAction(message.MERCHANT, False, d.road0)
         self.game.handle(a)
 
         self.assertIn(d.dock0, self.p1.stockpile)
@@ -671,7 +671,7 @@ class TestBasilica(unittest.TestCase):
 
     def test_merchant_from_stockpile_only(self):
         d = self.deck
-        a = message.GameAction(message.MERCHANT, d.dock0, None, False)
+        a = message.GameAction(message.MERCHANT, False, d.dock0)
         self.game.handle(a)
 
         self.assertNotIn(d.dock0, self.p1.stockpile)

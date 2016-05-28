@@ -979,7 +979,7 @@ class Game(object):
 
         if len(pool_cards)>1:
             raise GTRError('Received too many cards from the pool ({1})'
-                       .format(p.name, ', '.join(map(str, hand_cards))))
+                       .format(', '.join(map(str, hand_cards))))
 
         if len(cards) > len(hand_cards) + len(pool_cards):
             raise GTRError('Received cards not in pool or hand.')
@@ -1788,9 +1788,28 @@ class Game(object):
 
 
     def _handle_merchant(self, a):
-        stockpile_card, hand_card, from_deck = a.args
+        from_deck = a.args[0]
+        cards = a.args[1:]
 
         p = self.active_player
+
+        stockpile_cards = [c for c in cards if c in p.stockpile]
+        hand_cards = [c for c in cards if c in p.hand]
+
+        if len(hand_cards)>1:
+            raise GTRError('Received too many cards from {0}\'s hand ({1})'
+                       .format(p.name, ', '.join(map(str, hand_cards))))
+
+        if len(stockpile_cards)>1:
+            raise GTRError('Received too many cards from {0}\'s stockpile ({1})'
+                       .format(p.name, ', '.join(map(str, stockpile_cards))))
+
+        if len(cards) > len(hand_cards) + len(stockpile_cards):
+            raise GTRError('Received cards not in stockpile or hand.')
+
+        stockpile_card = stockpile_cards[0] if stockpile_cards else None
+        hand_card = hand_cards[0] if hand_cards else None
+
 
         if stockpile_card and stockpile_card not in p.stockpile:
             raise GTRError('Card {0!s} not found in {1}\'s stockpile.'
