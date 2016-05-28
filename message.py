@@ -147,10 +147,10 @@ _action_args_dict = {
         (   (bool, 'from_deck'), ), (Card, 'cards') ),
 
     LEADROLE       : GTRActionSpec('leadrole',
-        (   (str, 'role'), (int, 'n_actions'), (Card, 'c1') ), (Card, 'cards') ),
+        (   (str, 'role'), (int, 'n_actions') ), (Card, 'cards') ),
 
     FOLLOWROLE     : GTRActionSpec('followrole',
-        (   (bool, 'think'), (int, 'n_actions'), (Card, 'c1') ), (Card, 'cards') ),
+        (   (bool, 'think'), (int, 'n_actions') ), (Card, 'cards') ),
 
     FOUNTAIN       : GTRActionSpec('fountain',
         (   (bool, 'skip'), (Card, 'building'),

@@ -118,12 +118,41 @@ class TestLeadRole(unittest.TestCase):
     def setUp(self):
         """ This is run prior to every test.
         """
+        self.deck = test_setup.TestDeck()
         self.game = test_setup.simple_two_player()
         self.p1, self.p2 = self.game.players
         
         # Indicate that we want to lead
         a = message.GameAction(message.THINKERORLEAD, False)
         self.game.handle(a)
+
+
+    def test_not_enough_cards_and_actions(self):
+        """Lead a role without enough cards.
+        """
+        d = self.deck
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 0, d.latrine0)
+
+        mon = Monitor()
+        mon.modified(self.game)
+        with self.assertRaises(GTRError) as cm:
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 1)
+        with self.assertRaises(GTRError) as cm:
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        a = message.GameAction(message.LEADROLE, 'Laborer', 0)
+        with self.assertRaises(GTRError) as cm:
+            self.game.handle(a)
+
+
+        self.assertFalse(mon.modified(self.game))
 
 
     def test_handle_lead_role_with_orders(self):
