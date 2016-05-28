@@ -46,12 +46,12 @@ class Game(object):
     finished = property(lambda self : self.winners is not None)
 
     def __init__(self):
+        self.game_id = 0
         self.players = []
         self.leader_index = None
         self.turn_number = 0
         self.role_led = None
         self.active_player = None
-        self.turn_index = 0
         self.jacks = Zone()
         self.library = Zone()
         self.pool = Zone()
@@ -61,11 +61,8 @@ class Game(object):
         self.used_oot = False
         self.stack = stack.Stack()
         self.legionary_count = 0
-        self.legionary_index = 0
-        self.legionary_resp_indices = []
-        self.senate_resp_indices = []
+        self.legionary_player = None
         self.expected_action = None
-        self.game_id = 0
         self.host = None
         self.winners = None
 
@@ -221,7 +218,6 @@ class Game(object):
         self.leader_index = self.leader_index + 1
         if self.leader_index >= len(self.players):
             self.leader_index = 0
-            self.turn_index = self.turn_index + 1
         lg.debug('Leader index changed from {0} to {1}'.format(prev_index,
         self.leader_index))
 
@@ -1627,22 +1623,34 @@ class Game(object):
             .format(', '.join(revealed_materials), 
                 ', '.join(map(str, p.revealed))))
 
-        # Get cards from other players
-        self.legionary_index = self.players.index(p)
+        # Get cards from other players, but only neighbors without Bridge.
 
         has_bridge = self._player_has_active_building(p, 'Bridge')
 
-        if has_bridge:
-            r = range(len(self.players))
-            indices = r[self.legionary_index+1:] + r[:self.legionary_index]
-        else:
-            indices = [(self.legionary_index + 1) % len(self.players)]
-            if len(self.players) > 2:
-                indices.append((self.legionary_index - 1) % len(self.players))
-                
-        self.legionary_resp_indices = indices
+        if len(self.players) > 3 and not has_bridge:
+            players_turn_order = self._players_in_turn_order(p) 
+            responding_players = players_turn_order[1], players_turn_order[-1]
 
+        else:
+            responding_players = self._players_in_turn_order(p)
+            responding_players.pop(0)
+
+        for player in responding_players[::-1]:
+            self.stack.push_frame('_do_legionary_response', player)
+                
+        self.legionary_player = p
         self.expected_action = message.TAKEPOOLCARDS
+        self.active_player = p
+        return
+
+
+    def _do_legionary_response(self, player):
+        """Await GIVECARDS response from player.
+        """
+        self.expected_action = message.GIVECARDS
+        self.active_player = player
+        return
+
 
     def _handle_takepoolcards(self, a):
         pool_cards = a.args
@@ -1662,11 +1670,7 @@ class Game(object):
                 .format(self.leader.name,
                     ', '.join([c.material for c in pool_matches])))
 
-        if self.legionary_resp_indices:
-            self.active_player = self.players[self.legionary_resp_indices[0]]
-            self.expected_action = message.GIVECARDS
-        else:
-            self._pump()
+        self._pump()
 
 
     def _handle_givecards(self, a):
@@ -1680,7 +1684,7 @@ class Game(object):
 
         p = self.active_player
 
-        leg_p = self.players[self.legionary_index]
+        leg_p = self.legionary_player
 
         has_bridge = self._player_has_active_building(leg_p, 'Bridge')
         has_coliseum = self._player_has_active_building(leg_p, 'Coliseum')
@@ -1693,17 +1697,7 @@ class Game(object):
         self._move_legionary_cards(p, leg_p, cards, is_immune,
                 has_bridge, has_coliseum)
 
-        self.legionary_resp_indices.pop(0)
-        if len(self.legionary_resp_indices):
-            lg.debug('Waiting on next player to respond to legionary.')
-            next_index = self.legionary_resp_indices[0]
-
-            self.active_player = self.players[next_index]
-            self.expected_action = message.GIVECARDS
-
-        else:
-            lg.debug('All players have responded to legionary.')
-            self._pump()
+        self._pump()
 
 
     def _move_legionary_cards(self, p, leg_p, cards, immune, has_bridge, has_coliseum):
@@ -1716,8 +1710,9 @@ class Game(object):
 
         if cards_in_stockpile and not has_bridge:
             raise GTRError('Cannot give cards from stockpile if '
-                    'Legionary leader has no Bridge ({0}).'
-                    .format(', '.join(map(str, cards_in_stockpile))))
+                    'Legionary leader ({0}) has no Bridge ({1}).'
+                    .format(self.legionary_player.name,
+                        ', '.join(map(str, cards_in_stockpile))))
 
         if cards_in_clientele and not has_coliseum:
             raise GTRError('Cannot give cards from clientele if '
@@ -1758,10 +1753,17 @@ class Game(object):
 
         hand_cards_to_move = legionary_zone(
                 leg_p.revealed, cards_in_hand, p.hand)
-        stockpile_cards_to_move = legionary_zone(
-                leg_p.revealed, cards_in_stockpile, p.stockpile)
-        clientele_cards_to_move = legionary_zone(
-                leg_p.revealed, cards_in_clientele, p.clientele)
+        if has_bridge:
+            stockpile_cards_to_move = legionary_zone(
+                    leg_p.revealed, cards_in_stockpile, p.stockpile)
+        else:
+            stockpile_cards_to_move = []
+
+        if has_coliseum:
+            clientele_cards_to_move = legionary_zone(
+                    leg_p.revealed, cards_in_clientele, p.clientele)
+        else:
+            clientele_cards_to_move = []
 
         if hand_cards_to_move or stockpile_cards_to_move or \
                 clientele_cards_to_move:

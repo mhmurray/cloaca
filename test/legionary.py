@@ -107,14 +107,12 @@ class TestMultiLegionary(unittest.TestCase):
 
 class TestLegionaryFivePlayers(unittest.TestCase):
 
-
     def setUp(self):
         d = self.deck = TestDeck()
         self.game = test_setup.n_player_lead(5, 'Legionary', deck=d,
                 clientele=[['Atrium']])
         self.p1 = self.game.players[0]
         self.others = self.game.players[1:]
-
 
         self.p1.hand.set_content([d.road0, d.dock0])
         for i, p in enumerate(self.game.players):
@@ -146,6 +144,23 @@ class TestLegionaryFivePlayers(unittest.TestCase):
         self.assertEqual(self.game.active_player, self.game.players[1])
 
 
+class TestLegionaryFivePlayersBridge(unittest.TestCase):
+
+    def setUp(self):
+        d = self.deck = TestDeck()
+        self.game = test_setup.n_player_lead(5, 'Legionary', deck=d,
+                clientele=[['Atrium']],
+                buildings=[['Bridge']])
+        self.p1 = self.game.players[0]
+        self.others = self.game.players[1:]
+
+        self.p1.hand.set_content([d.road0, d.dock0])
+        for i, p in enumerate(self.game.players):
+            p.hand.set_content([getattr(d, 'road'+str(i)),
+                getattr(d, 'dock'+str(i))])
+            p.stockpile.set_content([getattr(d, 'insula'+str(i))])
+
+
     def test_legionary_hits_all_with_bridge(self):
         d = self.deck
         self.p1.buildings.append(Building(d.bridge, 'Concrete', complete=True))
@@ -159,25 +174,25 @@ class TestLegionaryFivePlayers(unittest.TestCase):
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
         self.assertEqual(self.game.active_player, self.game.players[1])
 
-        a = message.GameAction(message.GIVECARDS, d.road1, d.dock1)
+        a = message.GameAction(message.GIVECARDS, d.road1, d.dock1, d.insula1)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
         self.assertEqual(self.game.active_player, self.game.players[2])
 
-        a = message.GameAction(message.GIVECARDS, d.road2, d.dock2)
+        a = message.GameAction(message.GIVECARDS, d.road2, d.dock2, d.insula2)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
         self.assertEqual(self.game.active_player, self.game.players[3])
 
-        a = message.GameAction(message.GIVECARDS, d.road3, d.dock3)
+        a = message.GameAction(message.GIVECARDS, d.road3, d.dock3, d.insula3)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.GIVECARDS)
         self.assertEqual(self.game.active_player, self.game.players[4])
 
-        a = message.GameAction(message.GIVECARDS, d.road4, d.dock4)
+        a = message.GameAction(message.GIVECARDS, d.road4, d.dock4, d.insula4)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
