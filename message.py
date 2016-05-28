@@ -135,7 +135,7 @@ _action_args_dict = {
     TAKEPOOLCARDS  : GTRActionSpec('takepoolcards',  (), (Card, 'from_pool') ),
     PRISON         : GTRActionSpec('prison',         ( (Card, 'building'), ), () ),
     LABORER        : GTRActionSpec('laborer',
-        ( (Card, 'from_hand'), (Card, 'from_pool') ), () ),
+        (), ( (Card, 'cards') ) ),
 
     ARCHITECT      : GTRActionSpec('architect',
         (   (Card, 'building'), (Card, 'material'),

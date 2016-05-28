@@ -150,7 +150,7 @@ class TestBathNonConsecutiveLegionary(unittest.TestCase):
         a = message.GameAction(message.PATRONFROMPOOL, d.road0)
         self.game.handle(a)
 
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         self.game.handle(a)
 
         a = message.GameAction(message.PATRONFROMPOOL, d.shrine1)
@@ -191,7 +191,7 @@ class TestBathNonConsecutiveLegionary(unittest.TestCase):
         a = message.GameAction(message.PATRONFROMPOOL, d.road0)
         self.game.handle(a)
 
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         self.game.handle(a)
 
         a = message.GameAction(message.PATRONFROMPOOL, d.shrine1)

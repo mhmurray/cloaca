@@ -122,7 +122,7 @@ class TestBuildingResolution(unittest.TestCase):
 
         # Should have 4 influence now and 4 laborer actions stacked up
         for i in range(4):
-            a = message.GameAction(message.LABORER, None, None)
+            a = message.GameAction(message.LABORER)
             self.game.handle(a)
         
         # Now it's p2's turn
@@ -711,7 +711,7 @@ class TestCircusMaximus(unittest.TestCase):
         game.pool.set_content([d.road0, d.road1, d.road2])
 
         for card in [d.road0, d.road1, d.road2]:
-            a = message.GameAction(message.LABORER, None, card)
+            a = message.GameAction(message.LABORER, card)
             game.handle(a)
 
         self.assertEqual(game.expected_action, message.THINKERORLEAD)
@@ -735,14 +735,14 @@ class TestCircusMaximus(unittest.TestCase):
         self.assertEqual(game.active_player, p1)
 
         # Laborer for nothing with p1
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         game.handle(a)
 
         self.assertEqual(game.expected_action, message.LABORER)
         self.assertEqual(game.active_player, p2)
 
         for card in [d.road0, d.road1, d.road2, d.road3, d.road4]:
-            a = message.GameAction(message.LABORER, None, card)
+            a = message.GameAction(message.LABORER, card)
             game.handle(a)
 
         self.assertEqual(game.expected_action, message.THINKERORLEAD)
@@ -766,7 +766,7 @@ class TestCircusMaximus(unittest.TestCase):
         self.assertEqual(game.active_player, p1)
 
         # Laborer for nothing with p1
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         game.handle(a)
 
         self.assertEqual(game.expected_action, message.LABORER)
@@ -774,7 +774,7 @@ class TestCircusMaximus(unittest.TestCase):
 
         # Only two clients, but Circus Maximus isn't active when not following.
         for card in [d.road0, d.road1]:
-            a = message.GameAction(message.LABORER, None, card)
+            a = message.GameAction(message.LABORER, card)
             game.handle(a)
 
         self.assertEqual(game.expected_action, message.THINKERORLEAD)
@@ -2104,7 +2104,7 @@ class TestSenate(unittest.TestCase):
         self.assertTrue(game._player_has_active_building(p2, 'Senate'))
         self.assertEqual(len(p2.hand), 0)
 
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         game.handle(a)
 
         self.assertEqual(game.expected_action, message.USESENATE)
@@ -2130,7 +2130,7 @@ class TestSenate(unittest.TestCase):
         self.assertTrue(game._player_has_active_building(p2, 'Senate'))
         self.assertEqual(len(p2.hand), 0)
 
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         game.handle(a)
 
         self.assertEqual(game.expected_action, message.USESENATE)
@@ -2167,7 +2167,7 @@ class TestSenate(unittest.TestCase):
         self.assertEqual(len(p2.hand), 0)
         self.assertEqual(len(p3.hand), 0)
 
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
         game.handle(a)
 
         self.assertEqual(game.expected_action, message.USESENATE)
@@ -2209,7 +2209,7 @@ class TestSewer(unittest.TestCase):
         a = message.GameAction(message.FOLLOWROLE, False, 1, d.jack1)
         self.game.handle(a)
 
-        a = message.GameAction(message.LABORER, None, None)
+        a = message.GameAction(message.LABORER)
 
         for i in range(4):
             self.game.handle(a)

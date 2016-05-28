@@ -966,19 +966,36 @@ class Game(object):
 
 
     def _handle_laborer(self, a):
-        hand_c, pool_c = a.args[0:2]
+        cards = a.args
 
         p = self.active_player
 
-        if pool_c and pool_c not in self.pool:
+        hand_cards = [c for c in cards if c in p.hand]
+        pool_cards = [c for c in cards if c in self.pool]
+
+        if len(hand_cards)>1:
+            raise GTRError('Received too many cards from {0}\'s hand ({1})'
+                       .format(p.name, ', '.join(map(str, hand_cards))))
+
+        if len(pool_cards)>1:
+            raise GTRError('Received too many cards from the pool ({1})'
+                       .format(p.name, ', '.join(map(str, hand_cards))))
+
+        if len(cards) > len(hand_cards) + len(pool_cards):
+            raise GTRError('Received cards not in pool or hand.')
+
+        pool_c = pool_cards[0] if pool_cards else None
+        hand_c = hand_cards[0] if hand_cards else None
+
+        if pool_c is not None and pool_c not in self.pool:
             raise GTRError('Tried to move non-existent card {0} from pool'
                        .format(pool_c))
 
-        if hand_c and hand_c not in p.hand:
+        if hand_c is not None and hand_c not in p.hand:
             raise GTRError('Tried to move non-existent card {0} from hand'
                        .format(hand_c))
 
-        if hand_c and not self._player_has_active_building(p, 'Dock'):
+        if hand_c is not None and not self._player_has_active_building(p, 'Dock'):
             raise GTRError('Tried to Laborer from hand without Dock.');
 
         if pool_c:

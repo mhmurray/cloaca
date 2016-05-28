@@ -19,24 +19,25 @@ class TestLaborer(unittest.TestCase):
     def setUp(self):
         """This is run prior to every test.
         """
-        self.game = test_setup.two_player_lead('Laborer')
+        d = self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Laborer', deck=d)
         self.p1, self.p2 = self.game.players
 
 
     def test_expects_laborer(self):
         self.assertEqual(self.game.expected_action, message.LABORER)
+        self.assertEqual(self.game.active_player, self.p1)
 
 
     def test_laborer_one_from_pool(self):
+        d = self.deck
+        self.game.pool.set_content([d.atrium0])
 
-        atrium = cm.get_card('Atrium')
-        self.game.pool.set_content([atrium])
-
-        a = message.GameAction(message.LABORER, None, atrium)
+        a = message.GameAction(message.LABORER, d.atrium0)
         self.game.handle(a)
 
-        self.assertNotIn('Atrium', self.game.pool)
-        self.assertIn('Atrium', self.p1.stockpile)
+        self.assertNotIn(d.atrium0, self.game.pool)
+        self.assertIn(d.atrium0, self.p1.stockpile)
 
     
     def test_laborer_non_existent_card(self):
@@ -44,12 +45,13 @@ class TestLaborer(unittest.TestCase):
 
         This invalid game action should leave the game state unchanged.
         """
-        self.game.pool.set_content(cm.get_cards(['Atrium']))
+        d = self.deck
+        self.game.pool.set_content([d.atrium0])
 
         mon = Monitor()
         mon.modified(self.game)
 
-        a = message.GameAction(message.LABORER, None, cm.get_card('Dock'))
+        a = message.GameAction(message.LABORER, d.dock0)
         with self.assertRaises(GTRError):
             self.game.handle(a)
 
@@ -88,7 +90,7 @@ class TestLaborerWithDock(unittest.TestCase):
         self.game.pool.set_content([d.shrine0])
         self.p1.hand.set_content([d.foundry0])
 
-        a = message.GameAction(message.LABORER, d.foundry0, None)
+        a = message.GameAction(message.LABORER, d.foundry0)
         self.game.handle(a)
 
         self.assertIn(d.shrine0, self.game.pool)
@@ -116,10 +118,10 @@ class TestStoreroom(unittest.TestCase):
 
         self.game.pool.set_content([d.shrine0, d.foundry0])
 
-        a = message.GameAction(message.LABORER, None, d.shrine0)
+        a = message.GameAction(message.LABORER, d.shrine0)
         self.game.handle(a)
 
-        a = message.GameAction(message.LABORER, None, d.foundry0)
+        a = message.GameAction(message.LABORER, d.foundry0)
         self.game.handle(a)
 
         self.assertIn(d.shrine0, self.p1.stockpile)
