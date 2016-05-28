@@ -171,6 +171,42 @@ class TestBathNonConsecutiveLegionary(unittest.TestCase):
         self.assertIn(d.insula0, self.p1.prev_revealed)
 
 
+    def test_bath_reveal_same_card_twice(self):
+        d = self.deck
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.shrine0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEGIONARY, d.dock0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
+        self.assertIn(d.dock0, self.p1.revealed)
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LABORER, None, None)
+        self.game.handle(a)
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.shrine1)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEGIONARY, d.dock0)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
 
 class TestBathBar(unittest.TestCase):
 
