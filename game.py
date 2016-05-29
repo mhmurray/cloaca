@@ -420,6 +420,20 @@ class Game(object):
 
         return _active_buildings
 
+
+    def _await_action(self, action, active_player):
+        """Sets the game in a state to await a call to handle()
+        for the active_player and the specific action. For example:
+
+            self._await_action(message.GIVECARDS, player)
+
+        This exists because these are frequently placed on the stack,
+        requiring a function.
+        """
+        self.expected_action = action
+        self.active_player = active_player
+
+
     def _handle_thinkerorlead(self, a):
         do_thinker = a.args[0]
         p = self.leader
@@ -429,8 +443,8 @@ class Game(object):
             for p in self._players_in_turn_order()[::-1]:
                 self.stack.push_frame("_perform_role_being_led", p)
             for p in self._following_players_in_order()[::-1]:
-                self.stack.push_frame("_follow_role_action", p)
-            self.stack.push_frame("_lead_role_action")
+                self.stack.push_frame("_await_action", message.FOLLOWROLE, p)
+            self.stack.push_frame("_await_action", message.LEADROLE, p)
 
         else:
             self.stack.push_frame("_perform_thinker_action", p)
@@ -468,11 +482,6 @@ class Game(object):
         for i in range(0, n_cards):
             cards.append(self.library.pop(0))
         return cards
-
-    def _thinker_or_lead(self, player):
-        self.active_player = player
-        self.expected_action = message.THINKERORLEAD
-        return
 
     def _log(self, msg):
         """Logs the message in the GameState log roll.
@@ -518,7 +527,7 @@ class Game(object):
         self.stack.push_frame("_advance_turn")
         self.stack.push_frame("_end_turn")
         self.stack.push_frame("_kids_in_pool")
-        self.stack.push_frame("_thinker_or_lead", player)
+        self.stack.push_frame("_await_action", message.THINKERORLEAD, player)
 
         self._pump()
 
@@ -531,17 +540,6 @@ class Game(object):
 
         return max_hand_size
 
-    def _await_prison(self):
-        self.expected_action = message.PRISON
-        return
-
-    def _perform_optional_thinker_action(self, player):
-        """ Thinker using Academy at the end of turn in which player used Craftsman.
-
-        This thinker is optional, unlike _perform_thinker_action().
-        """
-        self.expected_action = message.SKIPTHINKER
-        return
 
     def _handle_skipthinker(self, a):
         skip = a.args[0]
@@ -645,13 +643,6 @@ class Game(object):
         self._pump()
 
 
-    def _lead_role_action(self):
-        """ Entry point for the lead role stack frame.
-        """
-        self.active_player = self.leader
-        self.expected_action = message.LEADROLE
-
-
     def _handle_leadrole(self, a):
         p = self.leader
 
@@ -678,11 +669,6 @@ class Game(object):
                     .format(p.name, role, ', '.join(map(str, cards))))
 
         self._pump()
-
-
-    def _follow_role_action(self, player):
-        self.active_player = player
-        self.expected_action = message.FOLLOWROLE
 
 
     def _check_action_units(self, player, role_led, n_actions, cards):
@@ -946,25 +932,26 @@ class Game(object):
             if role=='Patron':
                 self._perform_patron_action(player)
             elif role=='Laborer':
-                self._perform_laborer_action(player)
+                self.active_player = player
+                self.expected_action = message.LABORER
+                return
             elif role=='Architect':
-                self._perform_architect_action(player)
+                self.active_player = player
+                self.expected_action = message.ARCHITECT
+                return
             elif role=='Craftsman':
                 self._perform_craftsman_action(player)
             elif role=='Legionary':
                 self._perform_legionary_action(player)
             elif role=='Merchant':
-                self._perform_merchant_action(player)
+                self.active_player = player
+                self.expected_action = message.MERCHANT
+
             else:
                 raise ValueError('Illegal role: {}'.format(role))
 
         else:
             self._pump()
-
-
-    def _perform_laborer_action(self, player):
-        self.active_player = player
-        self.expected_action = message.LABORER
 
 
     def _handle_laborer(self, a):
@@ -1020,16 +1007,16 @@ class Game(object):
         has_aqueduct = self._player_has_active_building(player, 'Aqueduct')
 
         if has_bar and has_aqueduct:
-            # All patron stack frames will be pushed by _handle_baroraqueduct
             self.expected_action = message.BARORAQUEDUCT
+            return
 
         else:
             if has_bar:
-                self.stack.push_frame('_perform_patron_from_deck', player)
+                self.stack.push_frame('_await_action', message.PATRONFROMDECK, player)
             if has_aqueduct:
-                self.stack.push_frame('_perform_patron_from_hand', player)
+                self.stack.push_frame('_await_action', message.PATRONFROMHAND, player)
 
-            self.stack.push_frame('_perform_patron_from_pool', player)
+            self.stack.push_frame('_await_action', message.PATRONFROMPOOL, player)
 
             self._pump()
 
@@ -1040,20 +1027,15 @@ class Game(object):
         p = self.active_player
 
         if bar_first:
-            self.stack.push_frame('_perform_patron_from_deck', p)
-            self.stack.push_frame('_perform_patron_from_hand', p)
+            self.stack.push_frame('_await_action', message.PATRONFROMDECK, p)
+            self.stack.push_frame('_await_action', message.PATRONFROMHAND, p)
         else:
-            self.stack.push_frame('_perform_patron_from_hand', p)
-            self.stack.push_frame('_perform_patron_from_deck', p)
+            self.stack.push_frame('_await_action', message.PATRONFROMHAND, p)
+            self.stack.push_frame('_await_action', message.PATRONFROMDECK, p)
 
-        self.stack.push_frame('_perform_patron_from_pool', p)
+        self.stack.push_frame('_await_action', message.PATRONFROMPOOL, p)
 
         self._pump()
-
-
-    def _perform_patron_from_pool(self, player):
-        self.active_player = player
-        self.expected_action = message.PATRONFROMPOOL
 
 
     def _handle_patronfrompool(self, a):
@@ -1084,11 +1066,6 @@ class Game(object):
         self._pump()
 
 
-    def _perform_patron_from_deck(self, player):
-        self.active_player = player
-        self.expected_action = message.PATRONFROMDECK
-
-
     def _handle_patronfromdeck(self, a):
         do_patron = a.args[0]
 
@@ -1113,11 +1090,6 @@ class Game(object):
         self._check_forum()
 
         self._pump()
-
-
-    def _perform_patron_from_hand(self, player):
-        self.active_player = player
-        self.expected_action = message.PATRONFROMHAND
 
 
     def _handle_patronfromhand(self, a):
@@ -1253,11 +1225,6 @@ class Game(object):
         else:
             a = message.GameAction(message.USEFOUNTAIN, False)
             self._handle_usefountain(a)
-
-
-    def _perform_architect_action(self, player):
-        self.active_player = player
-        self.expected_action = message.ARCHITECT
 
 
     def _handle_usefountain(self, a):
@@ -1590,7 +1557,6 @@ class Game(object):
             else:
                 break
 
-        # Player can infer the legionary count
         self.expected_action = message.LEGIONARY
 
 
@@ -1636,19 +1602,11 @@ class Game(object):
             responding_players.pop(0)
 
         for player in responding_players[::-1]:
-            self.stack.push_frame('_do_legionary_response', player)
+            self.stack.push_frame('_await_action', message.GIVECARDS, player)
                 
         self.legionary_player = p
         self.expected_action = message.TAKEPOOLCARDS
         self.active_player = p
-        return
-
-
-    def _do_legionary_response(self, player):
-        """Await GIVECARDS response from player.
-        """
-        self.expected_action = message.GIVECARDS
-        self.active_player = player
         return
 
 
@@ -1792,11 +1750,6 @@ class Game(object):
             p.clientele.move_card(c, leg_p.vault)
 
 
-    def _perform_merchant_action(self, player):
-        self.active_player = player
-        self.expected_action = message.MERCHANT
-
-
     def _handle_merchant(self, a):
         from_deck = a.args[0]
         cards = a.args[1:]
@@ -1878,7 +1831,7 @@ class Game(object):
 
         for p in self._players_in_turn_order()[::-1]:
             if self._player_has_active_building(p, 'Senate'):
-                self.stack.push_frame('_do_senate', p)
+                self.stack.push_frame('_await_action', message.USESENATE, p)
 
         self._pump()
 
@@ -1890,11 +1843,6 @@ class Game(object):
 
         else:
             self._handle_usesewer(message.GameAction(message.USESEWER))
-
-
-    def _do_senate(self, p):
-        self.active_player = p
-        self.expected_action = message.USESENATE
 
 
     def _handle_usesenate(self, a):
@@ -2004,7 +1952,7 @@ class Game(object):
 
         if p.performed_craftsman and has_academy:
             p.peformed_craftsman = False
-            self.stack.push_frame('_perform_optional_thinker_action', p)
+            self.stack.push_frame('_await_action', message.SKIPTHINKER, p)
 
         self._pump()
 
@@ -2124,7 +2072,7 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.stack.push_frame('_perform_laborer_action', player)
+                self.stack.push_frame('_await_action', message.LABORER, player)
 
         elif str(building_obj) == 'Garden':
             n = player.influence_points
@@ -2142,7 +2090,7 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.stack.push_frame('_perform_optional_thinker_action', player)
+                self.stack.push_frame('_await_action', message.SKIPTHINKER, player)
 
         elif str(building_obj) == 'Amphitheatre':
             n = player.influence_points
@@ -2154,7 +2102,7 @@ class Game(object):
                 self.stack.push_frame('_perform_role_action', player, 'Craftsman')
 
         elif str(building_obj) == 'Prison':
-            self.stack.push_frame('_await_prison')
+            self.stack.push_frame('_await_action', message.PRISON, player)
 
         elif str(building_obj) in ('Forum', 'Ludus Magna', 'Gate', 'Storeroom'):
             self._check_forum()
