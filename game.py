@@ -40,7 +40,6 @@ class Game(object):
     """
     _initial_jack_count = 6
 
-    active_player_index = property(lambda self : self.players.index(self.active_player))
     leader = property(lambda self : self.players[self.leader_index])
     started = property(lambda self : self.turn_number > 0)
     finished = property(lambda self : self.winners is not None)
@@ -51,7 +50,7 @@ class Game(object):
         self.leader_index = None
         self.turn_number = 0
         self.role_led = None
-        self.active_player = None
+        self.active_player_index = None
         self.jacks = Zone()
         self.library = Zone()
         self.pool = Zone()
@@ -61,7 +60,7 @@ class Game(object):
         self.used_oot = False
         self.stack = stack.Stack()
         self.legionary_count = 0
-        self.legionary_player = None
+        self.legionary_player_index = None
         self.expected_action = None
         self.host = None
         self.winners = None
@@ -70,6 +69,22 @@ class Game(object):
         self._current_frame = None
 
         self.game_log = []
+
+    @property
+    def active_player(self):
+        return self.players[self.active_player_index]
+
+    @active_player.setter
+    def active_player(self, player):
+        self.active_player_index = self.players.index(player)
+
+    @property
+    def legionary_player(self):
+        return self.players[self.legionary_player_index]
+
+    @legionary_player.setter
+    def legionary_player(self, player):
+        self.legionary_player_index = self.players.index(player)
 
     def start(self):
         if self.started:
@@ -488,6 +503,7 @@ class Game(object):
         """
         time = datetime.now().time().strftime('%H:%M:%S ')
         self.game_log.append(time+msg)
+        lg.debug(time+msg)
 
     def _pump(self):
         """Pop the top frame from the stack into self._current_frame
@@ -1621,11 +1637,11 @@ class Game(object):
                     .format(', '.join(map(str, pool_matches))))
 
         for c in pool_matches:
-            self.pool.move_card(c, self.leader.stockpile)
+            self.pool.move_card(c, self.legionary_player.stockpile)
 
         if pool_matches:
             self._log('{0} collected {1} from the pool.'
-                .format(self.leader.name,
+                .format(self.legionary_player.name,
                     ', '.join([c.material for c in pool_matches])))
 
         self._pump()

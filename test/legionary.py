@@ -14,6 +14,7 @@ import cloaca.test.test_setup as test_setup
 from cloaca.test.test_setup import TestDeck
 
 import unittest
+#import logging_setup
 
 class TestMultiLegionary(unittest.TestCase):
     """Test handling legionary responses with multiple legionary
@@ -214,6 +215,40 @@ class TestLegionary(unittest.TestCase):
         """The Game should expect a LEGIONARY action.
         """
         self.assertEqual(self.game.expected_action, message.LEGIONARY)
+        self.assertEqual(self.game.active_player, self.p1)
+
+
+    def test_expects_takepoolcards(self):
+        """The Game should expect a TAKEPOOLCARDS action.
+        """
+        d = self.deck
+        self.p1.hand.set_content([d.atrium0])
+        self.game.pool.set_content([d.foundry0])
+
+        a = message.GameAction(message.LEGIONARY, d.atrium0)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.TAKEPOOLCARDS)
+        self.assertEqual(self.game.active_player, self.p1)
+        self.assertEqual(self.game.legionary_player, self.p1)
+
+
+    def test_expects_givecards(self):
+        """The Game should expect a TAKEPOOLCARDS action.
+        """
+        d = self.deck
+        self.p1.hand.set_content([d.atrium0])
+        self.game.pool.set_content([d.foundry0])
+
+        a = message.GameAction(message.LEGIONARY, d.atrium0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS, d.foundry0)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+        self.assertEqual(self.game.active_player, self.p2)
+        self.assertEqual(self.game.legionary_player, self.p1)
 
 
     def test_legionary_from_pool(self):
