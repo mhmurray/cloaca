@@ -2045,6 +2045,43 @@ class TestRoad(unittest.TestCase):
         self.assertTrue(game._player_has_active_building(p1, 'Coliseum'))
 
 
+    def test_lose_road_add_non_matching_matrials(self):
+        """Even if a building has a non-matching material added
+        via Road, if the Road is stolen (de-Stairwayed), they can't continue
+        to add non-matching materials.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Road'],[]],
+                clientele=[['Wall', 'Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.stockpile.set_content([d.road0, d.dock0, d.statue0])
+
+        b = Building(d.coliseum0, 'Stone')
+        p1.buildings.append(b)
+
+        a = message.GameAction(message.ARCHITECT, d.coliseum0, d.road0, None)
+        game.handle(a)
+
+        p1.buildings.pop(0)
+
+        self.assertFalse(game._player_has_active_building(p1, 'Road'))
+
+        a = message.GameAction(message.ARCHITECT, d.coliseum0, d.dock0, None)
+
+        mon = Monitor()
+        mon.modified(game)
+
+        with self.assertRaises(GTRError):
+            game.handle(a)
+
+        self.assertFalse(mon.modified(game))
+
+
 class TestScriptorium(unittest.TestCase):
 
     def test_finish_marble_building_with_one_marble(self):
@@ -2522,6 +2559,43 @@ class TestTower(unittest.TestCase):
         game.handle(a)
 
         self.assertIn('Road', p1.building_names)
+
+
+    def test_lose_tower(self):
+        """If the tower is lost, even after having added a Rubble to a
+        non-Rubble building, player cannot continue to add Rubble to it.
+        """
+        d = TestDeck()
+
+        game = test_setup.two_player_lead('Architect',
+                buildings=[['Tower'],[]],
+                clientele=[['Wall', 'Wall'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+
+        p1.stockpile.set_content([d.road0, d.bar0, d.insula0])
+
+        p1.buildings.append(Building(d.coliseum0, 'Stone'))
+
+        a = message.GameAction(message.ARCHITECT, d.coliseum0, d.road0, None)
+        game.handle(a)
+
+        a = message.GameAction(message.ARCHITECT, d.coliseum0, d.bar0, None)
+        game.handle(a)
+
+        p1.buildings.pop(0)
+        self.assertFalse(game._player_has_active_building(p1, 'Tower'))
+
+        a = message.GameAction(message.ARCHITECT, d.coliseum0, d.insula0, None)
+
+        mon = Monitor()
+        mon.modified(game)
+
+        with self.assertRaises(GTRError):
+            game.handle(a)
+
+        self.assertFalse(mon.modified(game))
 
 
 class TestVilla(unittest.TestCase):
