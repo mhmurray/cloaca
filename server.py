@@ -1,9 +1,9 @@
-from game import Game
-from player import Player
-from game_record import GameRecord
-from message import GameAction, Command
-import message
-from error import GTRError
+from cloaca.game import Game
+from cloaca.player import Player
+from cloaca.game_record import GameRecord
+from cloaca.message import GameAction, Command
+import cloaca.message as message
+from cloaca.error import GTRError, GameOver
 
 import uuid
 
