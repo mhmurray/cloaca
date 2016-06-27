@@ -104,7 +104,7 @@ class TestGameStatePrivatize(unittest.TestCase):
         gs_private = g.privatized_game_state_copy('p1')
 
         self.assertFalse(gs_private.library.contains('Circus'))
-        self.assertEqual(gs_private.library, Zone([Card(-1)]*len(gs_private.library)))
+        self.assertEqual(gs_private.library, Zone([Card(-1)]*len(gs_private.library), name='library'))
 
     def test_privatize_hands(self):
         """Test hiding opponents' hands.
@@ -151,8 +151,8 @@ class TestGameStatePrivatize(unittest.TestCase):
         gs_private = g.privatized_game_state_copy('p1')
         p0, p1 = gs_private.players
 
-        self.assertEqual(p0.vault, Zone([Card(-1)]*2))
-        self.assertEqual(p1.vault, Zone([Card(-1)]*2))
+        self.assertEqual(p0.vault, Zone([Card(-1)]*2, name='vault'))
+        self.assertEqual(p1.vault, Zone([Card(-1)]*2, name='vault'))
 
 
     def test_privatize_fountain_card(self):
