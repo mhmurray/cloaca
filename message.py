@@ -1,9 +1,8 @@
-import gtrutils
-import card_manager
+from cloaca.card import Card
+from cloaca.error import GameActionError, ParsingError
+
 from itertools import izip, izip_longest, count
-from card import Card
 import json
-from error import GameActionError, ParsingError
 
 THINKERORLEAD   =  0
 USELATRINE      =  1

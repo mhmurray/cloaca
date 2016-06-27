@@ -1,6 +1,9 @@
 class GTRError(Exception):
     pass
 
+class GTRDBError(GTRError):
+    pass
+
 class GameRuleError(GTRError):
     pass
 

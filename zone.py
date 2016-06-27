@@ -1,5 +1,5 @@
-from card import Card
-from error import GTRError
+from cloaca.card import Card
+from cloaca.error import GTRError
 
 from collections import Counter
 
@@ -7,18 +7,14 @@ class Zone(object):
     """An iterable container for Card objects.
     """
 
-    def __init__(self, cards=[], **kwargs):
+    def __init__(self, cards=[], name='zone'):
         """Initialize an instance with an iterable of Card objects.
 
         Additionally the "name" keyword argument is used as the name
         attribute (defaults to "zone"). 
         """
         self.cards = list(cards)
-        self.name = 'zone'
-        try:
-            self.name = kwargs['name']
-        except KeyError:
-            pass
+        self.name = name
 
     def set_content(self, cards):
         """Set the content of this zone to the specified cards.

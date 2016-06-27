@@ -3,9 +3,10 @@
 import re
 import logging
 import collections
-import card_manager as cm
 import termcolor
-from error import GTRError
+
+from cloaca.error import GTRError
+import cloaca.card_manager as cm
 
 """Utility functions for GTR.
 """

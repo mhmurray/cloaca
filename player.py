@@ -6,10 +6,10 @@ this class does not enforce anything more than physical limitations,
 like failing to get a card from an empty stack.
 """
 
-import card_manager
-from building import Building
-from zone import Zone
-from error import GTRError
+import cloaca.card_manager as card_manager
+from cloaca.building import Building
+from cloaca.zone import Zone
+from cloaca.error import GTRError
 
 import logging
 
@@ -20,21 +20,25 @@ class Player:
     """ Contains the piles and items controlled by a player. """
     max_hand_size = 5
 
-    def __init__(self, uid, name):
+    def __init__(self, uid, name, hand=None, stockpile=None, clientele=None,
+            vault=None, camp=None, fountain_card=None, n_camp_actions=0,
+            buildings=None, influence=None, revealed=None, prev_revealed=None,
+            performed_craftsman=False):
+
         self.name = name
         self.uid = uid
-        self.hand = Zone()
-        self.stockpile = Zone()
-        self.clientele = Zone()
-        self.vault = Zone()
-        self.camp = Zone()
-        self.fountain_card = None
-        self.n_camp_actions = 0
-        self.buildings = []
-        self.influence = []
-        self.revealed = Zone()
-        self.prev_revealed = Zone()
-        self.performed_craftsman = False
+        self.hand = hand if hand is not None else Zone(name='hand')
+        self.stockpile = stockpile if stockpile is not None else Zone(name='stockpile')
+        self.clientele = clientele if clientele is not None else Zone(name='clientele')
+        self.vault = vault if vault is not None else Zone(name='vault')
+        self.camp = camp if camp is not None else Zone(name='camp')
+        self.fountain_card = fountain_card
+        self.n_camp_actions = n_camp_actions
+        self.buildings = buildings if buildings is not None else []
+        self.influence = influence if influence is not None else []
+        self.revealed = revealed if revealed is not None else Zone(name='revealed')
+        self.prev_revealed = prev_revealed if prev_revealed is not None else Zone(name='prev_revealed')
+        self.performed_craftsman = performed_craftsman
 
     def __repr__(self):
         return 'Player({uid!r}, {name!r})'.format(**self.__dict__)

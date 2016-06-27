@@ -1,11 +1,11 @@
-from player import Player
-import gtrutils
-import card_manager as cm
-from building import Building
-from card import Card
-from zone import Zone
-from error import GTRError, GameOver
-import stack
+from cloaca.player import Player
+import cloaca.gtrutils as gtrutils
+from cloaca.building import Building
+from cloaca.card import Card
+from cloaca.zone import Zone
+from cloaca.error import GTRError, GameOver
+import cloaca.stack as stack
+import cloaca.card_manager as cm
 
 import random
 import copy
@@ -51,9 +51,9 @@ class Game(object):
         self.turn_number = 0
         self.role_led = None
         self.active_player_index = None
-        self.jacks = Zone()
-        self.library = Zone()
-        self.pool = Zone()
+        self.jacks = Zone(name='jacks')
+        self.library = Zone(name='library')
+        self.pool = Zone(name='pool')
         self.in_town_sites = []
         self.out_of_town_sites = []
         self.oot_allowed = False
@@ -133,8 +133,7 @@ class Game(object):
 
     def add_player(self, uid, name):
         """Adds a player to the game. Raises GTRError if game is started,
-        full. If a player with the specified name is already in the game,
-        silently do nothing.
+        full, or player already is in the game.
         """
         if self._find_player(name) is not None:
             raise GTRError('Cannot add player to same game twice: {0}'
@@ -1963,7 +1962,8 @@ class Game(object):
     def _do_end_turn(self, p):
         has_academy = self._player_has_active_building(p, 'Academy')
 
-        p.revealed = []
+        p.revealed.set_content([])
+        p.prev_revealed.set_content([])
         p.n_camp_actions = 0
 
         if p.performed_craftsman and has_academy:

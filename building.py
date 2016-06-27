@@ -1,5 +1,5 @@
-from zone import Zone
-from error import GTRError
+from cloaca.zone import Zone
+from cloaca.error import GTRError
 
 class Building:
     """A container that represents buildings.
