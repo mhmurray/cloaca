@@ -7,7 +7,8 @@
 html {
   font-family: Helvetica, Arial, sans-serif;
   font-size: 100%;
-  background: #333;
+  background: #BBB;
+  /*background: #333;*/
 }
 
 #page-wrapper {
@@ -87,6 +88,7 @@ li.ui-tabs-active a {
 .card-container > * {
   display: inline-block;
 }
+
 .influence {
   border: 2px solid #888;
   padding: 2px;
@@ -122,7 +124,6 @@ li.ui-tabs-active a {
 .building.selected {
   border: 3px solid #F22;
 }
-
 
 .player-box {
   border: 6px double black;
@@ -223,6 +224,16 @@ li.ui-tabs-active a {
   width: 208px;
 }
 
+.material {
+  width: 100px;
+  border-width: 1px;
+  border-style: solid;
+  text-align: center;
+  height: 40px;
+  border-radius: 6px;
+  padding: 7px 2px 2px 2px;
+  overflow: hidden;
+}
 
 .orders {
   border-color: #000;
@@ -336,7 +347,15 @@ li.ui-tabs-active a {
   border: 3px solid #F22;
   padding: 5px 0px 0px 0px;
 }
-  
+
+.building > .site {
+  height: 20px;
+  padding: 1px 1px 1px 1px;
+}
+
+.building > .material {
+  height: 10px;
+}
 
 .status {
   font-size: 0.9rem;

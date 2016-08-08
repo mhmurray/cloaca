@@ -6,7 +6,7 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
     };
 
     App.initialize = function(){
-        var WS_URI = 'http://localhost:5000/hello/';
+        var WS_URI = 'ws://localhost:5001/ws';
         var tabs = $('#tabs').tabs({
             active: 0, // Default to game list
         });
@@ -40,12 +40,12 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
 
             } else if (action == Util.Action.CREATEGAME) {
                 console.log('Received CREATEGAME');
-                sendAction(0, Util.Action.REQGAMELIST);
+                sendAction(0, null, Util.Action.REQGAMELIST);
 
             } else if (action == Util.Action.JOINGAME) {
                 console.log('Received JOINGAME');
                 App.game_id = game;
-                sendAction(0, Util.Action.REQGAMELIST);
+                sendAction(0, null, Util.Action.REQGAMELIST);
 
             } else if (action == Util.Action.STARTGAME) {
                 console.log('Received STARTGAME');
@@ -77,22 +77,28 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
 
         loginSM.onafterstart = function() {
             // Check if already logged in
-            $.get('user', {}, function(data, status) {
+            username = $('#the_username').text();
+            game_id = parseInt($('#the_game_id').text());
+            loginSM.login(username, game_id)
+            /*$.get('user', {}, function(data, status) {
                 if(data !== '') {
                     loginSM.login(data);
                 }
             });
+            */
         };
 
-        loginSM.onenterLoggedIn = function(event, from, to, user) {
-            $('#username').addClass('open').text(user);
+        loginSM.onenterLoggedIn = function(event, from, to, user, game_id) {
+            //$('#username').addClass('open').text(user);
+            $('#username').addClass('open');
             $('#login-status').removeClass('closed').text('Logged in as ');
             $('#login-form').hide();
             $('#logout-btn').show();
             Games.user = user;
             Net.user = user;
             Net.connect(WS_URI, function() {
-                Net.sendAction(0, Util.Action.REQGAMELIST);
+                console.log('Requesting game state');
+                Net.sendAction(game_id, null, Util.Action.REQGAMESTATE);
             }, handleCommand);
         };
 
@@ -132,8 +138,8 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
             });
         });
 
-        function sendAction(game_id, action, args) {
-            return Net.sendAction(game_id, action, args);
+        function sendAction(game_id, number, action, args) {
+            return Net.sendAction(game_id, number, action, args);
         }
 
         // Get references to elements on the page.
@@ -144,12 +150,12 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
         var refreshBtn = document.getElementById('refresh');
 
         refreshBtn.onclick = function() {
-            sendAction(0, Util.Action.REQGAMELIST);
+            sendAction(0, null, Util.Action.REQGAMELIST);
         };
 
         newGameBtn.onclick = function() {
             console.log('create new game');
-            sendAction(0, Util.Action.REQCREATEGAME);
+            sendAction(0, null, Util.Action.REQCREATEGAME);
         };
         
 
@@ -163,13 +169,13 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
             function join(num) {
                 return function() {
                     console.log('join'+num);
-                    sendAction(num, Util.Action.REQJOINGAME);
+                    sendAction(num, null, Util.Action.REQJOINGAME);
                 };
             };
             function start(num) {
                 return function() {
                     console.log('start'+num);
-                    sendAction(num, Util.Action.REQSTARTGAME);
+                    sendAction(num, null, Util.Action.REQSTARTGAME);
                 };
             };
 
@@ -234,13 +240,27 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
                     game_obj.initialize();
                     var tabs = $('#tabs').tabs('refresh');
                     tabs.tabs('option', 'active', -1); // switch to new tab.
-                    sendAction(_id, Util.Action.REQGAMESTATE);
+                    sendAction(_id, null, Util.Action.REQGAMESTATE);
                 }
             }
         };
 
         function update_game_state(game_id, gameState) {
             console.dir(gameState);
+            if(!(game_id in Games.games)) {
+                players = [];
+                for(var i=0; i<gameState.players.length; i++) {
+                    players.push(gameState.players[i].name);
+                }
+
+                console.log('making game in update_game_state');
+                var game_obj = new Game(game_id, players);
+                Games.games[game_id] = game_obj;
+                game_obj.initialize();
+                var tabs = $('#tabs').tabs('refresh');
+                tabs.tabs('option', 'active', -1); // switch to new tab.
+            }
+
             var game = Games.games[game_id];
             game.updateState(gameState);
         };
@@ -253,11 +273,12 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
             var message = messageField.value;
             var obj = JSON.parse(message);
             var game = obj['game'];
+            var number = obj['number'];
             var action = obj['action'];
             var args = obj['args'];
 
             // Send the message through the WebSocket.
-            sendAction(game, action, args);
+            sendAction(game, number, action, args);
 
             // Clear out the message field.
             // messageField.value = '6:a,0,32,';

@@ -14,14 +14,15 @@ from cloaca import lua_scripts
 
 GAMEID = 'gameid'
 GAMEPREFIX = 'game:'
-GAMELIST = 'games'
+GAMES = 'games'
+GAMES_HOSTED_PREFIX = 'games_hosted:'
+GAMES_JOINED_PREFIX = 'games_joined:'
+GAME_HOSTS = 'game_hosts'
 
 USERID = 'userid'
 USERPREFIX='user:'
-USERS='usernames'
+USERNAMES='usernames'
 
-SESSIONPREFIX='session:'
-SESSIONEXPIRE=36000 # 10 hours
 SESSIONS='sessions'
 SESSION_AUTH_LENGTH_BYTES=16
 
@@ -47,29 +48,43 @@ class GTRDBTornadis(object):
         sha = yield self.r.call("SCRIPT", "LOAD", lua_scripts.REGISTER_USER)
         self.scripts_sha['register'] = sha
 
-    @gen.coroutine
-    def retrieve_game_id(self):
-        """Get a new unique game id. Each call returns a different id.
-        """
-        game_id = yield self.r.call('INCR', GAMEID)
-
-        if isinstance(game_id, TornadisException):
-            raise GTRDBError('Failed to get new game id.')
-        else:
-            raise gen.Return(game_id)
+        sha = yield self.r.call("SCRIPT", "LOAD", lua_scripts.CREATE_GAME)
+        self.scripts_sha['create_game'] = sha
 
 
     @gen.coroutine
-    def store_game(self, game_id, game):
-        """Stores a Game object. Raise GTRDBError if an error occurs.
+    def create_game_with_host(self, host_user_id):
+        """Create a new game hosted by user with ID host_user_id.
+        Return the new game ID.
+        
+        First verifies that the host user exists.
         """
-        game_json = encode.game_to_json(game)
+        game_id = yield self.r.call('EVALSHA', self.scripts_sha['create_game'],
+                5,
+                GAMEID,
+                USERPREFIX+str(host_user_id),
+                GAMES_HOSTED_PREFIX+str(host_user_id),
+                GAMES,
+                GAME_HOSTS,
+                host_user_id)
 
-        pipeline = tornadis.Pipeline()
-        pipeline.stack_call('SADD', GAMELIST, game_id)
-        pipeline.stack_call('SET', GAMEPREFIX+str(game_id), game_json)
 
-        res = yield self.r.call(pipeline)
+        if not game_id:
+            raise GTRDBError('Host user (ID {0:d}) does not exist.'.format(host_user_id))
+
+        now = int(time.mktime(time.gmtime()))
+        yield self.r.call('HMSET', GAMEPREFIX+str(game_id), 'date_created', now, 'game_json', '')
+
+        raise gen.Return(game_id)
+
+
+    @gen.coroutine
+    def store_game(self, game_id, game_json):
+        """Stores JSON-encoded Game object. Raise GTRDBError if an error occurs.
+        """
+        #game_json = encode.game_to_json(game)
+
+        res = yield self.r.call('HSET', GAMEPREFIX+str(game_id), 'game_json', game_json)
 
         if isinstance(res, TornadisException):
             raise GTRDBError('Failed to store game {0!s}: "{1}"'
@@ -78,65 +93,61 @@ class GTRDBTornadis(object):
 
     @gen.coroutine
     def retrieve_game(self, game_id):
-        """Retrieves a Game object.
+        """Retrieves a game, returning the JSON-encoding of the Game object.
 
         Raises GTRDBError if the game does not exist or if there is an error
         communicating with the database.
         """
-        game_json = yield self.r.call('GET', GAMEPREFIX+str(game_id))
+        game_json = yield self.r.call('HGET', GAMEPREFIX+str(game_id), 'game_json')
         if isinstance(game_json, TornadisException):
             raise GTRDBError('Failed to retrieve game {0!s}: "{1}"'
                     .format(game_json.message))
         elif game_json is None:
             raise GTRDBError('Game {0!s} does not exist.'.format(game_id))
 
-        raise gen.Return(encode.decode_game(json.loads(game_json)))
+        #game_obj = encode.decode_game(json.loads(game_json))
+        raise gen.Return(game_json)
 
 
     @gen.coroutine
     def retrieve_games(self, game_ids):
-        """Get list of Game objects from a list of game IDs.
+        """Retrieves a list of games as the JSON-encoding of the Game object.
+
+        If a game doesn't exist, None will be returned in its place.
         """
-        pipeline = tornadis.Pipeline()
-        for id in game_ids:
-            pipeline.stack_call('GET', GAMEPREFIX+str(id))
-
-        res = yield self.r.call(pipeline)
-
-        if isinstance(res, TornadisException):
-            raise GTRDBError('Failed to retrieve {0:d} games: {1}'
-                    .format(len(game_ids), res.message))
+        if len(game_ids) == 0:
+            raise gen.Return([])
         else:
-            raise gen.Return([encode.json_to_game(r) for r in res])
+            pipeline = tornadis.Pipeline()
+
+            for game_id in game_ids:
+                pipeline.stack_call('HGET', GAMEPREFIX+str(game_id), 'game_json')
+
+            pipeline = yield self.r.call(pipeline)
+
+            raise gen.Return(pipeline)
 
 
     @gen.coroutine
-    def retrieve_all_games(self):
-        """Get all games, return as list of game_ids (strings)
+    def retrieve_games_hosted_by_user(self, user_id):
+        """Get list of game_ids hosted by user with ID user_id.
         """
-        res = yield self.r.call('SMEMBERS', GAMELIST)
-        if isinstance(res, TornadisException):
-            raise GTRDBError('Failed to retrieve all game ids: {0}'
-                    .format(res.message))
+        game_ids = yield self.r.call('LRANGE', GAMES_HOSTED_PREFIX+str(user_id), 0, -1)
+        if isinstance(game_ids, TornadisException):
+            raise GTRDBError('Failed to retrieve games hosted by user: {0}'
+                    .format(user_id))
         else:
-            raise gen.Return(res)
+            raise gen.Return(game_ids)
+
+
+    @gen.coroutine
+    def retrieve_latest_games(self, n_games):
+        """Get the n_games most recently-created games.
+        """
+        game_ids = yield self.r.call('LRANGE', GAMES, 0, n_games)
+        raise gen.Return(game_ids)
 
     
-    @gen.coroutine
-    def delete_game(self, game_id):
-        """Remove game from database.
-        """
-        pipeline = tornadis.Pipeline()
-        pipeline.stack_call('DELETE', GAMEPREFIX+str(game_id))
-        pipeline.stack_call('SREM', GAMELIST, game_id)
-        res = yield self.r.call(pipeline)
-        if isinstance(res, TornadisException):
-            raise GTRDBError('Failed to delete game {0!s}: {1}'
-                    .format(game_id, res.message))
-        else:
-            raise gen.Return(res)
-
-
     @gen.coroutine
     def add_user(self, username, auth_token):
         """Add a new user with auth_token. Sets the date_added timestamp.
@@ -146,12 +157,12 @@ class GTRDBTornadis(object):
         # This check leaves open the possibility that the user is separately
         # registered between the check and the registration, but the register
         # function checks this atomically.
-        exists = yield self.r.call('HEXISTS', USERS, username)
+        exists = yield self.r.call('HEXISTS', USERNAMES, username)
         if isinstance(exists, TornadisException):
             raise GTRDBError('Error communicating with database: {0}'
                     .format(exists.message))
         elif exists:
-            user_id = yield self.r.call('HGET', USERS, username)
+            user_id = yield self.r.call('HGET', USERNAMES, username)
             if user_id is not None:
                 raise GTRDBError('User {0} already exists with user ID {1}'
                         .format(username, user_id))
@@ -176,18 +187,18 @@ class GTRDBTornadis(object):
     @gen.coroutine
     def register_user(self, username):
         result = yield self.r.call('EVALSHA', self.scripts_sha['register'],
-                2, USERID, USERS, username)
+                2, USERID, USERNAMES, username)
 
         if isinstance(result, TornadisException):
             if result.message.startswith('NOSCRIPT'):
                 result = yield self.r.call('EVAL', lua_scripts.REGISTER_USER,
-                        2, USERID, USERS, username)
+                        2, USERID, USERNAMES, username)
             else:
                 raise GTRDBError('Failed to register new user {0}: {1}'
                         .format(username, result.message))
 
         if result is None:
-            user_id = yield self.r.call('HGET', USERS, username)
+            user_id = yield self.r.call('HGET', USERNAMES, username)
             if user_id is not None:
                 raise GTRDBError('User {0} already exists with user ID {1}'
                         .format(username, user_id))
@@ -214,7 +225,7 @@ class GTRDBTornadis(object):
         """Get user_id from username by examining the "users" table.
         Return None if the username is not found.
         """
-        user_id = yield self.r.call('HGET', USERS, username)
+        user_id = yield self.r.call('HGET', USERNAMES, username)
         if isinstance(user_id, TornadisException): 
             raise GTRDBError('Failed to get user ID for {0}: {1}'
                     .format(username, user_id.message))
@@ -258,7 +269,11 @@ class GTRDBTornadis(object):
             raise GTRDBError('Failed to retrieve user {0!s}: {1}'
                     .format(user_id, res.message))
         else:
-            raise gen.Return(res)
+            # tornadis gives us hashes as lists, with alternating
+            # key1, value1, key2, value2, etc.
+            # This formats as a Python dict.
+            user_dict = dict(zip(res[::2], res[1::2]))
+            raise gen.Return(user_dict)
 
 
     @gen.coroutine

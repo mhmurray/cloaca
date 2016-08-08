@@ -505,5 +505,105 @@ class TestFollow(unittest.TestCase):
         self.assertFalse(mon.modified(self.game))
 
 
+class TestEndOfTurn(unittest.TestCase):
+    """Test cleanup at the end of a turn.
+    """
+
+    def setUp(self):
+        d = self.deck = test_setup.TestDeck()
+        self.game = test_setup.simple_two_player()
+        self.p1, self.p2 = self.game.players
+        
+        # p1 leads Legionary, p2 thinks
+        self.p1.hand.set_content([d.jack0, d.latrine0])
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+        a = message.GameAction(message.LEADROLE, 'Legionary', 1, d.jack0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.FOLLOWROLE, 0)
+        self.game.handle(a)
+        a = message.GameAction(message.THINKERTYPE, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.role_led, 'Legionary')
+        self.assertEqual(self.game.turn_number, 1)
+
+        a = message.GameAction(message.LEGIONARY, d.latrine0)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.legionary_count, 1)
+        self.assertEqual(self.game.legionary_player_index, 0)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
+
+    def test_role_led_reset(self):
+        """Game.role_led should be None after the turn is over.
+        """
+        self.assertIsNone(self.game.role_led)
+
+    def test_turn_number_advance(self):
+        self.assertEqual(self.game.turn_number, 2)
+
+    def test_legionary_counters_reset(self):
+        """Game.legionary_count and Game.legionary_player_index should be
+        None at the end of the turn.
+        """
+        self.assertIsNone(self.game.legionary_count)
+        self.assertIsNone(self.game.legionary_player_index)
+
+    def test_oot_reset(self):
+        """Out-of-town markers reset to False at the end of the turn.
+        """
+        self.assertFalse(self.game.oot_allowed)
+        self.assertFalse(self.game.used_oot)
+
+
+class TestEndOfTurnOutOfTownFlags(unittest.TestCase):
+    """Test cleanup at the end of a turn for out of town flags.
+    """
+
+    def setUp(self):
+        d = self.deck = test_setup.TestDeck()
+        self.game = test_setup.simple_two_player()
+        self.p1, self.p2 = self.game.players
+        
+        # p1 leads Craftsman, p2 thinks
+        self.p1.hand.set_content([d.jack0, d.latrine0])
+        self.p1.clientele.set_content([d.dock0])
+        self.game.in_town_sites = ['Stone', 'Stone']
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        self.game.handle(a)
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 1, d.jack0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.FOLLOWROLE, 0)
+        self.game.handle(a)
+        a = message.GameAction(message.THINKERTYPE, True)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.role_led, 'Craftsman')
+        self.assertEqual(self.game.turn_number, 1)
+
+        self.assertTrue(self.game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.latrine0, None, 'Rubble')
+        self.game.handle(a)
+
+
+    def test_oot_reset(self):
+        """Out-of-town markers reset to False at the end of the turn.
+        """
+        self.assertFalse(self.game.oot_allowed)
+        self.assertFalse(self.game.used_oot)
+
+
 if __name__ == '__main__':
     unittest.main()

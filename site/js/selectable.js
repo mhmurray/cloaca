@@ -77,6 +77,7 @@ function($) {
             this.makeUnselectable($unselected.unbind('click'));
             if(typeof(this.finishedCallback) !== 'undefined') {
                 this.finishedCallback($selected);
+                return this;
             }
         }
         this.makeSelectable($selected);

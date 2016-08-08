@@ -59,11 +59,12 @@ class Game(object):
         self.oot_allowed = False
         self.used_oot = False
         self.stack = stack.Stack()
-        self.legionary_count = 0
+        self.legionary_count = None
         self.legionary_player_index = None
         self.expected_action = None
         self.host = None
         self.winners = None
+        self.action_number = 0
 
         # Keep track of currently-executing stack frame.
         self._current_frame = None
@@ -437,7 +438,11 @@ class Game(object):
 
     def _await_action(self, action, active_player):
         """Sets the game in a state to await a call to handle()
-        for the active_player and the specific action. For example:
+        for the active_player and the specific action. 
+        Increments the Game.action_number, so this must be used for
+        all cases where we're waiting for a player.
+        
+        For example:
 
             self._await_action(message.GIVECARDS, player)
 
@@ -446,11 +451,11 @@ class Game(object):
         """
         self.expected_action = action
         self.active_player = active_player
+        self.action_number += 1
 
 
     def _handle_thinkerorlead(self, a):
         do_thinker = a.args[0]
-        p = self.leader
 
         if not do_thinker:
             # my_list[::-1] reverses the list
@@ -458,10 +463,10 @@ class Game(object):
                 self.stack.push_frame("_perform_role_being_led", p)
             for p in self._following_players_in_order()[::-1]:
                 self.stack.push_frame("_await_action", message.FOLLOWROLE, p)
-            self.stack.push_frame("_await_action", message.LEADROLE, p)
+            self.stack.push_frame("_await_action", message.LEADROLE, self.leader)
 
         else:
-            self.stack.push_frame("_perform_thinker_action", p)
+            self.stack.push_frame("_perform_thinker_action", self.leader)
 
         self._pump()
 
@@ -476,12 +481,15 @@ class Game(object):
         player.hand.append(self._draw_jack())
 
     def _discard_for_player(self, player, card):
-        player.hand.move_card(card, self.pool)
+        if card.name == 'Jack':
+            player.hand.move_card(card, self.jacks)
+        else:
+            player.hand.move_card(card, self.pool)
 
     def _discard_all_for_player(self, player):
-        cards_to_discard = list(player.hand)
-        for card in cards_to_discard:
-            player.hand.move_card(card, self.pool)
+        # Make copy of hand because we're modifying it.
+        for card in list(player.hand):
+            self._discard_for_player(player, card)
 
     def _draw_jack(self):
         try:
@@ -521,7 +529,7 @@ class Game(object):
             func.__call__(*self._current_frame.args)
 
     def _advance_turn(self):
-        """ Moves the leader index, prints game state, saves, and pushes the next turn.
+        """Advance turn and leader markers.
         """
         self.turn_number += 1
         self._increment_leader_index()
@@ -574,8 +582,7 @@ class Game(object):
         """ Entry point for the stack frame that performs one thinker action.
         """
         if self._player_has_active_building(player, 'Vomitorium'):
-            self.active_player = player
-            self.expected_action = message.USEVOMITORIUM
+            self._await_action(message.USEVOMITORIUM, player)
 
         else:
             a = message.GameAction(message.USEVOMITORIUM, False)
@@ -604,8 +611,7 @@ class Game(object):
             self._handle_uselatrine(a)
 
         elif self._player_has_active_building(p, 'Latrine'):
-            self.active_player = p
-            self.expected_action = message.USELATRINE
+            self._await_action(message.USELATRINE, p)
 
         else:
             a = message.GameAction(message.USELATRINE, None)
@@ -621,8 +627,7 @@ class Game(object):
             self._log('{0} discards {1} using Latrine.'
                 .format(p.name, latrine_card))
 
-        self.active_player = p
-        self.expected_action = message.THINKERTYPE
+        self._await_action(message.THINKERTYPE, p)
 
 
     def _handle_thinkertype(self, a):
@@ -947,20 +952,17 @@ class Game(object):
             if role=='Patron':
                 self._perform_patron_action(player)
             elif role=='Laborer':
-                self.active_player = player
-                self.expected_action = message.LABORER
+                self._await_action(message.LABORER, player)
                 return
             elif role=='Architect':
-                self.active_player = player
-                self.expected_action = message.ARCHITECT
+                self._await_action(message.ARCHITECT, player)
                 return
             elif role=='Craftsman':
                 self._perform_craftsman_action(player)
             elif role=='Legionary':
                 self._perform_legionary_action(player)
             elif role=='Merchant':
-                self.active_player = player
-                self.expected_action = message.MERCHANT
+                self._await_action(message.MERCHANT, player)
 
             else:
                 raise ValueError('Illegal role: {}'.format(role))
@@ -982,7 +984,7 @@ class Game(object):
                        .format(p.name, ', '.join(map(str, hand_cards))))
 
         if len(pool_cards)>1:
-            raise GTRError('Received too many cards from the pool ({1})'
+            raise GTRError('Received too many cards from the pool ({0})'
                        .format(', '.join(map(str, hand_cards))))
 
         if len(cards) > len(hand_cards) + len(pool_cards):
@@ -1022,7 +1024,7 @@ class Game(object):
         has_aqueduct = self._player_has_active_building(player, 'Aqueduct')
 
         if has_bar and has_aqueduct:
-            self.expected_action = message.BARORAQUEDUCT
+            self._await_action(message.BARORAQUEDUCT, player)
             return
 
         else:
@@ -1236,7 +1238,7 @@ class Game(object):
     def _perform_craftsman_action(self, player):
         self.active_player = player
         if self._player_has_active_building(player, 'Fountain'):
-            self.expected_action = message.USEFOUNTAIN
+            self._await_action(message.USEFOUNTAIN, player)
         else:
             a = message.GameAction(message.USEFOUNTAIN, False)
             self._handle_usefountain(a)
@@ -1251,7 +1253,6 @@ class Game(object):
 
         if use_fountain:
             p.fountain_card = self._draw_cards(1)[0]
-            self.expected_action = message.FOUNTAIN
             self._log('{0} reveals {1} with Fountain.'
                 .format(p.name, p.fountain_card))
 
@@ -1260,8 +1261,10 @@ class Game(object):
                         .format(p.name))
                 self._end_game()
 
+            self._await_action(message.FOUNTAIN, p)
+
         else:
-            self.expected_action = message.CRAFTSMAN
+            self._await_action(message.CRAFTSMAN, p)
 
 
     def _handle_fountain(self, a):
@@ -1480,7 +1483,7 @@ class Game(object):
 
         has_stairway = self._player_has_active_building(p, 'Stairway')
         if has_stairway:
-            self.expected_action = message.STAIRWAY
+            self._await_action(message.STAIRWAY, p)
             return
 
         self._pump()
@@ -1572,7 +1575,7 @@ class Game(object):
             else:
                 break
 
-        self.expected_action = message.LEGIONARY
+        self._await_action(message.LEGIONARY, player)
 
 
     def _handle_legionary(self, a):
@@ -1620,8 +1623,7 @@ class Game(object):
             self.stack.push_frame('_await_action', message.GIVECARDS, player)
                 
         self.legionary_player = p
-        self.expected_action = message.TAKEPOOLCARDS
-        self.active_player = p
+        self._await_action(message.TAKEPOOLCARDS, p)
         return
 
 
@@ -1853,8 +1855,7 @@ class Game(object):
 
     def _do_kids_in_pool(self, p):
         if self._player_has_active_building(p, 'Sewer'):
-            self.active_player = p
-            self.expected_action = message.USESEWER
+            self._await_action(message.USESEWER, p)
 
         else:
             self._handle_usesewer(message.GameAction(message.USESEWER))
@@ -1884,8 +1885,7 @@ class Game(object):
                 player.camp.move_card(jack, p.hand)
 
         if self._player_has_active_building(p, 'Sewer'):
-            self.active_player = p
-            self.expected_action = message.USESEWER
+            self._await_action(message.USESEWER, p)
 
         self._pump()
 
@@ -1950,7 +1950,14 @@ class Game(object):
 
 
     def _end_turn(self):
-        # players in reverse order
+        """Clean up Game flags and push a _do_end_turn for each player.
+        """
+        self.role_led = None
+        self.legionary_count = None
+        self.legionary_player_index = None
+        self.used_oot = False
+        self.oot_allowed = False
+
         players = self._players_in_turn_order()[::-1]
 
         for p in players:
@@ -1960,6 +1967,8 @@ class Game(object):
 
 
     def _do_end_turn(self, p):
+        """Run Academy for each player, and cleans up Player flags.
+        """
         has_academy = self._player_has_active_building(p, 'Academy')
 
         p.revealed.set_content([])
@@ -1967,7 +1976,7 @@ class Game(object):
         p.n_camp_actions = 0
 
         if p.performed_craftsman and has_academy:
-            p.peformed_craftsman = False
+            p.performed_craftsman = False
             self.stack.push_frame('_await_action', message.SKIPTHINKER, p)
 
         self._pump()

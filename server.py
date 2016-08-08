@@ -12,8 +12,9 @@ import functools
 import json
 import pickle
 import logging
+import datetime
 
-from tornado import gen
+from tornado import gen, locks
 import tornado.ioloop
 
 lg = logging.getLogger(__name__)
@@ -148,206 +149,95 @@ class GTRServer(object):
         
     """
 
+    GAME_WAIT_TIMEOUT = datetime.timedelta(seconds=1)
+
+
     def __init__(self, database):
         self.games = []
         self._users = {} # User database
+        self._game_locks = {}
 
         self.db = database
         self.send_command = lambda _ : None
 
 
-    def _send_game_list(self, user, game_list_future):
-        game_list = game_list_future.result()
-        json_list = json.dumps(game_list, sort_keys=True,
-                default=lambda o:o.__dict__)
-        resp = Command(game_id, GameAction(message.GAMELIST, json_list))
-        self.send_command(user, resp)
+    @gen.coroutine
+    def handle_game_action(self, game_id, user_id, action_number, action):
+        userdict = yield self.db.retrieve_user(user_id)
 
+        # Check the lock to see if the game is in use.
+        try:
+            lock = self._game_locks[game_id]
+        except KeyError:
+            lock = locks.Lock()
+            self._game_locks[game_id] = lock
+        
+        with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
+            game_json = yield self.db.retrieve_game(game_id)
 
-    def _start_game_callback(self, user, future):
-        e = future.exception()
-        if e is not None:
-            pass
+            username = userdict['username']
 
-
-    def handle_command(self, user, command):
-        """Muliplexes the action to helper functions.
-        """
-        game_id = command.game
-        action = command.action.action
-        args = command.action.args
-
-        lg.debug('Handling command: {0!s}, {1!s}, {2!s}, {3!s}'
-                .format(user, game_id, action, args))
-
-        if action == message.REQGAMESTATE:
-            self._retrieve_and_send_game(user, game_id)
-
-
-        elif action == message.REQGAMELIST:
-            gl_future = self._get_game_list()
-            cb = functools.partial(self._send_game_list, user)
-
-            ioloop = tornado.ioloop.IOLoop.current()
-            ioloop.add_future(gl_future, cb)
-
-
-        elif action == message.REQCREATEGAME:
-            res = self._handle_create(user)
-
-
-        elif action == message.REQJOINGAME:
-            self._handle_join(self, user, game_id)
-
-
-        elif action == message.REQSTARTGAME:
-            future = self._start_game(user, game_id)
-            cb = functools.partial(self._start_game_callback, user)
-            
-            ioloop = tornado.ioloop.IOLoop.current()
-            ioloop.add_future(future, cb)
-
-            #except GTRError as e:
-            #    self._send_error(user, e.message)
-            #else:
-            #    self.db.store_game(game_id, self.games[game_id])
-            #    gs = self._get_game(user, game_id)
-            #    for u in [p.uid for p in gs.players]:
-            #        resp = Command(game_id, GameAction(message.STARTGAME))
-            #        self.send_command(u, resp)
-
-            #        self._retrieve_and_send_game(u, game_id)
-
-        elif action in (message.CREATEGAME, message.JOINGAME,
-                        message.GAMESTATE, message.GAMELIST,
-                        message.STARTGAME, message.LOGIN):
-            # Todo: send error to client.
-            # It would be better to check if the action is a GameAction
-            # command and return an error otherwise
-            self._send_error(user, 'Invalid server command: '+str(command.action))
-
-        else: # Game commands
-            try:
-                game = self.games[game_id]
-            except IndexError as e:
-                msg = ("Couldn't find game {0:d} in {1!s}"
-                        ).format(game_id, self.games[:10])
-
+            if game_json is None:
+                msg = 'Invalid game id: ' + str(game_id)
                 lg.warning(msg)
-                self._send_error(user, msg)
+                return
 
-            name = self._userinfo(user)['name']
-            player_index = game.find_player_index(name)
+            game = encode.json_to_game(game_json)
+
+            player_index = game.find_player_index(username)
             if player_index is None:
                 msg = ('User {0} is not part of game {1:d}, players: {2!s}'
                         ).format(name, game_id,
                             [p.name for p in game.players])
-
                 lg.warning(msg)
-                self._send_error(user, msg)
+                self._send_error(user_id, msg)
+                return
 
-            lg.debug('Expected action: {0}'.format(str(game.expected_action)))
-            lg.debug('Got action: {0}'.format(repr(action)))
+            if action_number != game.action_number:
+                msg = ('Received action_number {0:d}, but require {1:d}.'
+                        ).format(action_number, game.action_number)
+                lg.warning(msg)
+                self._send_error(user_id, msg)
+                return
+
             lg.debug('Handling action: {0}'.format(repr(action)))
+
+            if game.finished:
+                msg = 'Game {0} has finished.'.format(game_id)
+                lg.warning(msg)
+                self._send_error(user_id, msg)
 
             i_active_p = game.active_player_index
 
-            if game.finished:
-                self._send_error(user, 'Game {0} has finished.'.format(game_id))
-
             if i_active_p == player_index:
                 try:
-                    game.handle(command.action)
+                    game.handle(action)
                 except GTRError as e:
                     lg.warning(e.message)
-                    self._send_error(user, e.message)
+                    self._send_error(user_id, e.message)
+                    return
                 except GameOver:
                     lg.info('Game {0} has ended.'.format(game_id))
 
-                self.db.store_game(game_id, self.games[game_id])
+                yield self.store_game(game)
+
+                for u in [p.uid for p in game.players]:
+                    yield self._retrieve_and_send_game(u, game_id)
 
             else:
-                msg = ('Received action for player {0!s}, '
-                    'but waiting on player {1!s}'
-                    ).format(player_index, i_active_p)
+                msg = ('Received action for player {0!s} ({1}), '
+                    'but waiting on player {2!s} ({3}).'
+                    ).format(player_index, game.players[player_index].name,
+                            i_active_p, game.players[i_active_p].name)
 
                 lg.warning(msg)
-                self._send_error(user, msg)
-
-            for u in [p.uid for p in game.players]:
-                self._retrieve_and_send_game(u, game_id)
-
-
-    def _handle_create(self, user):
-        game_id_future = self._create_game(user)
-        cb = lambda gid: self.send_command(user,
-                Command(gid.result(), GameAction(message.JOINGAME)))
-
-        ioloop = tornado.ioloop.IOLoop.current()
-        ioloop.add_future(game_id_future, cb)
+                self._send_error(user_id, msg)
 
 
     @gen.coroutine
-    def _handle_join(self, user, game_id):
+    def join_game(self, user_id, game_id):
         """Joins an existing game"""
-        userdict = yield self.db.retrieve_user(user)
-        game_json = yield self.db.retrieve_game(game_id)
-
-        username = userdict['username']
-
-        if game is None:
-            msg = 'Invalid game id: ' + str(game_id)
-            lg.warning(msg)
-            self._send_error(user, msg)
-            return
-
-        game = encode.json_to_game(game_json)
-
-        try:
-            player_index = game.add_player(user, username)
-        except GTRError as e:
-            lg.warning(e.message)
-            self._send_error(user, e.message)
-            return
-        else:
-            self.db.store_game(game_id, game)
-
-            resp = Command(id_, GameAction(message.JOINGAME))
-            self.send_command(user, resp)
-            
-            if game.started:
-                self._send_game(user, game)
-
-
-    def register_user(self, uid, userinfo):
-        """Register the dictionary <userinfo> with the unique
-        id <uid>. For instance, the player's display name should
-        be included under the "name" key in <userinfo>.
-
-        If the uid is already registered, the userinfo is replaced.
-        """
-        try:
-            name = userinfo['name']
-        except KeyError:
-            lg.warning('Cannot register user without "name" key in dictionary.')
-            lg.warning('  userinfo dict: ' +str(userinfo))
-            return
-
-        self._users[uid] = userinfo
-
-    def unregister_user(self, uid):
-        """Remove the user identified by uid from the the registry.
-
-        If the user doesn't exist, this does nothing.
-        """
-        try:
-            del self._users[uid]
-        except KeyError:
-            pass
-
-    @gen.coroutine
-    def _get_game(self, user, game_id):
-        userdict = yield self.db.retrieve_user(user)
+        userdict = yield self.db.retrieve_user(user_id)
         game_json = yield self.db.retrieve_game(game_id)
 
         username = userdict['username']
@@ -355,34 +245,64 @@ class GTRServer(object):
         if game_json is None:
             msg = 'Invalid game id: ' + str(game_id)
             lg.warning(msg)
-            self._send_error(user, msg)
             return
+
+        game = encode.json_to_game(game_json)
+
+        player_index = game.add_player(user_id, username)
+        yield self.store_game(game)
+
+
+    @gen.coroutine
+    def get_game(self, user_id, game_id):
+        userdict = yield self.db.retrieve_user(user_id)
+        game_json = yield self.db.retrieve_game(game_id)
+
+        username = userdict['username']
+
+        if game_json is None:
+            msg = 'Invalid game id: ' + str(game_id)
+            lg.warning(msg)
+            raise GTRError(msg)
             
         game = encode.json_to_game(game_json)
-        username = userdict['username']
 
         player_index = game.find_player_index(username)
         if player_index is None:
             msg = 'User {0:s} is not part of game {1:d}'.format(username, game_id)
             lg.warning(msg)
-            self._send_error(user, msg)
-            return
+            raise GTRError(msg)
 
         if game.started:
-            gs_privatized = game.privatized_game_state_copy(username)
+            game_privatized = game.privatized_game_state_copy(username)
 
-            raise gen.Return(gs_privatized)
+            raise gen.Return(game_privatized)
+
+        else:
+            raise gen.Return(None)
 
 
-    def _send_game(self, user, game):
+    @gen.coroutine
+    def get_game_json(self, user_id, game_id):
+        lg.debug('User {0!s} requests game {1!s}'.format(user_id, game_id))
+        game = yield self.get_game(user_id, game_id)
+        if game is None:
+            game_json = ''
+        else:
+            game_json = encode.game_to_json(game)
+
+        raise gen.Return(game_json)
+
+
+    def _send_game(self, user_id, game):
         """Sends the game to the user as a GAMESTATE command."""
         if game is None:
             gs_json = ''
         else:
-            gs_json = encode.game_to_json(gs)
+            gs_json = encode.game_to_json(game)
 
-        resp = Command(game, GameAction(message.GAMESTATE, gs_json))
-        self.send_command(user, resp)
+        resp = Command(game.game_id, None, GameAction(message.GAMESTATE, gs_json))
+        self.send_command(user_id, resp)
         
 
     @gen.coroutine
@@ -390,175 +310,80 @@ class GTRServer(object):
         """Retrieves the game from the database using game_id and 
         sends the game to the user in a GAMESTATE command.
         """
-        gs = yield self._get_game(user, game)
-        self._send_game(user, game)
+        try:
+            game = yield self.get_game(user, game_id)
+        except GTRError as e:
+            self._send_error(user, e.message)
+        else:
+            self._send_game(user, game)
 
 
     def _send_error(self, user, msg):
         """Send error message to user."""
-        resp = Command(None, GameAction(message.SERVERERROR, msg))
+        resp = Command(None, None, GameAction(message.SERVERERROR, msg))
         self.send_command(user, resp)
         
 
-    def _userinfo(self, uid):
-        """Get the userinfo dict associated with uid.
-
-        Raise KeyError if the uid isn't registered.
-        """
-        try:
-            return self._users[uid]
-        except KeyError:
-            raise
-
-    def _join_game(self, user, game_id):
-        """Joins an existing game"""
-        try:
-            game = self.games[game_id]
-        except IndexError:
-            raise GTRError()
-
-        username = self._userinfo(user)['name']
-
-        try:
-            player_index = game.add_player(user, username)
-        except GTRError:
-            # Send error to client.
-            raise
-
-        return game_id
-
     @gen.coroutine
-    def _join_game(self, user_id, game_id):
-        """Join an existing game.
+    def create_game(self, user_id):
+        """Create a new game, return the new game ID."""
 
-        Raise GTRError if the user or game cannot be found.
-        """
+        game_id = yield self.db.create_game_with_host(user_id)
+
         userdict = yield self.db.retrieve_user(user_id)
-        game_json = yield self.db.retrieve_game(game_id)
-
-        if game_json is None:
-            msg = 'Invalid game id: ' + str(game_id)
-            lg.warning(msg)
-            self._send_error(user_id, msg)
-            return
-
-        game = encode.json_to_game(game_json)
-        username = userdict['username']
-
-        player_index = game.add_player(user, username)
-
-
-    @gen.coroutine
-    def _create_game(self, user):
-        """Create a new game."""
-        userdict = yield self.db.retrieve_user(user)
-        id = yield self.db.retrieve_game_id()
         username = userdict['username']
 
         lg.info('Creating new game {0:d} with host {1}'.format(
             game_id, username))
 
         game = Game()
-        game.game_id = id
-        game.host = user
+        game.game_id = game_id
+        game.host = username
 
-        player_index = game.add_player(user, username)
+        player_index = game.add_player(user_id, username)
 
-        self.db.store_game(id, game)
+        yield self.store_game(game)
 
         raise gen.Return(game_id)
         
 
     @gen.coroutine
-    def _get_game_list(self):
-        """Get list of GameRecord objects.
-
-        WARNING: This method loads all games
-        into memory. That's probably bad.
+    def store_game(self, game):
+        """Convert a Game object to JSON and store in the database
+        via self.db.store_game().
         """
-        game_ids = yield self.db.retrieve_all_games()
-        games = yield self.db.retrieve_games(game_ids)
-
-        game_list = []
-        for i, game in enumerate(games):
-            players = [p.name for p in game.players]
-            started = game.started
-            host = game.host
-            game_list.append(GameRecord(i, players, started, host))
-
-        raise gen.Return(game_list)
-
+        game_id = game.game_id
+        game_json = encode.game_to_json(game)
+        yield self.db.store_game(game_id, game_json)
+    
 
     @gen.coroutine
-    def _start_game(self, user, game_id):
-        userdict = yield self.db.retrieve_user(user)
+    def start_game(self, user_id, game_id):
+        userdict = yield self.db.retrieve_user(user_id)
         game_json = yield self.db.retrieve_game(game_id)
+
+        username = userdict['username']
 
         if game_json is None:
             msg = 'Invalid game id: ' + str(game_id)
             lg.warning(msg)
-            self._send_error(user, msg)
             return
 
         game = encode.json_to_game(game_json)
 
         if game.started:
-            raise GTRError('Game already started')
+            raise GTRError('Game already started.')
 
-        p = game.find_player_index(name)
+        p = game.find_player_index(username)
         if p is None:
             raise GTRError('Player {0} cannot start game {1} '
                     'that they haven\'t joined.'
-                    .format(name, game_id))
+                    .format(username, game_id))
 
-        if user != game.host:
+        if username != game.host:
             raise GTRError('Player {0} cannot start game {1} '
                     'if they are not the host ({2}).'
-                    .format(name, game_id, game.host))
+                    .format(username, game_id, game.host))
 
         game.start()
-        self.db.store_game(game_id, game)
-
-
-    def _load_backup(self):
-        """ Loads backup from JSON-encoded constructed file.
-        """
-        if self.games:
-            lg.warning('Error! Can\'t load backup file if games already exist')
-            return
-
-        try:
-            f = open(self._load_backup_file, 'r')
-        except IOError:
-            lg.warning('Can\'t open backup file: ' + self._load_backup_file)
-            return
-
-        with f:
-            try:
-                game_states = pickle.load(f)
-            except pickle.PickleError:
-                lg.warning('Error! Couldn\'t load games from backup file: ' + self._load_backup_file)
-                return
-
-            self.games = [gs for gs in game_states]
-
-    def _save_backup(self):
-        """ Writes pickled list of game states to backup file.
-        """
-        if self._backup_file:
-
-            game_states = [g for g in self.games]
-
-            try:
-                f = open(self._backup_file, 'w')
-            except IOError:
-                lg.warning('Can\'t write to file ' + self._backup_file)
-                return
-            
-            with f:
-                try:
-                    pickle.dump(game_states, f)
-                except pickle.PickleError:
-                    lg.warning('Error writing backup: ' + self._backup_file)
-                    return
-
+        self.store_game(game)

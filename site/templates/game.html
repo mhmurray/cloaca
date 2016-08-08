@@ -5,12 +5,13 @@
 
     <title>GtR</title>
 
-    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
 
-    <link rel="stylesheet" href="style.css">
-    <script data-main="js/main" src="js/libs/require/require.js"></script>
+    <link rel="stylesheet" href="/style.css">
+    <script data-main="/js/main" src="/js/libs/require/require.js"></script>
 </head>
 <body>
+    <h1 id="the_game_id">{{ escape(str(game_id)) }}</h1><span id="the_username">{{ escape(username) }}</span>
     <div id="tabs">
         <ul>
             <li><a href="#gamelist-wrapper">Game List</a></li>
@@ -25,7 +26,7 @@
             </div>
 
             <div id="gamelist-wrapper">
-                <div id='gamelist-canvas'>
+                <div id="gamelist-canvas">
                     <ul id="gamelist"></ul>
                 </div>
 
@@ -34,8 +35,8 @@
                 <button id="close">Close Connection</button>
 
                 <div>
-                    <span id='login-status' class='closed'>Not logged in.</span>
-                    <span id='username'></span>
+                    <span id="login-status" class='closed'>Not logged in.</span>
+                    <span id="username">{{ escape(username) }}</span>
                 </div>
 
                 <form id="login-form" action="/login" method="post">
@@ -49,7 +50,7 @@
                 <h3>Send GameAction</h3>
                 <form id="message-form" action="#" method="post">
                     <textarea id="custom-action" 
-                        required>{"user":"a", "game":0, "action":2, "args":["False"]}</textarea>
+                        required>{"game":{{ escape(str(game_id)) }}, "number":0, "action":2, "args":[false]}</textarea>
                     <button type="submit">Send Custom Action</button>
                 </form>
                 <h3>Game State (JSON)</h3>

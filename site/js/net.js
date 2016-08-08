@@ -6,7 +6,8 @@ function(SockJS, Util, FSM, Cookies) {
     }
 
     Net.connect = function(url, onopen, onmessage) {
-        Net.socket = SockJS(url);
+        //Net.socket = SockJS(url);
+        Net.socket = new WebSocket(url);
 
         // Handle any errors that occur.
         Net.socket.onerror = function(error) {
@@ -19,6 +20,7 @@ function(SockJS, Util, FSM, Cookies) {
             socketStatus.text('Connected.');
             socketStatus.removeClass('closed').addClass('open');
 
+            /*
             uid = Cookies.get('TWISTED_SESSION');
             console.log('Read TWISTED_SESSION cookie:', uid);
 
@@ -28,6 +30,7 @@ function(SockJS, Util, FSM, Cookies) {
             if(uid !== null) {
                 Net.sendAction(0, Util.Action.LOGIN, [uid]);
             }
+            */
 
             onopen();
         };
@@ -45,7 +48,8 @@ function(SockJS, Util, FSM, Cookies) {
             var message = event.data;
 
             // Parse NetString : <length>:<str>,
-            var msg = (splitWithTail(message, ':', 1)[1]).slice(0,-1);
+            //var msg = (splitWithTail(message, ':', 1)[1]).slice(0,-1);
+            var msg = message
 
             var dict = JSON.parse(msg);
             console.log('Received', dict);
@@ -79,11 +83,12 @@ function(SockJS, Util, FSM, Cookies) {
     };
 
     Net._sendString = function(s) {
-        Net.socket.send(s.length+':'+s+',');
+        //Net.socket.send(s.length+':'+s+',');
+        Net.socket.send(s);
     };
 
-    Net.sendAction = function(game_id, action, args=[]) {
-        var s = {'game':game_id, 'action':{'action':action, 'args':args}};
+    Net.sendAction = function(game_id, number, action, args=[]) {
+        var s = {'game':game_id, 'number':number, 'action':{'action':action, 'args':args}};
         console.log('Sending action: ' + JSON.stringify(s));
         Net._sendString(JSON.stringify(s));
     };
