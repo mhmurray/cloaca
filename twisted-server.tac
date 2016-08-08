@@ -12,6 +12,7 @@ import message
 from server import GTRServer
 from error import GTRError, ParsingError, GameActionError
 from interfaces import IGTRService, IGTRFactory
+import db
 
 import sys
 import cgi
@@ -46,45 +47,12 @@ def setup_logging(
     else:
         logging.basicConfig(level=default_level)
 
-setup_logging()
-
-# Bi-directional mapping between user id (uid) and session id
-users = {};
-
-# Bi-directional mapping between username and user id (uid)
-usernames = bidict()
-
-def _username_from_uid(uid):
-    global usernames
-    return usernames[uid]
-
-def _uid_from_username(username):
-    global usernames
-    return usernames.inverse[username]
-
-def new_user(uid, username):
-    global usernames
-    if uid in usernames:
-        raise KeyError('UID', uid, 'is already registered'
-                'with username', _username_from_uid(uid))
-    elif username in usernames.inverse:
-        raise KeyError('Username', username, 'is already registered'
-                'with uid', _uid_from_username(username))
-    else:
-        usernames[uid] = username
-
-
 class GTRProtocol(NetstringReceiver):
     MESSAGE_ERROR_THRESHOLD = 5
 
     def __init__(self):
         self.message_errors = 0
-
-    def connectionMade(self):
-        pass
-
-    def connectionLost(self, reason):
-        self.factory.unregister(self)
+        self.uid = None
 
     def stringReceived(self, request):
         """Receives Command objects of the form <game, action>.
@@ -107,18 +75,16 @@ class GTRProtocol(NetstringReceiver):
                                 'Error parsing message.')))
             return
 
-        uid = self.factory.user_from_protocol(self)
-
-        if uid is None:
+        if self.uid is None:
             if command.action.action == message.LOGIN:
                 session_id = command.action.args[0]
-                uid = self.factory.register(self, session_id)
+                self.uid = self.factory.register(self, session_id)
 
-            if uid is None:
+            if self.uid is None:
                 lg.warning('Ignoring message from unauthenticated user')
                 return
         else:
-            self.factory.handle_command(uid, command)
+            self.factory.handle_command(self.uid, command)
 
     def send_command(self, command):
         """Send a Command to the client."""
@@ -130,8 +96,9 @@ class GTRService(service.Service):
     """
     implements(IGTRService)
 
-    def __init__(self, backup_file=None, load_backup_file=None):
-        self.server = GTRServer(backup_file, load_backup_file)
+    def __init__(self, database):
+        self.server = GTRServer(database)
+        self.db = database
 
         self.factory = None
         self.server.send_command =\
@@ -169,16 +136,7 @@ class GTRFactoryFromService(protocol.ServerFactory):
         self.service = service
         self.service.factory = self
 
-        # Bidirectional mapping user-to-protocol. The inverse
-        # dictionary has a list of users with the same protocol
-        self.user_to_protocol = bidict()
-        self.session_user_dict = {}
-
-    def user_from_protocol(self, protocol):
-        try:
-            return self.user_to_protocol.inverse[protocol][0]
-        except KeyError:
-            return None
+        self.user_to_protocol = {}
 
     def protocol_from_user(self, user):
         try:
@@ -186,54 +144,57 @@ class GTRFactoryFromService(protocol.ServerFactory):
         except KeyError:
             return None
 
-    def register(self, protocol, session_id):
-        """Register protocol as associated with the specified user id.
-        This replaces the old protocol silently.
-        """
-        global users
-        try:
-            uid = users[session_id]
-        except KeyError:
-            uid = None
-        else:
-            self.user_to_protocol[uid] = protocol
+    def register(self, proto, session_id):
+        """Register protocol with a session.
 
+        If session id is invalid, return None.
+        """
+        uid = self.service.db.retrieve_session(session_id)
+        if uid is None:
+            lg.info('Session id not found: {0!s}'.format(session_id))
+            return None
+        else:
+            lg.debug('Registering uid {0!s}'.format(uid))
+
+        user = self.service.db.retrieve_user(uid)
         try:
-            username = _username_from_uid(uid)
-        except KeyError as e:
-            lg.exception(e.message)
+            username = user['username']
+        except KeyError:
+            lg.info('User not found: {0!s}'.format(uid))
             return None
 
+        self.user_to_protocol[uid] = proto
+        lg.debug('Registering uid {0!s} as {1!s}'
+                .format(uid, username))
         self.service.register_user(uid, {'name': username})
 
         return uid
 
-    def unregister(self, protocol):
-        uid = self.user_from_protocol(protocol)
-        if uid is not None:
-            del self.user_to_protocol[uid]
-
     def send_command(self, uid, command):
         """Sends an action to the specified user.
         """
-        protocol = self.protocol_from_user(uid)
-        if protocol is None:
-            username = _username_from_uid(uid)
-            lg.error('Error. Server tried to send a command to {0!s}'
-                    '({1!s}) but the user is not connected.'
-                    .format(username, uid))
+        proto = self.protocol_from_user(uid)
+        if proto is None:
+            lg.error('Error. Server tried to send a command to user {0!s} '
+                    'but the user is not connected.'
+                    .format(uid))
         else:
-            protocol.send_command(command)
+            proto.send_command(command)
 
     def handle_command(self, uid, command):
         self.service.handle_command(uid, command)
 
 
+setup_logging()
+
+database = db.connect()
+database.store_user('reasgt', 'reasgt')
+database.store_user('lexus', 'lexus')
+
 components.registerAdapter(GTRFactoryFromService, IGTRService, IGTRFactory)
 
 application = service.Application('gtr')
-#s = GTRService('tmp/twistd_backup.dat', 'tmp/test_backup2.dat')
-s = GTRService('/tmp/twistd_backup.dat', None)
+s = GTRService(database)
 serviceCollection = service.IServiceCollection(application)
 
 root = resource.Resource()
@@ -247,57 +208,57 @@ class FormPage(static.File):
 
 
 class GetUser(resource.Resource):
+
+    def __init__(self, db):
+        resource.Resource.__init__(self)
+        self.db = db
+
     def render_GET(self, request):
         session_id = request.getSession().uid
-        global users
-        try:
-            uid = users[session_id]
-            username = _username_from_uid(uid)
-        except KeyError as e:
-            lg.exception(e.message)
-            return ''
+        uid = self.db.retrieve_session(session_id)
+        lg.debug('User info request from session {0!s}, user {1!s}.'
+                .format(session_id, uid))
+        return str(uid) if uid is not None else ''
 
-        return username
 
 class NoPassLogin(resource.Resource):
+
+    def __init__(self, db):
+        resource.Resource.__init__(self)
+        self.db = db
+
     def render_POST(self, request):
-        global users
         username = cgi.escape(str(request.args['user'][0]))
         lg.info('Login request: {0}'.format(username))
 
-        try:
-            uid = _uid_from_username(username)
-        except KeyError:
-            uid = uuid4().int
-            lg.debug('Assigning uid to new user: {0!s}'.format(uid))
-            try:
-                new_user(uid, username)
-            except KeyError as e:
-                lg.exception(e.message)
-                return
-
+        uid = username
         session = request.getSession()
-        users[session.uid] = uid
+        self.db.store_session(session.uid, uid)
         lg.debug('Set session id: {0!s} for user {1} ({2!s})'
                 .format(session.uid, username, uid))
         session.notifyOnExpire(lambda: self._onExpire(session))
         return username
 
     def _onExpire(self, session):
-        global users
         try:
-            lg.debug('Expired session {0!s} for user {1!s}'
-                    .format(session.uid, users[session.uid]))
-            del users[session.uid]
+            lg.debug('Expired session {0!s}'
+                    .format(session.uid))
+            self.db.remove_session(self, session.uid)
+
         except KeyError:
             lg.debug('Couldn\'t remove session with uid {0!s}'
                     .format(session.uid))
 
 
 class Logout(resource.Resource):
+
+    def __init__(self, db):
+        resource.Resource.__init__(self)
+        self.db = db
+
     def render_GET(self, request):
-        global users
         session = request.getSession()
+        self.db.remove_session(self, session.uid)
         session.expire()
         return 'Logged out session '+ session.uid
 
@@ -306,9 +267,9 @@ root.putChild("index", static.File('site/index.html'))
 root.putChild("style.css", static.File('site/style.css'))
 root.putChild("favicon.ico", static.File('site/favicon.ico'))
 root.putChild("js", static.File('site/js'))
-root.putChild('user', GetUser())
-root.putChild('login', NoPassLogin())
-root.putChild('logout', Logout())
+root.putChild('user', GetUser(database))
+root.putChild('login', NoPassLogin(database))
+root.putChild('logout', Logout(database))
 site = server.Site(root)
 
 #reactor.listenTCP(5050, site)
