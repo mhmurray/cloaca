@@ -2,6 +2,9 @@
 *.swp
 *.log
 
+# virtualenv
+venv
+
 # Twisted
 twistd.pid
 
