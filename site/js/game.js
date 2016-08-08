@@ -1,42 +1,46 @@
 define(['jquery', 'action_builder', 'games', 'display', 'net', 'util'],
 function($, AB, Games, Display, Net, Util) {
-    function Game(record, user) {
-        this.id = record.id;
-        this.players = record.players;
-        this.user = user;
-        this.gs = null;
-        this.display = new Display(Games.records[this.id], Games.user);
+    function Game(id, players) {
+        this.id = id;
+        //this.id = record.id;
+        //this.players = record.players;
+        //this.user = user;
+        //this.gs = null;
+        console.log('new Display('+id+', '+Games.user+', '+players);
+        this.display = new Display(id, Games.user, players);
     };
 
     // Build the game state HTML
     Game.prototype.initialize = function() {
         this.display.initialize();
 
-        $('#refresh-btn-'+this.id).click(function() {
-            Net.sendAction(this.id, Util.Action.REQGAMESTATE);
+        $('#refresh-btn').click(function() {
+            Net.sendAction(this.id, null, Util.Action.REQGAMESTATE);
         }.bind(this));
     };
     
     // Reset buttons/cards to be unclickable, remove onclicks, blank
     // the dialog, etc.
     Game.prototype.resetUIElements = function() {
-            var $btns = this.display.dialogBtns.find('button');
-            $btns.hide().prop('disabled', true).removeClass('selected selectable');
-            $('#deck,#jacks').off('click').removeClass('selectable');
+        var $btns = this.display.dialogBtns.find('button');
+        $btns.off('click').hide().prop('disabled', true).removeClass('selected selectable');
+        $('#deck, #jacks').off('click').removeClass('selectable');
 
-            var $dialogBtns = $('#ok-cancel-btns > button');
-            $dialogBtns.off('click').prop('disabled', true)
-                       .removeClass('selected selectable')
-                       .hide();
+        var $dialogBtns = $('#ok-cancel-btns > button');
+        $dialogBtns.off('click').prop('disabled', true)
+                   .removeClass('selected selectable')
+                   .hide();
 
-            var $cards = $('.card');
-            $cards.removeClass('selected selectable').off('click');
+        var $cards = $('.card');
+        $cards.removeClass('selected selectable').off('click');
 
-            $('#dialog').text('Waiting for server...');
+        $('#dialog').text('Waiting for server...');
     };
 
 
     Game.prototype.updateState = function(gs) {
+        console.log('GameState received');
+        console.dir(gs);
         // the game state will be null if the game isn't started
         if (gs === null) {
             console.log("Game not started yet.");
@@ -48,18 +52,10 @@ function($, AB, Games, Display, Net, Util) {
             if(gs.players[i].name === Games.user) {
                 player_index = i;
             }
-            if(gs.active_player.name === gs.players[i].name){
-                active_player_index = i;
-            }
+            active_player_index = gs.active_player_index;
         }
 
-        /*
-        var gameRecord = {
-            gameState: gs,
-            playerIndex: player_index
-        };
-        Games.games[gs.game_id] = gameRecord;
-        */
+        var active_player = gs.players[active_player_index];
 
         this.id = gs.game_id;
         AB.playerIndex = player_index;
@@ -70,163 +66,228 @@ function($, AB, Games, Display, Net, Util) {
         current_game_id = Display.game_id;
 
         if(active_player_index !== player_index) {
-            $('#dialog').text('Waiting on ' + gs.active_player.name + '...');
-            console.log('Waiting on ' + gs.active_player.name + '...');
+            $('#dialog').text('Waiting on ' + active_player.name + '...');
+            console.log('Waiting on ' + active_player.name + '('+active_player_index + '!='+player_index+')...');
             return;
         }
 
-        if(gs.expected_action == Util.Action.THINKERORLEAD) {
+        if(gs.expected_action == Util.Action.THINKERORLEAD || gs.expected_action == Util.Action.LEADROLE) {
             var petitionMin = 3;
             var petitionMax = 3;
-            var hasPalace = false;
-            console.log('Lead role');
+            var hasPalace = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Palace');
             AB.leadRole(this.display, hasPalace, petitionMin, petitionMax, function(action, args) {
                 if(action == Util.Action.THINKERTYPE) {
-                    Net.sendAction(gs.game_id, Util.Action.THINKERORLEAD, [true]);
-                    Net.sendAction(gs.game_id, action, args);
+                    Net.sendAction(gs.game_id, gs.action_number, Util.Action.THINKERORLEAD, [true]);
+                    // TODO: Check for latrine in here.
+                    Net.sendAction(gs.game_id, gs.action_number+1, action, args);
                 } else {
-                    Net.sendAction(gs.game_id, Util.Action.THINKERORLEAD, [false]);
-                    Net.sendAction(gs.game_id, Util.Action.LEADROLE, args);
+                    Net.sendAction(gs.game_id, gs.action_number, Util.Action.THINKERORLEAD, [false]);
+                    Net.sendAction(gs.game_id, gs.action_number+1, Util.Action.LEADROLE, args);
                 }
             });
+
+        } else if(gs.expected_action == Util.Action.THINKERTYPE) {
+            AB.thinkerType(this.display,
+                    function(action, args) {
+                        Net.sendAction(gs.game_id, gs.action_number,
+                                Util.Action.THINKERTYPE, args);
+                    }
+            );
 
         } else if(gs.expected_action == Util.Action.FOLLOWROLE) {
             var roleLed = gs.role_led;
             var petitionMin = 3;
             var petitionMax = 3;
-            var hasPalace = false;
-            console.log('Follow role!');
+            var hasPalace = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Palace');
+            var invocations = 0;
             AB.followRole(this.display, roleLed, hasPalace, petitionMin, petitionMax,
                     function(action, args) {
-                        Net.sendAction(gs.game_id, action, args);
+                        Net.sendAction(gs.game_id, gs.action_number+invocations, action, args);
+                        invocations += 1;
                     }
             );
 
         } else if (gs.expected_action == Util.Action.PATRONFROMHAND) {
             AB.patronFromHand(this.display, function(card) {
-                Net.sendAction(gs.game_id, Util.Action.PATRONFROMHAND, [card]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMHAND, [card]);
             });
 
         } else if (gs.expected_action == Util.Action.PATRONFROMPOOL) {
             AB.patronFromPool(this.display, function(card) {
-                Net.sendAction(gs.game_id, Util.Action.PATRONFROMPOOL, [card]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMPOOL, [card]);
             });
 
         } else if (gs.expected_action == Util.Action.USELATRINE) {
-            AB.patronFromPool(this.display, function(card) {
-                Net.sendAction(gs.game_id, Util.Action.USELATRINE, [card]);
+            AB.useLatrine(this.display, function(card) {
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USELATRINE, [card]);
             });
 
         } else if (gs.expected_action == Util.Action.USESEWER) {
             AB.useSewer(this.display, function(cards) {
-                Net.sendAction(gs.game_id, Util.Action.USESEWER, cards);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USESEWER, cards);
             });
 
         } else if (gs.expected_action == Util.Action.PATRONFROMDECK) {
             AB.singleChoice(this.display, 'Patron from deck using Bar?',
-                    [{text: 'Yes', return: true},
-                     {text: 'No', return: false}
+                    [{text: 'Yes', result: true},
+                     {text: 'No', result: false}
                     ], function(useBar) {
-                Net.sendAction(gs.game_id, Util.Action.PATRONFROMDECK, [useBar]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMDECK, [useBar]);
             });
 
         } else if (gs.expected_action == Util.Action.USEVOMITORIUM) {
             AB.singleChoice(this.display, 'Discard hand before thinking with Vomitorium?',
-                    [{text: 'Yes', return: true},
-                     {text: 'No', return: false}
+                    [{text: 'Yes', result: true},
+                     {text: 'No', result: false}
                     ], function(use) {
-                Net.sendAction(gs.game_id, Util.Action.USEVOMITORIUM, [use]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USEVOMITORIUM, [use]);
             });
 
         } else if (gs.expected_action == Util.Action.BARORAQUEDUCT) {
             AB.singleChoice(this.display, 'Patron first with Bar or Aqueduct?',
-                    [{text: 'Bar', return: true},
-                     {text: 'Aqueduct', return: false}
+                    [{text: 'Bar', result: true},
+                     {text: 'Aqueduct', result: false}
                     ], function(use) {
-                Net.sendAction(gs.game_id, Util.Action.BARORAQUEDUCT, [use]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.BARORAQUEDUCT, [use]);
             });
 
         } else if (gs.expected_action == Util.Action.USEFOUNTAIN) {
             AB.singleChoice(this.display, 'Use Fountain to Craftsman from deck?',
-                    [{text: 'Use Fountain', return: true},
-                     {text: 'Skip', return: false}
+                    [{text: 'Use Fountain', result: true},
+                     {text: 'Skip', result: false}
                     ], function(use) {
-                Net.sendAction(gs.game_id, Util.Action.USEFOUNTAIN, [use]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USEFOUNTAIN, [use]);
             });
 
         } else if (gs.expected_action == Util.Action.SKIPTHINKER) {
             AB.singleChoice(this.display, 'Skip optional Thinker action?',
-                    [{text: 'Thinker', return: false},
-                     {text: 'Skip', return: true}
+                    [{text: 'Thinker', result: false},
+                     {text: 'Skip', result: true}
                     ], function(use) {
-                Net.sendAction(gs.game_id, Util.Action.SKIPTHINKER, [use]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.SKIPTHINKER, [use]);
             });
 
         } else if (gs.expected_action == Util.Action.USESENATE) {
             AB.singleChoice(this.display, 'Take opponent\'s Jack with Senate?',
-                    [{text: 'Yes', return: true},
-                     {text: 'No', return: false}
+                    [{text: 'Yes', result: true},
+                     {text: 'No', result: false}
                     ], function(use) {
-                Net.sendAction(gs.game_id, Util.Action.USESENATE, [use]);
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USESENATE, [use]);
             });
 
         } else if (gs.expected_action == Util.Action.LABORER) {
-            var hasDock = false;
+            var hasDock = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Dock');
             AB.laborer(this.display, hasDock, function(handCard, poolCard) {
-                Net.sendAction(gs.game_id, Util.Action.LABORER, [handCard, poolCard]);
+                var cards = [];
+                if(!(handCard === null)) {
+                    cards.push(handCard);
+                }
+                if(!(poolCard === null)) {
+                    cards.push(poolCard);
+                }
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.LABORER, cards);
             });
         } else if (gs.expected_action == Util.Action.MERCHANT) {
-            var hasBasilica = false;
-            var hasAtrium = false;
+            var hasBasilica = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Basilica');
+            var hasAtrium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Atrium');
             AB.merchant(this.display, hasBasilica, hasAtrium,
-                    function(stockpileCard, handCard, fromDeck) {
-                Net.sendAction(gs.game_id, Util.Action.MERCHANT,
-                    [stockpileCard, handCard, fromDeck]);
+                    function(fromStockpile, fromHand, fromDeck) {
+                var cards = [];
+                if(!(fromHand === null)) {
+                    cards.push(fromHand);
+                }
+                if(!(fromStockpile === null)) {
+                    cards.push(fromStockpile);
+                }
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.MERCHANT,
+                    [fromDeck].concat(cards));
             });
         } else if (gs.expected_action == Util.Action.CRAFTSMAN) {
-            var hasFountain = false;
-            var hasRoad = false;
-            var hasTower = false;
-            var hasScriptorium = false;
+            var hasRoad = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Road');
+            var hasTower = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Tower');
+            var hasScriptorium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Scriptorium');
             var ootAllowed = gs.oot_allowed;
             AB.craftsman(this.display, ootAllowed, hasRoad, hasTower, hasScriptorium,
                     function(building, material, site) {
-                        Net.sendAction(gs.game_id,
+                        Net.sendAction(gs.game_id, gs.action_number,
                             Util.Action.CRAFTSMAN,
                             [building, material, site]);
             });
+
+        } else if (gs.expected_action == Util.Action.FOUNTAIN) {
+            var hasRoad = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Road');
+            var hasTower = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Tower');
+            var hasScriptorium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Scriptorium');
+            var ootAllowed = gs.oot_allowed;
+            var fountainCard = gs.players[AB.playerIndex].fountain_card;
+            AB.fountain(this.display, fountainCard, ootAllowed, hasRoad, hasTower, hasScriptorium,
+                    function(building, material, site) {
+                        Net.sendAction(gs.game_id, gs.action_number,
+                            Util.Action.FOUNTAIN,
+                            [building, material, site]);
+            });
+
         } else if (gs.expected_action == Util.Action.ARCHITECT) {
-            var hasFountain = false;
-            var hasRoad = false;
-            var hasTower = false;
-            var hasScriptorium = false;
-            var hasArchway = false;
+            var hasRoad = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Road');
+            var hasTower = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Tower');
+            var hasScriptorium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Scriptorium');
+            var hasArchway = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Archway');
             var ootAllowed = gs.oot_allowed;
             AB.architect(this.display, ootAllowed, hasRoad, hasTower,
                     hasScriptorium, hasArchway,
                     function(building, material, site, fromPool) {
-                        Net.sendAction(gs.game_id,
+                        Net.sendAction(gs.game_id, gs.action_number,
                             Util.Action.ARCHITECT,
-                            [building, material, site, fromPool]);
+                            [building, material, site]);
+            });
+
+        } else if (gs.expected_action == Util.Action.STAIRWAY) {
+            var hasRoad = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Road');
+            var hasTower = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Tower');
+            var hasScriptorium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Scriptorium');
+            var hasArchway = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Archway');
+            AB.stairway(this.display, hasRoad, hasTower, hasScriptorium,
+                    hasArchway,
+                    function(building, material) {
+                        Net.sendAction(gs.game_id, gs.action_number,
+                            Util.Action.STAIRWAY,
+                            [building, material]);
+            });
+
+        } else if (gs.expected_action == Util.Action.PRISON) {
+            AB.prison(this.display, function(building) {
+                        Net.sendAction(gs.game_id, gs.action_number,
+                            Util.Action.PRISON,
+                            [building]);
             });
 
         } else if (gs.expected_action == Util.Action.LEGIONARY) {
             AB.legionary(this.display, gs.legionary_count, function(cards) {
-                    Net.sendAction(gs.game_id, Util.Action.LEGIONARY, cards);
+                    Net.sendAction(gs.game_id, gs.action_number, Util.Action.LEGIONARY, cards);
             });
 
         } else if (gs.expected_action == Util.Action.GIVECARDS) {
-            var hasBridge = false;
-            var hasColiseum = false;
+            var hasBridge = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Bridge');
+            var hasColiseum = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Coliseum');
             var immune = false;
-            var revealed = gs.players[gs.legionary_index].revealed;
+            var revealed = gs.players[gs.legionary_player_index].revealed;
             var materials = $.map(revealed, function(card) {
-                return Util.cardProperties(card.ident).material;
+                return Util.cardProperties(card).material;
             });
 
             AB.giveCards(this.display, materials, hasBridge, hasColiseum, immune,
                     function(cards) {
-                        Net.sendAction(gs.game_id, Util.Action.GIVECARDS, cards);
+                        Net.sendAction(gs.game_id, gs.action_number, Util.Action.GIVECARDS, cards);
+                    }
+            );
+        } else if (gs.expected_action == Util.Action.TAKEPOOLCARDS) {
+            var revealed = gs.players[gs.legionary_player_index].revealed;
+            var materials = $.map(revealed, function(card) {
+                return Util.cardProperties(card).material;
+            });
+
+            AB.takePoolCards(this.display, materials, function(cards) {
+                        Net.sendAction(gs.game_id, gs.action_number, Util.Action.TAKEPOOLCARDS, cards);
                     }
             );
         } else {

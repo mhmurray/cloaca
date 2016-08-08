@@ -46,9 +46,7 @@ function($){
      * an array of card properties dictionaries.
      */
     util.extractCardProperties = function($cards) {
-        console.dir($cards);
         return $.map($cards, function(item) {
-            console.log(item);
             return util.cardProperties($(item).data('name'));
         });
     };
@@ -72,6 +70,17 @@ function($){
             Brick: 'Legionary',
             Stone: 'Merchant',
             Marble: 'Patron'
+        }[material];
+    }
+
+    util.materialToValue = function(material) {
+        return {
+            Rubble: 1,
+            Wood: 1,
+            Concrete: 2,
+            Brick: 2,
+            Stone: 3,
+            Marble: 3
         }[material];
     }
 
@@ -114,6 +123,55 @@ function($){
         }).text(material[0].toUpperCase() + material.slice(1));
     };
 
+
+    util.playerHasActiveBuilding = function(game, player_index, building) {
+        // Player's complete buildings
+        var player = game.players[player_index];
+        var completeBuildings = [];
+        for(var i=0; i<player.buildings.length; i++) {
+            if(player.buildings[i].complete) {
+                completeBuildings.push(util.cardName(player.buildings[i].foundation));
+            }
+        }
+        var hasComplete = completeBuildings.indexOf(building) > -1;
+        if(hasComplete) {return true;}
+
+        // Any player's stairwayed buildings
+        var stairwayBuildings = [];
+        for(var i=0; i<game.players.length; i++) {
+            for(var j=0; j<game.players[i].buildings.length; j++) {
+                var the_building = game.players[i].buildings[j];
+                if(the_building.stairway_materials.length>0) {
+                    stairwayBuildings.push(util.cardName(the_building.foundation));
+                }
+            }
+        }
+        var hasStairway = stairwayBuildings.indexOf(building) > -1;
+        if(hasStairway) {return true;}
+        
+        // Player has incomplete marble and gate in above 2
+        if(completeBuildings.indexOf('Gate') > -1 || stairwayBuildings.indexOf('Gate') > -1) {
+            var marbleFoundation = util.cardProperties(building).material == 'Marble';
+            if(marbleFoundation) {return true;}
+
+            var marbleMaterials = false;
+            for(var i=0; i<player.buildings.length; i++) {
+                if(player.buildings[i].foundation == building) {
+                    for(var j=0; j<player.buildings[i].materials.length; j++) {
+                        var material = player.buildings[i].materials[j];
+                        if(util.cardProperties(material).material == 'Marble') {
+                            marbleMaterials = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if(marbleMaterials) {return true;}
+        }
+
+        return false;
+    };
+
     // Cards are passed by ident as integers.
     util.makeBuilding = function(
         id_, foundation, site, materials, stairwayMaterials, complete) {
@@ -128,7 +186,7 @@ function($){
         $container.append($foundationCard);
 
         var foundationMaterial = util.cardProperties(foundation).material;
-        var siteMaterial = site;
+        var siteMaterial = site.toLowerCase();
 
         $container.data({
             ident: foundation,
@@ -136,13 +194,21 @@ function($){
             complete: complete
         });
 
-        $container.append(util.makeSite(siteMaterial));
+        if(typeof(materials) === 'undefined') {
+            n_materials = 0
+        } else {
+            n_materials = materials.length;
+        }
+
+        $site = util.makeSite(siteMaterial);
+        $site.text(n_materials+'/'+util.materialToValue(site));
+        $container.append($site);
 
         if(typeof(materials) !== 'undefined') {
             $.each(materials, function(i, card) {
                 $container.append($('<div />', {
                     class: 'material',
-                }).text(util.cardName(card.ident)));
+                }).text(util.cardName(card.ident)).addClass(siteMaterial));
             });
         }
         
@@ -150,7 +216,7 @@ function($){
             $.each(stairwayMaterials, function(i, card) {
                 $container.append($('<div />', {
                     class: 'material stairway',
-                }).text(util.cardName(card.ident)));
+                }).text(util.cardName(card.ident)).addClass(siteMaterial));
             });
         }
         
@@ -224,7 +290,9 @@ function($){
         STARTGAME       : 31,
         REQGAMELIST     : 32,
         GAMELIST        : 33,
-        SERVERERROR     : 34
+        SERVERERROR     : 34,
+        PRISON          : 35,
+        TAKEPOOLCARDS   : 36
     };
 
     util._cardDictionary = {

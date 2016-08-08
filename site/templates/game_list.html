@@ -1,0 +1,26 @@
+<html>
+<head>
+    <title>GtR</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Games</h1>
+    <p>Welcome, {{ escape(username) }}.</p>
+    <a href="/newgame">Create New Game</a>
+    <ul>
+        {% for record in game_records %}
+        <li class="received">
+            <a href="/game/{{ escape(str(record.game_id)) }}">Game #{{ escape(str(record.game_id)) }}</a>
+            <a href="/joingame/{{ escape(str(record.game_id)) }}">Join</a>
+            <a href="/startgame/{{ escape(str(record.game_id)) }}">Start</a>
+            Host: {{ escape(record.host) }}, Players: {{ escape(', '.join(record.players)) }}
+            {% if record.started %}
+                (In progress...)
+            {%  else %}
+                (Waiting for players...)
+            {%  end %}
+        </li>
+        {% end %}
+    </ul>
+</body>
+</html>

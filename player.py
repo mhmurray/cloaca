@@ -16,7 +16,7 @@ import logging
 lg = logging.getLogger(__name__)
 lg.addHandler(logging.NullHandler())
 
-class Player:
+class Player(object):
     """ Contains the piles and items controlled by a player. """
     max_hand_size = 5
 

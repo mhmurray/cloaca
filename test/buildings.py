@@ -441,6 +441,18 @@ class TestAcademy(unittest.TestCase):
         self.assertEqual(self.game.active_player, self.p2)
 
 
+    def test_perform_craftsman_flag_reset(self):
+        d = self.deck
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
+        self.assertEqual(self.game.active_player, self.p1)
+
+        self.assertFalse(self.p1.performed_craftsman)
+
+
     def test_no_thinker_after_skipping_craftsman(self):
         d = self.deck
 

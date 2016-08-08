@@ -26,10 +26,9 @@ class TestEncodeGame(unittest.TestCase):
         game_dict = encode.encode(self.game)
         self.assertIsInstance(game_dict, dict)
 
-        print str(game_dict)
-        game_json = encode.game_to_json(self.game)
+        game_json = encode.game_to_json(self.game, indent=2)
         game = encode.json_to_game(game_json)
-        game_json2 = encode.game_to_json(game)
+        game_json2 = encode.game_to_json(game, indent=2)
 
         self.assertEqual(game_json, game_json2)
 

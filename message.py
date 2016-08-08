@@ -165,14 +165,16 @@ class Command(object):
     This is a GameAction object and the id of the game it's
     intended for.
     """
-    def __init__(self, game, action):
-        if game is None:
-            self.game = game
+    def __init__(self, game_id, number, action):
+        self.number = number
+
+        if game_id is None:
+            self.game = game_id
         else:
             try:
-                self.game = int(game)
+                self.game = int(game_id)
             except ValueError:
-                raise GameActionError('Game id must be an integer or None: '+str(game))
+                raise GameActionError('Game id must be an integer or None: '+str(game_id))
 
         self.action = action
 
@@ -204,23 +206,30 @@ class Command(object):
             raise ParsingError('Failed to parse JSON: ' + s)
 
         try:
-            game, action_dict = d['game'], d['action']
+            game, number, action_dict = d['game'], d['number'], d['action']
         except KeyError:
             raise ParsingError('Failed to decode Command object from JSON: '+s)
 
         try:
             action, args = action_dict['action'], action_dict['args']
+
         except KeyError:
             raise ParsingError('Failed to decode GameAction when'
                     'parsing Command from JSON')
 
-        return Command(game, GameAction(action, *args))
+        return Command(game, number, GameAction(action, *args))
 
 
 class GameAction(object):
     """ Class that represents a game action that the client submits
-    to the game server. Consists of an action type and one or more
-    arguments, each of which should be representable by a string.
+    to the game server. Consists of an action type, action number,
+    and one or more arguments, each of which should be representable by a
+    string.
+
+    The action number is used to keep actions in order as they arrive
+    asynchronously from clients. The client must match this number with
+    the Game object they are responding to, and the server must check
+    it against the server's version of the game.
 
     Raises a GameActionError if the action type is not valid or if the
     arguments don't match the action type signature.
@@ -407,6 +416,7 @@ class GameAction(object):
 
         try:
             action, args = d['action'], d['args']
+
         except KeyError:
             raise ParsingError('Failed to decode Command object from JSON: '+s)
 

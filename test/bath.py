@@ -139,13 +139,13 @@ class TestBathNonConsecutiveLegionary(unittest.TestCase):
         a = message.GameAction(message.LEGIONARY, d.dock0)
         self.game.handle(a)
 
+        self.assertIn(d.dock0, self.p1.revealed)
+
         a = message.GameAction(message.TAKEPOOLCARDS)
         self.game.handle(a)
 
         a = message.GameAction(message.GIVECARDS)
         self.game.handle(a)
-
-        self.assertIn(d.dock0, self.p1.revealed)
 
         a = message.GameAction(message.PATRONFROMPOOL, d.road0)
         self.game.handle(a)
@@ -161,14 +161,16 @@ class TestBathNonConsecutiveLegionary(unittest.TestCase):
 
         self.assertIn(d.insula0, self.p1.revealed)
 
+        self.assertIn(d.insula0, self.p1.prev_revealed)
+        self.assertIn(d.dock0, self.p1.prev_revealed)
+
         a = message.GameAction(message.TAKEPOOLCARDS)
         self.game.handle(a)
 
         a = message.GameAction(message.GIVECARDS)
         self.game.handle(a)
 
-        self.assertIn(d.dock0, self.p1.prev_revealed)
-        self.assertIn(d.insula0, self.p1.prev_revealed)
+        self.assertEqual(len(self.p1.prev_revealed), 0)
 
 
     def test_bath_reveal_same_card_twice(self):
