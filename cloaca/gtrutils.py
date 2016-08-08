@@ -3,7 +3,6 @@
 import re
 import logging
 import collections
-import termcolor
 
 from cloaca.error import GTRError
 import cloaca.card_manager as cm
