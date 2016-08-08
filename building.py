@@ -1,7 +1,7 @@
 from cloaca.zone import Zone
 from cloaca.error import GTRError
 
-class Building:
+class Building(object):
     """A container that represents buildings.
     
     The primary data members are the building foundation, site, and materials.
