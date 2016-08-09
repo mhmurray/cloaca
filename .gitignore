@@ -2,12 +2,6 @@
 *.swp
 *.log
 
-# virtualenv
-venv
-
-# Twisted
-twistd.pid
-
 # C extensions
 *.so
 
