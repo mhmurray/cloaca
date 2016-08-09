@@ -1461,7 +1461,7 @@ function($, _, FSM, Util, Selectable){
         fsm.onenterSelectSite = function() {
             $dialog.text('Choose site to start a new building.');
 
-            var cardIdent = AB._extractCardIds(selHand);
+            var cardIdent = AB._extractCardId(selHand);
             var cardName = Util.cardName(cardIdent);
             var cardProp = Util.cardProperties(cardName);
             var cardMaterial = cardProp.material;
