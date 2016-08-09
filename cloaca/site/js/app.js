@@ -6,7 +6,7 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
     };
 
     App.initialize = function(){
-        var WS_URI = 'ws://localhost:5001/ws';
+        var WS_URI = 'ws://localhost:8080/ws';
         var tabs = $('#tabs').tabs({
             active: 0, // Default to game list
         });

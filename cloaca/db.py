@@ -27,17 +27,18 @@ SESSION_AUTH_LENGTH_BYTES=16
 
 db = None
 
-def connect():
+def connect(host, port, prefix):
     global db
     if db is None:
-        db = GTRDBTornadis()
+        db = GTRDBTornadis(host, port, prefix)
     return db
 
 
 class GTRDBTornadis(object):
 
-    def __init__(self, host='localhost', port=6379, autoconnect=True):
-        self.r = tornadis.Client()
+    def __init__(self, host='localhost', port=6379, prefix=''):
+        self.r = tornadis.Client(host=host, port=port, autoconnect=True)
+        self.prefix = prefix
 
         self.scripts_sha = {}
 
@@ -52,6 +53,11 @@ class GTRDBTornadis(object):
 
 
     @gen.coroutine
+    def select(self, selected_db):
+        yield self.r.call('SELECT', selected_db)
+
+
+    @gen.coroutine
     def create_game_with_host(self, host_user_id):
         """Create a new game hosted by user with ID host_user_id.
         Return the new game ID.
@@ -60,11 +66,11 @@ class GTRDBTornadis(object):
         """
         game_id = yield self.r.call('EVALSHA', self.scripts_sha['create_game'],
                 5,
-                GAMEID,
-                USERPREFIX+str(host_user_id),
-                GAMES_HOSTED_PREFIX+str(host_user_id),
-                GAMES,
-                GAME_HOSTS,
+                self.prefix+GAMEID,
+                self.prefix+USERPREFIX+str(host_user_id),
+                self.prefix+GAMES_HOSTED_PREFIX+str(host_user_id),
+                self.prefix+GAMES,
+                self.prefix+GAME_HOSTS,
                 host_user_id)
 
 
@@ -72,7 +78,7 @@ class GTRDBTornadis(object):
             raise GTRDBError('Host user (ID {0:d}) does not exist.'.format(host_user_id))
 
         now = int(time.mktime(time.gmtime()))
-        yield self.r.call('HMSET', GAMEPREFIX+str(game_id), 'date_created', now, 'game_json', '')
+        yield self.r.call('HMSET', self.prefix+GAMEPREFIX+str(game_id), 'date_created', now, 'game_json', '')
 
         raise gen.Return(game_id)
 
@@ -83,7 +89,7 @@ class GTRDBTornadis(object):
         """
         #game_json = encode.game_to_json(game)
 
-        res = yield self.r.call('HSET', GAMEPREFIX+str(game_id), 'game_json', game_json)
+        res = yield self.r.call('HSET', self.prefix+GAMEPREFIX+str(game_id), 'game_json', game_json)
 
         if isinstance(res, TornadisException):
             raise GTRDBError('Failed to store game {0!s}: "{1}"'
@@ -97,7 +103,7 @@ class GTRDBTornadis(object):
         Raises GTRDBError if the game does not exist or if there is an error
         communicating with the database.
         """
-        game_json = yield self.r.call('HGET', GAMEPREFIX+str(game_id), 'game_json')
+        game_json = yield self.r.call('HGET', self.prefix+GAMEPREFIX+str(game_id), 'game_json')
         if isinstance(game_json, TornadisException):
             raise GTRDBError('Failed to retrieve game {0!s}: "{1}"'
                     .format(game_json.message))
@@ -120,7 +126,7 @@ class GTRDBTornadis(object):
             pipeline = tornadis.Pipeline()
 
             for game_id in game_ids:
-                pipeline.stack_call('HGET', GAMEPREFIX+str(game_id), 'game_json')
+                pipeline.stack_call('HGET', self.prefix+GAMEPREFIX+str(game_id), 'game_json')
 
             pipeline = yield self.r.call(pipeline)
 
@@ -131,7 +137,7 @@ class GTRDBTornadis(object):
     def retrieve_games_hosted_by_user(self, user_id):
         """Get list of game_ids hosted by user with ID user_id.
         """
-        game_ids = yield self.r.call('LRANGE', GAMES_HOSTED_PREFIX+str(user_id), 0, -1)
+        game_ids = yield self.r.call('LRANGE', self.prefix+GAMES_HOSTED_PREFIX+str(user_id), 0, -1)
         if isinstance(game_ids, TornadisException):
             raise GTRDBError('Failed to retrieve games hosted by user: {0}'
                     .format(user_id))
@@ -143,7 +149,7 @@ class GTRDBTornadis(object):
     def retrieve_latest_games(self, n_games):
         """Get the n_games most recently-created games.
         """
-        game_ids = yield self.r.call('LRANGE', GAMES, 0, n_games)
+        game_ids = yield self.r.call('LRANGE', self.prefix+GAMES, 0, n_games)
         raise gen.Return(game_ids)
 
     
@@ -156,12 +162,12 @@ class GTRDBTornadis(object):
         # This check leaves open the possibility that the user is separately
         # registered between the check and the registration, but the register
         # function checks this atomically.
-        exists = yield self.r.call('HEXISTS', USERNAMES, username)
+        exists = yield self.r.call('HEXISTS', self.prefix+USERNAMES, username)
         if isinstance(exists, TornadisException):
             raise GTRDBError('Error communicating with database: {0}'
                     .format(exists.message))
         elif exists:
-            user_id = yield self.r.call('HGET', USERNAMES, username)
+            user_id = yield self.r.call('HGET', self.prefix+USERNAMES, username)
             if user_id is not None:
                 raise GTRDBError('User {0} already exists with user ID {1}'
                         .format(username, user_id))
@@ -172,7 +178,7 @@ class GTRDBTornadis(object):
         user_id = yield self.register_user(username)
         unix_time_utc = int(time.mktime(time.gmtime()))
 
-        result = yield self.r.call('HMSET', USERPREFIX+str(user_id),
+        result = yield self.r.call('HMSET', self.prefix+USERPREFIX+str(user_id),
                 'date_added', unix_time_utc,
                 'last_login', unix_time_utc,
                 'auth', auth_token)
@@ -186,18 +192,18 @@ class GTRDBTornadis(object):
     @gen.coroutine
     def register_user(self, username):
         result = yield self.r.call('EVALSHA', self.scripts_sha['register'],
-                2, USERID, USERNAMES, username)
+                2, self.prefix+USERID, self.prefix+USERNAMES, username)
 
         if isinstance(result, TornadisException):
             if result.message.startswith('NOSCRIPT'):
                 result = yield self.r.call('EVAL', lua_scripts.REGISTER_USER,
-                        2, USERID, USERNAMES, username)
+                        2, self.prefix+USERID, self.prefix+USERNAMES, username)
             else:
                 raise GTRDBError('Failed to register new user {0}: {1}'
                         .format(username, result.message))
 
         if result is None:
-            user_id = yield self.r.call('HGET', USERNAMES, username)
+            user_id = yield self.r.call('HGET', self.prefix+USERNAMES, username)
             if user_id is not None:
                 raise GTRDBError('User {0} already exists with user ID {1}'
                         .format(username, user_id))
@@ -215,7 +221,7 @@ class GTRDBTornadis(object):
 
         Raise GTRDBError if user doesn't exist.
         """
-        yield self.r.call('HSET', USERPREFIX+str(user_id), 'last_login', last_login_time)
+        yield self.r.call('HSET', self.prefix+USERPREFIX+str(user_id), 'last_login', last_login_time)
 
 
 
@@ -224,7 +230,7 @@ class GTRDBTornadis(object):
         """Get user_id from username by examining the "users" table.
         Return None if the username is not found.
         """
-        user_id = yield self.r.call('HGET', USERNAMES, username)
+        user_id = yield self.r.call('HGET', self.prefix+USERNAMES, username)
         if isinstance(user_id, TornadisException): 
             raise GTRDBError('Failed to get user ID for {0}: {1}'
                     .format(username, user_id.message))
@@ -234,7 +240,7 @@ class GTRDBTornadis(object):
 
     @gen.coroutine
     def retrieve_user_auth(self, user_id):
-        user_auth = yield self.r.call('HGET', USERPREFIX+str(user_id), 'auth')
+        user_auth = yield self.r.call('HGET', self.prefix+USERPREFIX+str(user_id), 'auth')
         if isinstance(user_auth, TornadisException):
             raise GTRDBError('Failed to get user auth for {0}: {1}'
                     .format(username, res.message))
@@ -245,7 +251,7 @@ class GTRDBTornadis(object):
     @gen.coroutine
     def retrieve_user_session_auth(self, user_id):
         session_auth = yield self.r.call(
-                'HGET', USERPREFIX+str(user_id), 'session_auth')
+                'HGET', self.prefix+USERPREFIX+str(user_id), 'session_auth')
         if isinstance(session_auth, TornadisException):
             raise GTRDBError('Failed to get session token for {0}: {1}'
                     .format(username, session_auth.message))
@@ -255,7 +261,7 @@ class GTRDBTornadis(object):
 
     @gen.coroutine
     def retrieve_userid_from_session_auth(self, session_auth):
-        user_id = yield self.r.call('HGET', SESSIONS, session_auth)
+        user_id = yield self.r.call('HGET', self.prefix+SESSIONS, session_auth)
         raise gen.Return(user_id)
 
 
@@ -263,7 +269,7 @@ class GTRDBTornadis(object):
     def retrieve_user(self, user_id):
         """Return the entire User dictionary.
         """
-        res = yield self.r.call('HGETALL', USERPREFIX+str(user_id))
+        res = yield self.r.call('HGETALL', self.prefix+USERPREFIX+str(user_id))
         if isinstance(res, TornadisException):
             raise GTRDBError('Failed to retrieve user {0!s}: {1}'
                     .format(user_id, res.message))
@@ -280,14 +286,14 @@ class GTRDBTornadis(object):
         """Replaces a session token for user.
         """
         old_session_auth = yield self.r.call(
-                'HGET', USERPREFIX+str(user_id), 'session_auth')
+                'HGET', self.prefix+USERPREFIX+str(user_id), 'session_auth')
 
         pipeline = tornadis.Pipeline()
-        pipeline.stack_call('HSET', USERPREFIX+str(user_id),
+        pipeline.stack_call('HSET', self.prefix+USERPREFIX+str(user_id),
                 'session_auth', session_auth)
 
         if old_session_auth is not None:
-            pipeline.stack_call('HDEL', SESSIONS, old_session_auth)
+            pipeline.stack_call('HDEL', self.prefix+SESSIONS, old_session_auth)
 
-        pipeline.stack_call('HSET', SESSIONS, session_auth, user_id)
+        pipeline.stack_call('HSET', self.prefix+SESSIONS, session_auth, user_id)
         res = yield self.r.call(pipeline)

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import cloaca.message
 from cloaca.message import Command, GameAction
 from cloaca.error import ParsingError, GTRDBError, GTRError
@@ -8,13 +6,11 @@ from cloaca.game_record import GameRecord
 import cloaca.db
 import cloaca.encode
 
-import tornado.ioloop
-from tornado.web import RequestHandler, StaticFileHandler
+import tornado
+from tornado.web import RequestHandler
 from tornado.websocket import WebSocketHandler
-from tornado import gen
-from tornado import escape
+from tornado import gen, escape
 from tornado.process import cpu_count
-from tornado.auth import GoogleOAuth2Mixin
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -22,8 +18,6 @@ import os
 import os.path
 import logging
 import logging.config
-import base64
-import datetime
 import time
 import json
 import binascii
@@ -33,7 +27,7 @@ import re
 SESSION_AUTH_LENGTH_BYTES = 16
 SESSION_MAX_AGE_DAYS = 1
 
-lg = logging.getLogger('tornado-server')
+lg = logging.getLogger('handlers')
 
 pool = ThreadPoolExecutor(cpu_count())
 
@@ -113,7 +107,7 @@ class CreateGameHandler(BaseHandler):
         user_id = self.current_user['user_id']
         game_id = yield self.server.create_game(user_id)
 
-        self.redirect('/games')
+        self.redirect('/')
         return
 
 
@@ -129,7 +123,7 @@ class JoinGameHandler(BaseHandler):
         user_id = self.current_user['user_id']
         game_id = yield self.server.join_game(user_id, game_id)
 
-        self.redirect('/games')
+        self.redirect('/')
         return
 
 
@@ -145,7 +139,7 @@ class StartGameHandler(BaseHandler):
         user_id = self.current_user['user_id']
         game_id = yield self.server.start_game(user_id, game_id)
 
-        self.redirect('/games')
+        self.redirect('/')
         return
 
 
@@ -166,7 +160,7 @@ class GameHandler(BaseHandler):
         return
 
 
-class MainHandler(BaseHandler):
+class GameListHandler(BaseHandler):
 
     @tornado.web.authenticated
     @gen.coroutine
@@ -412,54 +406,3 @@ class GameWSHandler(WebSocketHandler):
     def send_error(self, msg):
         resp = Command(None, None, GameAction(message.SERVERERROR, msg))
         self.send_command(resp)
-
-
-def make_app():
-    path = os.path.dirname(__file__)
-    site_path = os.path.join(path, 'site')
-    js_path = os.path.join(site_path, 'js')
-    database = cloaca.db.connect()
-    ioloop = tornado.ioloop.IOLoop.current()
-    ioloop.run_sync(database.load_scripts)
-
-    server = GTRServer(database)
-
-    def send_command(user_id, command):
-        try:
-            cxn = GameWSHandler.client_cxn_by_user_id[user_id]
-        except KeyError:
-            lg.debug('User ID {0!s} is not connected.'.format(user_id))
-            return
-
-        cxn.send_command(command)
-
-    server.send_command = send_command
-
-    settings = dict(
-            cookie_secret='__TODO:_GENERATE_COOKIE_SECRET__',
-            login_url='/login',
-            xsrf_cookies=True,
-            )
-    return tornado.web.Application([
-        (r'/(favicon.ico)', tornado.web.StaticFileHandler, {'path':site_path}),
-        (r'/(index.html)', tornado.web.StaticFileHandler, {'path':site_path}),
-        (r'/games', MainHandler, {'database':database}),
-        (r'/newgame', CreateGameHandler, {'database':database, 'server':server}),
-        (r'/joingame/([0-9]+)', JoinGameHandler, {'database':database, 'server':server}),
-        (r'/startgame/([0-9]+)', StartGameHandler, {'database':database, 'server':server}),
-        (r'/game/([0-9]+)', GameHandler, {'database':database, 'server':server}),
-        (r'/(style.css)', tornado.web.StaticFileHandler, {'path':site_path}),
-        (r'/js/(.*)', tornado.web.StaticFileHandler, {'path':js_path}),
-        (r'/', MainHandler, {'database':database}),
-        (r'/ws', GameWSHandler, {'database':database, 'server':server}),
-        (r'/register', RegisterHandler, {'database': database}),
-        (r'/login', LoginPageHandler, {'database': database}),
-        (r'/auth', AuthenticateHandler, {'database': database}),
-        (r'/logout', LogoutHandler, {'database': database}),
-        ],
-        **settings)
-
-if __name__ == '__main__':
-    app = make_app()
-    app.listen(5001)
-    tornado.ioloop.IOLoop.current().start()
