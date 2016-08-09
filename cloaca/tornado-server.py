@@ -199,7 +199,7 @@ class LoginPageHandler(BaseHandler):
     def get(self):
         error = self.get_argument('error', None)
         error_msg = escape.url_unescape(error) if error else ''
-        self.render('tornado_login_form.html', error=error_msg)
+        self.render('site/templates/tornado_login_form.html', error=error_msg)
 
 
 class RegisterHandler(BaseHandler):

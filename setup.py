@@ -9,4 +9,10 @@ setup(name='cloaca',
         packages=['cloaca'],
         zip_safe=False,
         include_package_data=True,
+        install_requires=[
+            'tornado>=4.3.0',
+            'tornadis>=0.7.0',
+            'bcrypt>=2.0.0',
+            'futures>=3.0.5',
+            ]
         )
