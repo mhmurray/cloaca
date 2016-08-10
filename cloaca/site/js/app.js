@@ -6,7 +6,12 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
     };
 
     App.initialize = function(){
-        var WS_URI = 'ws://localhost:8080/ws';
+        var ws_proto = 'wss:'
+        if(location.protocol == 'http:') {
+            ws_proto = 'ws:'
+        }
+        var ws_uri = ws_proto+'//'+location.host+'/ws'
+        //var ws_uri = 'wss://localhost:8080/ws';
         var tabs = $('#tabs').tabs({
             active: 0, // Default to game list
         });
@@ -96,7 +101,7 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
             $('#logout-btn').show();
             Games.user = user;
             Net.user = user;
-            Net.connect(WS_URI, function() {
+            Net.connect(ws_uri, function() {
                 console.log('Requesting game state');
                 Net.sendAction(game_id, null, Util.Action.REQGAMESTATE);
             }, handleCommand);

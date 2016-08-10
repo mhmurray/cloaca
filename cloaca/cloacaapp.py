@@ -4,6 +4,7 @@ import tornado.ioloop
 from tornado.web import StaticFileHandler
 from tornado.websocket import WebSocketHandler
 from tornado import gen, escape
+import tornado.httpserver
 
 import os
 import os.path
@@ -12,6 +13,7 @@ import logging.config
 import json
 import re
 import argparse
+import sys
 
 from cloaca.server import GTRServer
 import cloaca.db
@@ -69,6 +71,7 @@ def make_app(database):
             cookie_secret='__TODO:_GENERATE_COOKIE_SECRET__',
             login_url='/login',
             xsrf_cookies=True,
+
             )
     return tornado.web.Application([
         (r'/(favicon.ico)', tornado.web.StaticFileHandler, {'path':site_path}),
@@ -90,21 +93,32 @@ def make_app(database):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('Run Cloaca server')
-    parser.add_argument('--server-port', default=8080, type=int,
+    parser.add_argument('--port', default=8080, type=int,
             help=('Default port for the Cloaca server'))
     parser.add_argument('--redis-port', default=6379, type=int,
             help=('Redis port'))
     parser.add_argument('--redis-host', default='localhost',
             help=('Redis host'))
     parser.add_argument('--redis-db', default=0, type=int,
-            help=('redis database'))
+            help=('Redis database'))
+    parser.add_argument('--no-ssl', default=False, action='store_true',
+            help=('Run server without SSL'))
+    parser.add_argument('--ssl-cert', default=None,
+            help=('SSL Certificate path'))
+    parser.add_argument('--ssl-key', default=None,
+            help=('SSL Key path'))
     # This doesn't work with tornadis.
     #parser.add_argument('--redis-prefix', default='',
     #        help=('Custom prefix to redis keys'))
 
     args = parser.parse_args()
 
-    lg.info('Starting Cloaca server on port {0}'.format(args.server_port))
+    if not args.no_ssl and (args.ssl_cert is None or args.ssl_key is None):
+        lg.critical('--no-ssl argument was not specified but no SSL cert or key provided '
+                '(--ssl-cert / --ssl-key')
+        sys.exit(1)
+
+    lg.info('Starting Cloaca server on port {0}'.format(args.port))
     lg.info('Connecting to Redis database at {0}:{1!s}'.format(args.redis_host, args.redis_port))
     database = cloaca.db.connect(
             host=args.redis_host,
@@ -116,5 +130,14 @@ if __name__ == '__main__':
 
     app = make_app(database)
 
-    app.listen(args.server_port)
+    settings = {}
+    if not args.no_ssl:
+        settings['ssl_options'] = {
+                    "certfile": os.path.abspath(args.ssl_cert),
+                    "keyfile": os.path.abspath(args.ssl_key),
+                }
+
+    httpserver = tornado.httpserver.HTTPServer(app, **settings)
+
+    httpserver.listen(args.port)
     tornado.ioloop.IOLoop.current().start()
