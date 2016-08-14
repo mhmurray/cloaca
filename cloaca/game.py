@@ -1759,7 +1759,7 @@ class Game(object):
                         .format(p.name,
                             ', '.join(map(str, clientele_cards_to_move))))
         else:
-            self._log('{0}: "Glory to Rome!"')
+            self._log('{0}: "Glory to Rome!"'.format(p.name))
 
         for c in hand_cards_to_move:
             p.hand.move_card(c, leg_p.stockpile)
@@ -1826,11 +1826,11 @@ class Game(object):
         # Logging
         if stockpile_card:
             self._log(('{0} performs Merchant, selling a {1!s} from the stockpile'
-                      + ' and a card from their hand.' if hand_card else '.')
+                      + (' and a card from their hand.' if hand_card else '.'))
                       .format(p.name, stockpile_card))
         elif from_deck:
             self._log(('{0} performs Merchant, selling a card from the deck'
-                      + ' and a card from their hand.' if hand_card else '.')
+                      + (' and a card from their hand.' if hand_card else '.'))
                       .format(p.name))
         elif hand_card:
             self._log('{0} performs Merchant, selling a card from their hand.'
