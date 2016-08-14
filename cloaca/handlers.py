@@ -51,6 +51,7 @@ def setup_logging(
 
 setup_logging()
 
+APPDIR = os.path.dirname(__file__)
 
 class BaseHandler(RequestHandler):
     def initialize(self, database):
@@ -154,9 +155,11 @@ class GameHandler(BaseHandler):
     def get(self, game_id):
         user_id = self.current_user['user_id']
 
+        # Render with ws-uri so that a proxy will re-write the websocket URI.
         self.render('site/templates/game.html',
                 game_id=game_id,
-                username=self.current_user['username'])
+                username=self.current_user['username'],
+                websocket_uri='/ws/')
         return
 
 
@@ -309,7 +312,6 @@ class GameWSHandler(WebSocketHandler):
     # Session expiration is handled via expiring Tornado secure cookies.
     @gen.coroutine
     def prepare(self):
-        lg.info('Current user: ' + str(self.current_user))
         if self.current_user is not None:
             lg.debug('Current user logged in {0}'.format(self.current_user['username']))
             return

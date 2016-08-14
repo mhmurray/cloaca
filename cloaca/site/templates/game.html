@@ -12,6 +12,7 @@
 </head>
 <body>
     <h1 id="the_game_id">{{ escape(str(game_id)) }}</h1><span id="the_username">{{ escape(username) }}</span>
+    <a href="/">Game List</a>
     <div id="tabs">
         <ul>
             <li><a href="#gamelist-wrapper">Game List</a></li>
@@ -59,5 +60,6 @@
         </div>
     </div>
 
+    <a id="ws-uri" style="display: none;" href="{{ websocket_uri }}"></a>
 </body>
 </html>

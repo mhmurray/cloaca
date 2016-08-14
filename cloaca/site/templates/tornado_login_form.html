@@ -1,6 +1,6 @@
 <p>{{ escape(error) }}</p>
 <h1>Please log in</h1>
-<form action="/auth" method="post">
+<form action="auth" method="post">
     {% module xsrf_form_html() %}
     User: <input type="text" name="username" autofocus><br>
     Password:  <input type="password" name="auth"><br>

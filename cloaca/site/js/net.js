@@ -49,7 +49,7 @@ function(SockJS, Util, FSM, Cookies) {
 
             // Parse NetString : <length>:<str>,
             //var msg = (splitWithTail(message, ':', 1)[1]).slice(0,-1);
-            var msg = message
+            var msg = message;
 
             var dict = JSON.parse(msg);
             console.log('Received', dict);

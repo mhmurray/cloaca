@@ -17,6 +17,7 @@ import sys
 
 from cloaca.server import GTRServer
 import cloaca.db
+import cloaca.handlers
 from cloaca.handlers import (
         BaseHandler, CreateGameHandler, JoinGameHandler,
         StartGameHandler, GameHandler, GameListHandler,
@@ -48,7 +49,7 @@ setup_logging()
 
 
 def make_app(database):
-    path = os.path.dirname(__file__)
+    path = cloaca.handlers.APPDIR
     site_path = os.path.join(path, 'site')
     js_path = os.path.join(site_path, 'js')
     ioloop = tornado.ioloop.IOLoop.current()
