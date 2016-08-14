@@ -273,10 +273,10 @@ class Game(object):
         """
         all_cards = Zone()
         has_winner = False
-        players = range(n_players)
+        player_indices = range(n_players)
         while not has_winner:
             # Make list of (player, card) pairs
-            cards = [(i,self._draw_cards(1)[0]) for i in players]
+            cards = [(i,self._draw_cards(1)[0]) for i in player_indices]
             first = min(cards, key=lambda x : x[1])
             players = [c[0] for c in cards if c[1].name == first[1].name]
             all_cards.extend([c[1] for c in cards])
@@ -287,7 +287,7 @@ class Game(object):
 
             if len(players)==1:
                 has_winner = True
-                self._log('{0} plays first.'.format(self.players[0].name))
+                self._log('{0} plays first.'.format(self.players[players[0]].name))
             else:
                 self._log('Deal more cards into pool to break tie.')
 
