@@ -1456,6 +1456,7 @@ function($, _, FSM, Util, Selectable){
             if(hasArchway) {selPool.makeUnselectable();}
 
             Util.off($skipBtn);
+            $skipBtn.hide();
         };
 
         fsm.onenterSelectSite = function() {
@@ -1483,11 +1484,20 @@ function($, _, FSM, Util, Selectable){
                 actionCallback(cardIdent, null, siteName, false);
                 fsm.finish();
             });
+
+            $cancelBtn.show().prop('disabled', false).off('click').click(function() {
+                fsm.cancel();
+            });
+
         };
 
         fsm.onleaveSelectSite = function() {
             selHand.reset();
             selSite.reset();
+            Util.off($skipBtn);
+            $skipBtn.hide();
+            Util.off($cancelBtn);
+            $cancelBtn.hide();
         };
 
         fsm.onenterSelectBuilding = function() {
@@ -1532,6 +1542,10 @@ function($, _, FSM, Util, Selectable){
             selBuilding.reset();
             selPool.reset();
             selStockpile.reset();
+            Util.off($skipBtn);
+            $skipBtn.hide();
+            Util.off($cancelBtn);
+            $cancelBtn.hide();
         };
 
         fsm.onenterFinish = function() {
