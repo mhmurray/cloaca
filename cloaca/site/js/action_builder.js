@@ -174,7 +174,7 @@ function($, _, FSM, Util, Selectable){
             actionCallback([null]);
         });
 
-        $okBtn.prop('disabled', false).click(function(e) {
+        $okBtn.show().prop('disabled', false).click(function(e) {
             var selection = AB._extractCardIds(sel);
             sel.reset();
 

@@ -13,6 +13,7 @@ from collections import Counter
 import logging
 import message
 from datetime import datetime
+import itertools
 
 lg = logging.getLogger(__name__)
 lg.addHandler(logging.NullHandler())
@@ -1854,7 +1855,8 @@ class Game(object):
 
 
     def _do_kids_in_pool(self, p):
-        if self._player_has_active_building(p, 'Sewer'):
+        if self._player_has_active_building(p, 'Sewer') and \
+                next(itertools.ifilter(lambda c: c.name != 'Jack', p.camp), None) is not None:
             self._await_action(message.USESEWER, p)
 
         else:
