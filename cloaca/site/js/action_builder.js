@@ -911,7 +911,7 @@ function($, _, FSM, Util, Selectable){
                         petitionMin + ' cards for petition');
                 } else {
                     selHandNoJacks.makeUnselectable();
-                    fsm.finishpetition();
+                    fsm.petition();
                 }
             });
         };
