@@ -25,4 +25,4 @@ class Frame(object):
         return 'Frame({0})'.format(self.function_name)
 
     def __repr__(self):
-        return 'Frame({0}, {1})'.format(self.function_name, self.args)
+        return 'Frame({0}, args={1})'.format(self.function_name, self.args)
