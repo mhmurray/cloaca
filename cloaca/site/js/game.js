@@ -65,6 +65,13 @@ function($, AB, Games, Display, Net, Util) {
 
         current_game_id = Display.game_id;
 
+        var game_over = gs.winners.length>0;
+        if(game_over) {
+            console.log('Game has ended.');
+            $('#dialog').text('Game over!');
+            return;
+        }
+
         if(active_player_index !== player_index) {
             $('#dialog').text('Waiting on ' + active_player.name + '...');
             console.log('Waiting on ' + active_player.name + '('+active_player_index + '!='+player_index+')...');

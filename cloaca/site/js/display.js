@@ -166,8 +166,8 @@ function(Util, $, _){
                 }.bind(this));
 
         // Dialog and control buttons
-        this.dialogWrapper = $('<div>').addClass('dialog-wrapper');
-        this.dialog = $('<div/>').addClass('dialog');
+        this.dialogWrapper = $('<div>').attr('id', 'dialog-wrapper');
+        this.dialog = $('<div/>').attr('id', 'dialog');
         this.dialogBtns = $('<div/>').append([
             $('<button/>').attr('id', 'ok-btn').text('OK'),
             $('<button/>').attr('id', 'cancel-btn').text('Cancel'),

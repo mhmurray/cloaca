@@ -193,6 +193,13 @@ function($, _, FSM, Util, Selectable){
         $dialog.text('Reveal cards for Legionary or skip remaining actions.');
 
         var sel = new Selectable($hand);
+        function finished($selected) {
+            var cards = AB._extractCardIds(sel);
+
+            sel.reset();
+            actionCallback(cards);
+        };
+
         sel.makeSelectN(count, finished);
 
         $skipBtn.show().prop('disabled', false).click(function(e) {
