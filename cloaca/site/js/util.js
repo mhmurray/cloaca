@@ -262,7 +262,7 @@ function($){
         PATRONFROMPOOL  :  3,
         BARORAQUEDUCT   :  4,
         PATRONFROMDECK  :  5,
-        PATRONFHAND     :  6,
+        PATRONFROMHAND  :  6,
         USEFOUNTAIN     :  7,
         FOUNTAIN        :  8,
         LEGIONARY       :  9,
