@@ -523,7 +523,7 @@ class Game(object):
                 lg.warning('Tried to pop from empty stack!')
                 raise
 
-            lg.debug('Execute next stack frame: ' + str(self._current_frame))
+            lg.debug('Execute next stack frame: ' + repr(self._current_frame))
 
             func = getattr(self, self._current_frame.function_name)
             func.__call__(*self._current_frame.args)
@@ -1858,6 +1858,7 @@ class Game(object):
             self._await_action(message.USESEWER, p)
 
         else:
+            self.active_player = p
             self._handle_usesewer(message.GameAction(message.USESEWER))
 
 
