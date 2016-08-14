@@ -1094,10 +1094,10 @@ function($, _, FSM, Util, Selectable){
                 var $building = $(building);
                 var materials = $building.data('materials');
 
-                var materialMatch = $.inArray(cardMaterial, materials)>-1;
+                var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                 var notComplete = !$building.data('complete');
-                var roadMatch = hasRoad && $.inArray('Stone', materials)>-1;
-                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials)>-1;
+                var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
+                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
                 var towerMatch = hasTower && (cardMaterial === 'Rubble');
 
                 return notComplete &&
@@ -1183,10 +1183,10 @@ function($, _, FSM, Util, Selectable){
                         var $building = $(building);
                         var materials = $building.data('materials');
 
-                        var materialMatch = $.inArray(cardMaterial, materials)>-1;
+                        var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                         var notComplete = !$building.data('complete');
-                        var roadMatch = hasRoad && $.inArray('Stone', materials)>-1;
-                        var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials)>-1;
+                        var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
+                        var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
                         var towerMatch = hasTower && (cardMaterial === 'Rubble');
 
                         return notComplete &&
@@ -1243,21 +1243,14 @@ function($, _, FSM, Util, Selectable){
                 var ident = $(building).data('ident');
                 return Util.cardName(ident);
         }).get();
-        console.log('my_building_names: '+ my_building_names);
-        console.dir(my_building_names);
 
         var $buildings = $('.building').not(display.buildings(AB.playerIndex)).filter(
                 function(i, building) {
             var $building = $(building);
             var name = Util.cardName($building.data('ident'));
 
-            console.log($building.data('complete'));
-            console.log($.inArray(name, my_building_names));
-            console.log(name);
             return $building.data('complete') && $.inArray(name, my_building_names) == -1;
         });
-        console.log($buildings);
-        console.dir($buildings);
 
         selBuilding = new Selectable($buildings);
         selBuilding.makeSelectN(1, function($selected) {
@@ -1349,8 +1342,8 @@ function($, _, FSM, Util, Selectable){
 
                 var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                 var complete = $building.data('complete');
-                var roadMatch = hasRoad && $.inArray('Stone', materials);
-                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials);
+                var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
+                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
                 var towerMatch = hasTower && (cardMaterial === 'Rubble');
 
                 return complete &&
@@ -1514,8 +1507,8 @@ function($, _, FSM, Util, Selectable){
 
                 var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                 var notComplete = !$building.data('complete');
-                var roadMatch = hasRoad && $.inArray('Stone', materials);
-                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials);
+                var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
+                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
                 var towerMatch = cardMaterial === 'Rubble';
 
                 return notComplete &&
