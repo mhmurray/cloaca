@@ -65,7 +65,7 @@ function($, AB, Games, Display, Net, Util) {
 
         current_game_id = Display.game_id;
 
-        var game_over = gs.winners.length>0;
+        var game_over = (gs.winners !== null) && (gs.winners.length>0);
         if(game_over) {
             console.log('Game has ended.');
             $('#dialog').text('Game over!');
