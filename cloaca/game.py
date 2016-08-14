@@ -1604,28 +1604,32 @@ class Game(object):
 
         revealed_materials = [c.material for c in p.revealed]
 
-        self._log('Rome demands {0}! (revealing {1})'
-            .format(', '.join(revealed_materials), 
-                ', '.join(map(str, p.revealed))))
-
-        # Get cards from other players, but only neighbors without Bridge.
-
-        has_bridge = self._player_has_active_building(p, 'Bridge')
-
-        if len(self.players) > 3 and not has_bridge:
-            players_turn_order = self._players_in_turn_order(p) 
-            responding_players = players_turn_order[1], players_turn_order[-1]
-
+        if len(revealed_materials) == 0:
+            self._log('{0} skips legionary.'.format(p.name))
+            self._pump()
+            return
         else:
-            responding_players = self._players_in_turn_order(p)
-            responding_players.pop(0)
+            self._log('Rome demands {0}! (revealing {1})'
+                .format(', '.join(revealed_materials), 
+                    ', '.join(map(str, p.revealed))))
 
-        for player in responding_players[::-1]:
-            self.stack.push_frame('_await_action', message.GIVECARDS, player)
-                
-        self.legionary_player = p
-        self._await_action(message.TAKEPOOLCARDS, p)
-        return
+            # Get cards from other players, but only neighbors without Bridge.
+
+            has_bridge = self._player_has_active_building(p, 'Bridge')
+
+            if len(self.players) > 3 and not has_bridge:
+                players_turn_order = self._players_in_turn_order(p) 
+                responding_players = players_turn_order[1], players_turn_order[-1]
+
+            else:
+                responding_players = self._players_in_turn_order(p)
+                responding_players.pop(0)
+
+            for player in responding_players[::-1]:
+                self.stack.push_frame('_await_action', message.GIVECARDS, player)
+                    
+            self.legionary_player = p
+            self._await_action(message.TAKEPOOLCARDS, p)
 
 
     def _handle_takepoolcards(self, a):
@@ -1656,7 +1660,6 @@ class Game(object):
         from stockpile or clientele.
         """
         cards = a.args
-        lg.debug('Received GIVECARDS(' + ','.join(map(str, cards))+')')
 
         p = self.active_player
 
