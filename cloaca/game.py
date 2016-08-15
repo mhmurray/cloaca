@@ -184,6 +184,8 @@ class Game(object):
         players' hands, as well as the revealed card for a Fountain.
 
         Do not hide Jacks in hand.
+        
+        Don't hide anything but the library if the game is over.
 
         Return a new game state object
         """
@@ -191,14 +193,15 @@ class Game(object):
 
         gs.library.set_content([Card(-1)]*len(gs.library))
 
-        for p in gs.players:
-            p.vault.set_content([Card(-1)]*len(p.vault))
+        if self.winners == None:
+            for p in gs.players:
+                p.vault.set_content([Card(-1)]*len(p.vault))
 
-            if p.name != player_name:
-                p.hand.set_content([c if c.name == 'Jack' else Card(-1) for c in p.hand ])
-                p.fountain_card = Card(-1) if p.fountain_card else None
-                p.revealed.set_content([cm.get_card(c.name) for c in p.revealed])
-                p.prev_revealed.set_content([cm.get_card(c.name) for c in p.prev_revealed])
+                if p.name != player_name:
+                    p.hand.set_content([c if c.name == 'Jack' else Card(-1) for c in p.hand ])
+                    p.fountain_card = Card(-1) if p.fountain_card else None
+                    p.revealed.set_content([cm.get_card(c.name) for c in p.revealed])
+                    p.prev_revealed.set_content([cm.get_card(c.name) for c in p.prev_revealed])
 
         return gs
 
