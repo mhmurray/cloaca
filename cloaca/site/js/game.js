@@ -82,6 +82,10 @@ function($, AB, Games, Display, Net, Util) {
             var petitionMin = 3;
             var petitionMax = 3;
             var hasPalace = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Palace');
+            var hasCircus = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Circus');
+            if(hasCircus) {
+                petitionMin = 2;
+            }
             AB.leadRole(this.display, hasPalace, petitionMin, petitionMax, function(action, args) {
                 if(action == Util.Action.THINKERTYPE) {
                     Net.sendAction(gs.game_id, gs.action_number, Util.Action.THINKERORLEAD, [true]);
@@ -106,6 +110,10 @@ function($, AB, Games, Display, Net, Util) {
             var petitionMin = 3;
             var petitionMax = 3;
             var hasPalace = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Palace');
+            var hasCircus = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Circus');
+            if(hasCircus) {
+                petitionMin = 2;
+            }
             var invocations = 0;
             AB.followRole(this.display, roleLed, hasPalace, petitionMin, petitionMax,
                     function(action, args) {
