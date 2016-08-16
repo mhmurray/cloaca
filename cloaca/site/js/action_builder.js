@@ -218,6 +218,8 @@ function($, _, FSM, Util, Selectable){
     {
 
         var $hand = display.zoneCards('hand', AB.playerIndex).not('.jack');
+        var $clientele = display.zoneCards('clientele', AB.playerIndex);
+        var $stockpile = display.zoneCards('stockpile', AB.playerIndex);
         var $dialog = display.dialog;
         var $gloryBtn = display.button('glory');
 
@@ -1097,7 +1099,7 @@ function($, _, FSM, Util, Selectable){
                 var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                 var notComplete = !$building.data('complete');
                 var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
-                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
+                var scriptoriumMatch = hasScriptorium;
                 var towerMatch = hasTower && (cardMaterial === 'Rubble');
 
                 return notComplete &&
@@ -1186,7 +1188,7 @@ function($, _, FSM, Util, Selectable){
                         var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                         var notComplete = !$building.data('complete');
                         var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
-                        var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
+                        var scriptoriumMatch = hasScriptorium;
                         var towerMatch = hasTower && (cardMaterial === 'Rubble');
 
                         return notComplete &&
