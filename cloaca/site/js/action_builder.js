@@ -234,12 +234,86 @@ function($, _, FSM, Util, Selectable){
 
         if(immune) { gloryButton(); return; }
 
-        materialCounts = {Rubble: 0, Wood: 0, Concrete: 0, Brick: 0, Stone: 0, Marble: 0};
+        materialNames = ['Rubble', 'Wood', 'Concrete', 'Brick', 'Stone', 'Marble'];
+        materialCountsDemanded = {Rubble: 0, Wood: 0, Concrete: 0, Brick: 0, Stone: 0, Marble: 0};
         materials.forEach(function(item) {
-                materialCounts[item]+=1;
+                materialCountsDemanded[item]+=1;
         });
 
-        var cards = [];
+
+        // Mapping of zone -> (mapping of material -> selectable)
+        var sels = {};
+
+        var zones = ['hand'];
+        if(hasBridge) {
+            zones.push('stockpile');
+        }
+        if(hasColiseum) {
+            zones.push('clientele');
+        }
+
+
+        // Make a selectable for each combination of (zone, material) with the right
+        // number needed for each. Then the finish condition is to check all of them to
+        // see if they're done. To get more info on what the user hasn't picked,
+        // we'll have to know which selectables aren't finished.
+        var zoneSelectableMap = {};
+
+        function checkFinished() {
+            for(var zone in zoneSelectableMap) {
+                var $zone = display.zoneCards(zone, AB.playerIndex).not('.jack');
+                for(var mat in zoneSelectableMap[zone]) {
+                    var $cards = $zone.filter('.'+mat.toLowerCase());
+                    var sel = zoneSelectableMap[zone][mat];
+                    var materialCounts = Math.min(materialCountsDemanded[mat], $cards.length);
+                    if(sel.selected().length !== materialCounts){
+                        return;
+                    }
+                }
+            }
+            // If no selectable is unfinished, accumulate all cards and reset selectables.
+            var cards = [];
+            for(var zone in zoneSelectableMap) {
+                for(var mat in zoneSelectableMap[zone]) {
+                    var sel = zoneSelectableMap[zone][mat];
+                    cards.push.apply(cards, AB._extractCardIds(sel));
+                    sel.reset();
+                }
+            }
+            $dialog.text('');
+            actionCallback(cards);
+        };
+
+        var addedOne = false;
+        for(var i=0; i<zones.length; i++) {
+            var materialSelectableMap = {};
+            var $zone = display.zoneCards(zones[i], AB.playerIndex).not('.jack');
+            var materialCounts = Object.assign({}, materialCountsDemanded);
+            materialNames.forEach(function(mat) {
+                var $cards = $zone.filter('.'+mat.toLowerCase());
+                materialCounts[mat] = Math.min(materialCounts[mat], $cards.length);
+                var takeAll = materialCounts[mat] === $cards.length;
+                if(materialCounts[mat]) {
+                    var sel = new Selectable($cards);
+                    if(takeAll && !immune) {
+                        sel.makeSelectN(materialCounts[mat], checkFinished);
+                        sel.select($cards);
+                        //$cards.trigger('click');
+                    } else {
+                        sel.makeSelectN(materialCounts[mat], checkFinished, true);
+                    }
+                    addedOne = true;
+                    materialSelectableMap[mat] = sel;
+                }
+            });
+            zoneSelectableMap[zones[i]] = materialSelectableMap;
+        }
+        checkFinished();
+
+                    
+
+    /*
+        var materialCounts = materialCountsDemanded.slice();
         var selectables = {};
 
         for(var m in materialCounts) {
@@ -255,7 +329,22 @@ function($, _, FSM, Util, Selectable){
                             return;
                         }
                     }
+                    if(hasBridge) {
+                        for(var mat in sp_selectables) {
+                            if(sp_selectables[mat].selected().length !== sp_materialCounts[mat]) {
+                                return;
+                            }
+                        }
+                    }
+                    if(hasColiseum) {
+                        for(var mat in sp_selectables) {
+                            if(sp_selectables[mat].selected().length !== sp_materialCounts[mat]) {
+                                return;
+                            }
+                        }
+                    }
                     // If done, accumulate cards from all and reset them.
+                    var cards = [];
                     for(var mat in selectables) {
                         var sel = selectables[mat];
                         cards.push.apply(cards, AB._extractCardIds(sel));
@@ -267,9 +356,10 @@ function($, _, FSM, Util, Selectable){
                 selectables[m] = sel;
             }
         }
+    */
 
         // If we don't have any of the materials, no Selectables will be made.
-        if(Object.keys(selectables).length == 0) {
+        if(!addedOne) {
             gloryButton();
         }
 
@@ -1173,7 +1263,6 @@ function($, _, FSM, Util, Selectable){
                     return siteAvail && siteMatch;
             });
 
-            console.dir($sitesAllowed);
             selSite = new Selectable($sitesAllowed);
             selSite.makeSelectN(1, function($selected) {
                 var siteName = $selected.data('material');

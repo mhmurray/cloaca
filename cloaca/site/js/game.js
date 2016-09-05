@@ -2,11 +2,6 @@ define(['jquery', 'action_builder', 'games', 'display', 'net', 'util'],
 function($, AB, Games, Display, Net, Util) {
     function Game(id, players) {
         this.id = id;
-        //this.id = record.id;
-        //this.players = record.players;
-        //this.user = user;
-        //this.gs = null;
-        console.log('new Display('+id+', '+Games.user+', '+players);
         this.display = new Display(id, Games.user, players);
     };
 
@@ -74,7 +69,6 @@ function($, AB, Games, Display, Net, Util) {
 
         if(active_player_index !== player_index) {
             $('#dialog').text('Waiting on ' + active_player.name + '...');
-            console.log('Waiting on ' + active_player.name + '('+active_player_index + '!='+player_index+')...');
             return;
         }
 
@@ -282,8 +276,8 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.GIVECARDS) {
-            var hasBridge = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Bridge');
-            var hasColiseum = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Coliseum');
+            var hasBridge = Util.playerHasActiveBuilding(gs, gs.legionary_player_index, 'Bridge');
+            var hasColiseum = Util.playerHasActiveBuilding(gs, gs.legionary_player_index, 'Coliseum');
             var immune = false;
             var revealed = gs.players[gs.legionary_player_index].revealed;
             var materials = $.map(revealed, function(card) {

@@ -77,7 +77,9 @@ function($) {
             this.makeUnselectable($unselected.unbind('click'));
             if(typeof(this.finishedCallback) !== 'undefined') {
                 this.finishedCallback($selected);
-                return this;
+                if(!this.allowBackout) {
+                    return this;
+                }
             }
         }
         this.makeSelectable($selected);
@@ -89,13 +91,17 @@ function($) {
 
     /* Sets up selection with a limit of n cards on specified keys.
      * If keys is not provided, operate on entire selection.
+     * The parameter allowBackout will allow selections and unselections
+     * to be made even after the limit is reached, activating the callback
+     * every time N items are selected.
      */
-    Selectable.prototype.makeSelectN = function(n, callback) {
+    Selectable.prototype.makeSelectN = function(n, callback, allowBackout=false) {
         var $selection = this.$selection;
         this.makeSelectable($selection);
         this.limit = n;
         this.finishedCallback = callback;
         this.addClickCallbacks($selection);
+        this.allowBackout = allowBackout;
     };
 
     /* Sets up selection with no limit to how many objects are selected.

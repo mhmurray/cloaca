@@ -89,7 +89,6 @@ function(Util, $, _){
 
         for(var i=0; i<players.length; i++) {
             var i_rot = (i+playerIndex) % players.length;
-            console.log('i='+i+', rotated='+i_rot);
             var ip = i_rot+1;
 
             var $p = $('<div />').addClass('player-box').appendTo(this.playerInfo);
@@ -225,8 +224,6 @@ function(Util, $, _){
         var leader = players[leader_index];
         var expected_action = gs.expected_action;
         var active_player = gs.players[gs.active_player_index]
-        console.log('Expected action from '+active_player.uid+
-            ': ' + expected_action);
 
         function populateCardZone(zone, cards) {
             zone.empty();

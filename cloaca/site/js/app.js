@@ -105,7 +105,6 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
             Games.user = user;
             Net.user = user;
             Net.connect(ws_uri, function() {
-                console.log('Requesting game state');
                 Net.sendAction(game_id, null, Util.Action.REQGAMESTATE);
             }, handleCommand);
         };
@@ -261,7 +260,6 @@ function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
                     players.push(gameState.players[i].name);
                 }
 
-                console.log('making game in update_game_state');
                 var game_obj = new Game(game_id, players);
                 Games.games[game_id] = game_obj;
                 game_obj.initialize();
