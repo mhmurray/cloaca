@@ -1826,8 +1826,8 @@ class Game(object):
                   int(from_deck)
 
         if n_cards + len(p.vault) > self._vault_limit(p):
-            raise GTRError('Not enough room in {0}\'s vault for {1:d} cards.'
-                .format(p.name, n_cards))
+            raise GTRError('Not enough room in {0}\'s vault for {1:d} additional cards. (Limit {2:d} more.)'
+                .format(p.name, n_cards, self._vault_limit(p)-len(p.vault)))
 
         if stockpile_card:
             p.stockpile.move_card(stockpile_card, p.vault)
