@@ -1060,11 +1060,14 @@ class Game(object):
 
 
     def _handle_patronfrompool(self, a):
-        card = a.args[0]
+        try:
+            card = a.args[0]
+        except IndexError:
+            card = None
 
         p = self.active_player
 
-        if card:
+        if card is not None:
             if len(p.clientele) >= self._clientele_limit(p):
                 raise GTRError('Player ' + p.name + ' has no room in clientele')
 
@@ -1093,6 +1096,9 @@ class Game(object):
         p = self.active_player
 
         if do_patron:
+            if len(p.clientele) >= self._clientele_limit(p):
+                raise GTRError('Player ' + p.name + ' has no room in clientele')
+
             card = self._draw_cards(1)[0]
             gtrutils.add_card_to_zone(card, p.clientele)
 
@@ -1108,17 +1114,23 @@ class Game(object):
                     '{0} performs Patron, hiring {1} from deck.'
                     .format(p.name, card))
 
-        self._check_forum()
+            self._check_forum()
 
         self._pump()
 
 
     def _handle_patronfromhand(self, a):
-        card = a.args[0]
+        try:
+            card = a.args[0]
+        except IndexError:
+            card = None
 
         p = self.active_player
 
-        if card:
+        if card is not None:
+            if len(p.clientele) >= self._clientele_limit(p):
+                raise GTRError('Player ' + p.name + ' has no room in clientele')
+
             p.hand.move_card(card, p.clientele)
 
             if self._player_has_active_building(p, 'Bath'):
@@ -1133,7 +1145,7 @@ class Game(object):
                     '{0} performs Patron, hiring {1} from hand.'
                     .format(p.name, card))
 
-        self._check_forum()
+            self._check_forum()
 
         self._pump()
 
