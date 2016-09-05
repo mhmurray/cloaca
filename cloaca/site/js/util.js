@@ -186,7 +186,8 @@ function($){
         $container.append($foundationCard);
 
         var foundationMaterial = util.cardProperties(foundation).material;
-        var siteMaterial = site.toLowerCase();
+        var siteMaterial = site;
+        var siteClass = site.toLowerCase();
 
         $container.data({
             ident: foundation,
@@ -208,7 +209,7 @@ function($){
             $.each(materials, function(i, card) {
                 $container.append($('<div />', {
                     class: 'material',
-                }).text(util.cardName(card.ident)).addClass(siteMaterial));
+                }).text(util.cardName(card.ident)).addClass(siteClass));
             });
         }
         
@@ -216,7 +217,7 @@ function($){
             $.each(stairwayMaterials, function(i, card) {
                 $container.append($('<div />', {
                     class: 'material stairway',
-                }).text(util.cardName(card.ident)).addClass(siteMaterial));
+                }).text(util.cardName(card.ident)).addClass(siteClass));
             });
         }
         
