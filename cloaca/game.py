@@ -1992,10 +1992,12 @@ class Game(object):
         p.n_camp_actions = 0
 
         if p.performed_craftsman and has_academy:
-            p.performed_craftsman = False
             self.stack.push_frame('_await_action', message.SKIPTHINKER, p)
 
+        p.performed_craftsman = False
+
         self._pump()
+
 
     def _calc_winners(self, players=None):
         """Calculate the winners using score and cards in hand among
