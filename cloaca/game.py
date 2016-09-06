@@ -1598,7 +1598,10 @@ class Game(object):
         p = self.active_player
         hand = Zone([c for c in p.hand if c.name !='Jack'])
         for c in p.prev_revealed:
-            hand.cards.remove(c)
+            try:
+                hand.cards.remove(c)
+            except ValueError:
+                pass # Possible that card is no longer in hand
 
         if not hand.contains(cards):
             raise GTRError('Demanding with cards not in hand: {0}.'
