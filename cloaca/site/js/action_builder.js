@@ -465,7 +465,7 @@ function($, _, FSM, Util, Selectable){
         }
 
         if(hasAtrium) {
-            $stockpile.extend(display.deck);
+            $stockpile = $stockpile.add(display.deck);
         }
         var selStockpile = new Selectable($stockpile);
         selStockpile.makeSelectN(1);
