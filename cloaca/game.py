@@ -1028,8 +1028,7 @@ class Game(object):
         has_aqueduct = self._player_has_active_building(player, 'Aqueduct')
 
         if has_bar and has_aqueduct:
-            self._await_action(message.BARORAQUEDUCT, player)
-            return
+            self.stack.push_frame('_await_action', message.BARORAQUEDUCT, player)
 
         else:
             if has_bar:
@@ -1037,9 +1036,7 @@ class Game(object):
             if has_aqueduct:
                 self.stack.push_frame('_await_action', message.PATRONFROMHAND, player)
 
-            self.stack.push_frame('_await_action', message.PATRONFROMPOOL, player)
-
-            self._pump()
+        self._await_action(message.PATRONFROMPOOL, player)
 
 
     def _handle_baroraqueduct(self, a):
@@ -1048,13 +1045,11 @@ class Game(object):
         p = self.active_player
 
         if bar_first:
-            self.stack.push_frame('_await_action', message.PATRONFROMDECK, p)
             self.stack.push_frame('_await_action', message.PATRONFROMHAND, p)
+            self.stack.push_frame('_await_action', message.PATRONFROMDECK, p)
         else:
-            self.stack.push_frame('_await_action', message.PATRONFROMHAND, p)
             self.stack.push_frame('_await_action', message.PATRONFROMDECK, p)
-
-        self.stack.push_frame('_await_action', message.PATRONFROMPOOL, p)
+            self.stack.push_frame('_await_action', message.PATRONFROMHAND, p)
 
         self._pump()
 
