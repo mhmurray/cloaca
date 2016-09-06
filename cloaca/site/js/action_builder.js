@@ -496,7 +496,7 @@ function($, _, FSM, Util, Selectable){
 
             var fromHand = null;
             if(hasBasilica) {
-                var $handPick = AB._extractCardId(selHand);
+                fromHand = AB._extractCardId(selHand);
                 selHand.reset();
             }
 
