@@ -222,6 +222,7 @@ function($, _, FSM, Util, Selectable){
         var $stockpile = display.zoneCards('stockpile', AB.playerIndex);
         var $dialog = display.dialog;
         var $gloryBtn = display.button('glory');
+        var $okBtn = display.button('ok');
 
         $dialog.text('Rome demands ' + materials.join(', ')+'!');
 
@@ -308,8 +309,10 @@ function($, _, FSM, Util, Selectable){
             });
             zoneSelectableMap[zones[i]] = materialSelectableMap;
         }
-        checkFinished();
+        //checkFinished();
 
+        $okBtn.show().prop('disabled', false).click(checkFinished);
+            
                     
 
     /*
