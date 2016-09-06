@@ -349,8 +349,8 @@ class Game(object):
         score for each player, including the merchant bonuses.
         """
         bonuses = {}
-        for player in self.players:
-            bonuses[player.name] = []
+        for aPlayer in self.players:
+            bonuses[aPlayer.name] = []
 
         for material in cm.get_materials():
             # Set name to None if there's a tie, but maintain maximum
