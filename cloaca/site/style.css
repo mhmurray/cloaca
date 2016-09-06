@@ -167,6 +167,12 @@ li.ui-tabs-active a {
   padding: 0px;
 }
 
+.pile.selected {
+  border: 3px solid #F22;
+  padding: 0px;
+}
+
+
 .pile-title {
   position: absolute;
   top: 4px;

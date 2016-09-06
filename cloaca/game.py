@@ -349,18 +349,18 @@ class Game(object):
         score for each player, including the merchant bonuses.
         """
         bonuses = {}
-        for player in self.players:
-            bonuses[player.name] = []
+        for a_player in self.players:
+            bonuses[a_player.name] = []
 
         for material in cm.get_materials():
             # Set name to None if there's a tie, but maintain maximum
             name, maximum = None, 0
-            for player in self.players:
+            for a_player in self.players:
                 material_cards = filter(
-                    lambda c : c.material == material, player.vault)
+                    lambda c : c.material == material, a_player.vault)
                 n = len(material_cards)
                 if n > maximum:
-                    name = player.name
+                    name = a_player.name
                     maximum = n
                 elif n == maximum:
                     index = None
@@ -1995,10 +1995,12 @@ class Game(object):
         p.n_camp_actions = 0
 
         if p.performed_craftsman and has_academy:
-            p.performed_craftsman = False
             self.stack.push_frame('_await_action', message.SKIPTHINKER, p)
 
+        p.performed_craftsman = False
+
         self._pump()
+
 
     def _calc_winners(self, players=None):
         """Calculate the winners using score and cards in hand among
