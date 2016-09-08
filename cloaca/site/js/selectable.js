@@ -75,7 +75,8 @@ function($) {
             );
         } else {
             this.makeUnselectable($unselected.unbind('click'));
-            if(typeof(this.finishedCallback) !== 'undefined') {
+            if(typeof(this.finishedCallback) !== 'undefined'
+                && this.finishedCallback !== null) {
                 this.finishedCallback($selected);
                 if(!this.allowBackout) {
                     return this;
