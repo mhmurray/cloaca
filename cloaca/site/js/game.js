@@ -278,7 +278,9 @@ function($, AB, Games, Display, Net, Util) {
         } else if (gs.expected_action == Util.Action.GIVECARDS) {
             var hasBridge = Util.playerHasActiveBuilding(gs, gs.legionary_player_index, 'Bridge');
             var hasColiseum = Util.playerHasActiveBuilding(gs, gs.legionary_player_index, 'Coliseum');
-            var immune = false;
+            var hasPalisade = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Palisade');
+            var hasWall = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Wall');
+            var immune = hasWall || (hasPalisade && !hasBridge);
             var revealed = gs.players[gs.legionary_player_index].revealed;
             var materials = $.map(revealed, function(card) {
                 return Util.cardProperties(card).material;
