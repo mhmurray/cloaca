@@ -222,6 +222,8 @@ function($, _, FSM, Util, Selectable){
         var $stockpile = display.zoneCards('stockpile', AB.playerIndex);
         var $dialog = display.dialog;
         var $gloryBtn = display.button('glory');
+        var $okBtn = display.button('ok');
+
 
         $dialog.text('Rome demands ' + materials.join(', ')+'!');
 
@@ -232,7 +234,7 @@ function($, _, FSM, Util, Selectable){
             });
         };
 
-        if(immune) { gloryButton(); return; }
+        if(immune) { actionCallback([]); return; }
 
         materialNames = ['Rubble', 'Wood', 'Concrete', 'Brick', 'Stone', 'Marble'];
         materialCountsDemanded = {Rubble: 0, Wood: 0, Concrete: 0, Brick: 0, Stone: 0, Marble: 0};
@@ -296,9 +298,9 @@ function($, _, FSM, Util, Selectable){
                 if(materialCounts[mat]) {
                     var sel = new Selectable($cards);
                     if(takeAll && !immune) {
-                        sel.makeSelectN(materialCounts[mat], checkFinished);
+                        sel.makeSelectN(materialCounts[mat], null);
                         sel.select($cards);
-                        //$cards.trigger('click');
+                        sel.finishedCallback = checkFinished;
                     } else {
                         sel.makeSelectN(materialCounts[mat], checkFinished, true);
                     }
@@ -308,58 +310,12 @@ function($, _, FSM, Util, Selectable){
             });
             zoneSelectableMap[zones[i]] = materialSelectableMap;
         }
-        checkFinished();
 
-                    
-
-    /*
-        var materialCounts = materialCountsDemanded.slice();
-        var selectables = {};
-
-        for(var m in materialCounts) {
-            var $cards = $hand.filter('.'+m.toLowerCase());
-            materialCounts[m] = Math.min(materialCounts[m], $cards.length);
-            var count = materialCounts[m];
-            if(count) {
-                var sel = new Selectable($cards);
-                sel.makeSelectN(count, function($selected) {
-                    // Check if all Selectables are done. Return if not.
-                    for(var mat in selectables) {
-                        if(selectables[mat].selected().length !== materialCounts[mat]) {
-                            return;
-                        }
-                    }
-                    if(hasBridge) {
-                        for(var mat in sp_selectables) {
-                            if(sp_selectables[mat].selected().length !== sp_materialCounts[mat]) {
-                                return;
-                            }
-                        }
-                    }
-                    if(hasColiseum) {
-                        for(var mat in sp_selectables) {
-                            if(sp_selectables[mat].selected().length !== sp_materialCounts[mat]) {
-                                return;
-                            }
-                        }
-                    }
-                    // If done, accumulate cards from all and reset them.
-                    var cards = [];
-                    for(var mat in selectables) {
-                        var sel = selectables[mat];
-                        cards.push.apply(cards, AB._extractCardIds(sel));
-                        sel.reset();
-                    }
-                    $dialog.text('');
-                    actionCallback(cards);
-                });
-                selectables[m] = sel;
-            }
-        }
-    */
-
-        // If we don't have any of the materials, no Selectables will be made.
-        if(!addedOne) {
+        if(addedOne) {
+            $okBtn.show().prop('disabled', false).click(function(event) {
+                checkFinished();
+            });
+        } else {
             gloryButton();
         }
 
