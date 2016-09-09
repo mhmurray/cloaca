@@ -124,7 +124,7 @@ class TestDeck(object):
 
 
 
-def simple_two_player():
+def simple_two_player(*args, **kwargs):
     """Two-player game with nothing in hands, stockpiles,
     or common piles. Player 1 (p1) goes first.
 
@@ -132,10 +132,10 @@ def simple_two_player():
     is pumped, so it's ready for the first player (p1) to 
     thinker or lead.
     """
-    return simple_n_player(2)
+    return simple_n_player(2, *args, **kwargs)
 
 
-def simple_n_player(n):
+def simple_n_player(n, clientele=[], buildings=[], deck=None):
     """N-player game with nothing in hands, stockpiles,
     or common piles. Player 1 (p1) goes first.
 
@@ -150,6 +150,21 @@ def simple_n_player(n):
     for p in players:
         uid = uuid4().int
         g.add_player(uid, p)
+
+    if deck is None:
+        d = TestDeck()
+    else:
+        d = deck
+
+    for p, p_clientele, p_buildings in \
+            izip_longest(g.players, clientele, buildings, fillvalue=[]):
+
+        p.clientele.set_content([getattr(d, c.replace(' ','')) for c in p_clientele])
+
+        for b in p_buildings:
+            foundation = getattr(d, b)
+            b = Building(foundation, foundation.material, [], None, True)
+            p.buildings.append(b)
 
     g.controlled_start()
 
@@ -188,24 +203,10 @@ def n_player_lead(n, role, clientele=[], buildings=[], deck=None, follow=False):
     "shrine2" to get a specific card as the foundation.
     """
     #print clientele, buildings, role
-    g = simple_n_player(n)
+    d = TestDeck()
+    g = simple_n_player(n, clientele, buildings, d)
     p1 = g.players[0]
     others = g.players[1:]
-
-    if deck is None:
-        d = TestDeck()
-    else:
-        d = deck
-
-    for p, p_clientele, p_buildings in \
-            izip_longest(g.players, clientele, buildings, fillvalue=[]):
-
-        p.clientele.set_content([getattr(d, c.replace(' ','')) for c in p_clientele])
-
-        for b in p_buildings:
-            foundation = getattr(d, b)
-            b = Building(foundation, foundation.material, [], None, True)
-            p.buildings.append(b)
             
 
     # Indicate that p1 will lead
