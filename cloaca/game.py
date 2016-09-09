@@ -839,7 +839,7 @@ class Game(object):
         (and we're leading craftsman), set "out of town allowed".
         """
         role = self.role_led
-        self._log('Player {} is performing {}'.format(player.name, role))
+        self._log('Player {0} is performing {1}'.format(player.name, role))
 
         n_merchants = self._player_client_count(player, 'Merchant')
         n_role = self._player_client_count(player, role)
@@ -970,7 +970,7 @@ class Game(object):
                 self._await_action(message.MERCHANT, player)
 
             else:
-                raise ValueError('Illegal role: {}'.format(role))
+                raise ValueError('Illegal role: {0}'.format(role))
 
         else:
             self._pump()
@@ -1420,17 +1420,17 @@ class Game(object):
 
             complete = False
             if has_scriptorium and material.material == 'Marble':
-                self._log('Player {} completed building {} using Scriptorium'.format(
+                self._log('Player {0} completed building {1} using Scriptorium'.format(
                   player.name, str(b)))
                 complete = True
            
             elif len(b.materials) == cm.get_value_of_material(b.site):
-                self._log('Player {} completed building {}'.format(player.name, str(b)))
+                self._log('Player {0} completed building {1}'.format(player.name, str(b)))
                 complete = True
             
             # This is an Architect action if the material comes from the stockpile.
             elif material_zone is player.stockpile and foundation.name == 'Villa':
-                self._log('Player {} completed Villa with one material '
+                self._log('Player {0} completed Villa with one material '
                         'using Architect.'
                         .format(player.name))
                 complete = True
