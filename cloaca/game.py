@@ -839,7 +839,7 @@ class Game(object):
         (and we're leading craftsman), set "out of town allowed".
         """
         role = self.role_led
-        self._log('Player {0} is performing {1}'.format(player.name, role))
+        self._log('{0} is performing {1}'.format(player.name, role))
 
         n_merchants = self._player_client_count(player, 'Merchant')
         n_role = self._player_client_count(player, role)
@@ -1065,7 +1065,7 @@ class Game(object):
 
         if card is not None:
             if len(p.clientele) >= self._clientele_limit(p):
-                raise GTRError('Player ' + p.name + ' has no room in clientele')
+                raise GTRError(p.name + ' has no room in clientele')
 
             self.pool.move_card(card, p.clientele)
 
@@ -1093,7 +1093,7 @@ class Game(object):
 
         if do_patron:
             if len(p.clientele) >= self._clientele_limit(p):
-                raise GTRError('Player ' + p.name + ' has no room in clientele')
+                raise GTRError(p.name + ' has no room in clientele')
 
             card = self._draw_cards(1)[0]
             gtrutils.add_card_to_zone(card, p.clientele)
@@ -1125,7 +1125,7 @@ class Game(object):
 
         if card is not None:
             if len(p.clientele) >= self._clientele_limit(p):
-                raise GTRError('Player ' + p.name + ' has no room in clientele')
+                raise GTRError(p.name + ' has no room in clientele')
 
             p.hand.move_card(card, p.clientele)
 
@@ -1194,7 +1194,7 @@ class Game(object):
                 .format(building, site))
 
         if player.owns_building(building):
-            raise GTRError('Player already owns {0!s}.'.format(building))
+            raise GTRError('{0} already owns {1!s}.'.format(player.name, building))
 
         if site not in self.out_of_town_sites:
             raise GTRError('No {0} sites left, including out of town'
@@ -1420,17 +1420,17 @@ class Game(object):
 
             complete = False
             if has_scriptorium and material.material == 'Marble':
-                self._log('Player {0} completed building {1} using Scriptorium'.format(
+                self._log('{0} completed building {1} using Scriptorium'.format(
                   player.name, str(b)))
                 complete = True
            
             elif len(b.materials) == cm.get_value_of_material(b.site):
-                self._log('Player {0} completed building {1}'.format(player.name, str(b)))
+                self._log('{0} completed building {1}'.format(player.name, str(b)))
                 complete = True
             
             # This is an Architect action if the material comes from the stockpile.
             elif material_zone is player.stockpile and foundation.name == 'Villa':
-                self._log('Player {0} completed Villa with one material '
+                self._log('{0} completed Villa with one material '
                         'using Architect.'
                         .format(player.name))
                 complete = True
@@ -1449,6 +1449,7 @@ class Game(object):
         p = self.active_player
 
         if foundation is None or (material is None and site is None):
+            self._log('{0} skips Craftsman action.'.format(p.name))
             self._pump()
 
         else:
@@ -2054,7 +2055,7 @@ class Game(object):
         """The game is over. This determines a winner.
         """
         for p in self.players:
-            self._log('Player {0} scores {1}'.format(p.name, self._player_score(p)))
+            self._log('{0} scores {1}'.format(p.name, self._player_score(p)))
         lg.info('\n')
 
         winners = self._calc_winners()
