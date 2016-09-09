@@ -188,9 +188,9 @@ function($, _, FSM, Util, Selectable){
     AB.legionary = function(display, count, actionCallback) {
         var $hand = display.zoneCards('hand', AB.playerIndex).not('.jack');
         var $dialog = display.dialog;
-        var $skipBtn = display.button('skip');
+        var $okBtn = display.button('ok');
 
-        $dialog.text('Reveal cards for Legionary or skip remaining actions.');
+        $dialog.text('Reveal cards for Legionary. Press OK when finished.');
 
         var sel = new Selectable($hand);
         function finished($selected) {
@@ -202,7 +202,7 @@ function($, _, FSM, Util, Selectable){
 
         sel.makeSelectN(count, finished);
 
-        $skipBtn.show().prop('disabled', false).click(function(e) {
+        $okBtn.show().prop('disabled', false).click(function(e) {
             var cards = AB._extractCardIds(sel);
             sel.reset();
 
