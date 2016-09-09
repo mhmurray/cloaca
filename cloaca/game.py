@@ -575,11 +575,10 @@ class Game(object):
         p = self.active_player
 
         if skip:
-            self._log('{0} skips thinker with Academy'.format(p.name))
+            self._log('{0} skips thinker action.'.format(p.name))
             self._pump()
 
         else:
-            self._log('{0} thinks at the end of turn with Academy'.format(p.name))
             self._perform_thinker_action(self.leader)
 
 
