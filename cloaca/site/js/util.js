@@ -151,12 +151,14 @@ function($){
         
         // Player has incomplete marble and gate in above 2
         if(completeBuildings.indexOf('Gate') > -1 || stairwayBuildings.indexOf('Gate') > -1) {
-            var marbleFoundation = util.cardProperties(building).material == 'Marble';
-            if(marbleFoundation) {return true;}
+            var buildingIsMarble = util.cardProperties(building).material == 'Marble';
 
             var marbleMaterials = false;
             for(var i=0; i<player.buildings.length; i++) {
-                if(player.buildings[i].foundation == building) {
+                if(util.cardName(player.buildings[i].foundation) == building) {
+                    if(buildingIsMarble) {
+                        return true;
+                    }
                     for(var j=0; j<player.buildings[i].materials.length; j++) {
                         var material = player.buildings[i].materials[j];
                         if(util.cardProperties(material).material == 'Marble') {
