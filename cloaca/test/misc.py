@@ -521,6 +521,181 @@ class TestSites(unittest.TestCase):
         self.assertFalse(mon.modified(game))
 
 
+class TestScore(unittest.TestCase):
+    """Test scoring.
+    """
+
+    # The buildings created in the test_setup methods don't come with sites
+    # in the players' influence.
+
+    def test_bare(self):
+        game = test_setup.simple_two_player()
+
+        p1, p2 = game.players
+
+        self.assertEqual(game._player_score(p1), 2)
+        self.assertEqual(game._player_score(p2), 2)
+
+
+    def test_buildings(self):
+        game = test_setup.simple_n_player(5)
+
+        game.players[0].influence.append('Wood')
+        game.players[1].influence.append('Brick')
+        game.players[2].influence.append('Marble')
+        game.players[3].influence.append('Rubble')
+        game.players[4].influence.extend(['Concrete', 'Stone'])
+
+        self.assertEqual(game._player_score(game.players[0]), 3)
+        self.assertEqual(game._player_score(game.players[1]), 4)
+        self.assertEqual(game._player_score(game.players[2]), 5)
+        self.assertEqual(game._player_score(game.players[3]), 3)
+        self.assertEqual(game._player_score(game.players[4]), 7)
+
+
+    def test_statue(self):
+        game = test_setup.simple_n_player(
+                2,
+                buildings=[['Statue'],[]]
+                )
+
+        game.players[0].influence.append('Marble')
+
+        self.assertEqual(game._player_score(game.players[0]), 8)
+        self.assertEqual(game._player_score(game.players[1]), 2)
+
+
+    def test_statue_gate(self):
+        d = TestDeck()
+
+        game = test_setup.simple_n_player(
+                2,
+                buildings=[['Gate'],[]],
+                deck = d
+                )
+
+        statue = Building(d.Statue, 'Marble', [], None, False)
+        game.players[0].buildings.append(statue)
+        game.players[0].influence.append('Marble')
+
+        self.assertEqual(game._player_score(game.players[0]), 8)
+        self.assertEqual(game._player_score(game.players[1]), 2)
+
+
+    def test_wall(self):
+        d = TestDeck()
+        game = test_setup.simple_n_player(
+                2,
+                buildings=[['Wall'],[]],
+                deck=d
+                )
+
+        game.players[0].influence.append('Concrete')
+        game.players[0].stockpile.extend(
+                [d.dock0, d.dock1, d.dock2, d.insula0, d.insula1])
+
+
+        self.assertEqual(game._player_score(game.players[0]), 6)
+        self.assertEqual(game._player_score(game.players[1]), 2)
+
+
+
+class TestVaultScoring(unittest.TestCase):
+
+    def setUp(self):
+        self.d = TestDeck()
+        self.game = test_setup.simple_n_player(
+                3,
+                deck=self.d
+                )
+
+        self.p1, self.p2, self.p3 = self.game.players
+        self.v1, self.v2, self.v3 = [p.vault for p in self.game.players]
+
+
+    def test_vault(self):
+        d = self.d
+        self.v1.set_content([d.dock0])
+
+        self.assertEqual(self.game._player_score(self.p1), 6)
+        self.assertEqual(self.game._player_score(self.p2), 2)
+
+        self.v1.set_content([d.bar0])
+        self.assertEqual(self.game._player_score(self.p1), 6)
+
+        self.v1.set_content([d.atrium0])
+        self.assertEqual(self.game._player_score(self.p1), 7)
+
+        self.v1.set_content([d.tower0])
+        self.assertEqual(self.game._player_score(self.p1), 7)
+
+        self.v1.set_content([d.temple0])
+        self.assertEqual(self.game._player_score(self.p1), 8)
+
+        self.v1.set_content([d.villa0])
+        self.assertEqual(self.game._player_score(self.p1), 8)
+
+
+    def test_vault2(self):
+        d = self.d
+
+        self.v1.set_content([d.dock0])
+        self.v2.set_content([d.dock1])
+
+        self.assertEqual(self.game._player_score(self.p2), 3)
+        self.assertEqual(self.game._player_score(self.p2), 3)
+
+
+    def test_vault3(self):
+        d = self.d
+
+        self.v1.set_content([d.dock0, d.dock2])
+        self.v2.set_content([d.dock1])
+
+        self.assertEqual(self.game._player_score(self.p1), 7)
+        self.assertEqual(self.game._player_score(self.p2), 3)
+
+
+    def test_vault4(self):
+        d = self.d
+
+        self.v2.set_content([d.dock1])
+
+        self.assertEqual(self.game._player_score(self.p1), 2)
+        self.assertEqual(self.game._player_score(self.p2), 6)
+
+
+    def test_vault5(self):
+        d = self.d
+
+        self.v1.set_content([d.insula0])
+        self.v2.set_content([d.dock0])
+
+        self.assertEqual(self.game._player_score(self.p1), 6)
+        self.assertEqual(self.game._player_score(self.p2), 6)
+
+
+    def test_vault6(self):
+        d = self.d
+
+        self.v1.set_content([d.insula0])
+        self.v2.set_content([d.dock0, d.insula1])
+
+        self.assertEqual(self.game._player_score(self.p1), 3)
+        self.assertEqual(self.game._player_score(self.p2), 7)
+
+
+    def test_vault7(self):
+        d = self.d
+
+        self.v1.set_content([d.insula0])
+        self.v2.set_content([d.dock0, d.insula1])
+        self.v3.set_content([d.bar0, d.insula1])
+
+        self.assertEqual(self.game._player_score(self.p1), 3)
+        self.assertEqual(self.game._player_score(self.p2), 7)
+        self.assertEqual(self.game._player_score(self.p3), 7)
+
 
 if __name__ == '__main__':
     unittest.main()
