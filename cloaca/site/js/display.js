@@ -293,14 +293,19 @@ function(Util, $, _){
             $buildings.empty();
             for(var j=0; j<buildings.length; j++) {
                 var b = buildings[j];
-                $buildings.append(Util.makeBuilding(
+                var $building = Util.makeBuilding(
                         prefix+'building'+b.foundation,
                         b.foundation,
                         b.site,
                         b.materials,
                         b.stairway_materials,
                         b.complete
-                ));
+                );
+                if(Util.playerHasActiveBuilding(gs, i, Util.cardName(b.foundation))) {
+                    $building.addClass('active');
+                }
+
+                $buildings.append($building);
             }
         }
 

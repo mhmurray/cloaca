@@ -183,6 +183,10 @@ function($){
             class: 'building',
         });
 
+        if(complete) {
+            $container.addClass('complete');
+        }
+
         var cardName = util.cardName(foundation);
         var $foundationCard = util.makeCard(foundation);
         $container.append($foundationCard);
