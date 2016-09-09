@@ -363,7 +363,7 @@ class Game(object):
                     name = a_player.name
                     maximum = n
                 elif n == maximum:
-                    index = None
+                    name = None
                     maximum = n
             if name:
                 bonuses[name].append(material)
