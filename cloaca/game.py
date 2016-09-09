@@ -480,6 +480,7 @@ class Game(object):
         lg.debug(
             'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
         player.hand.extend(self._draw_cards(n_cards))
+        return n_cards
 
     def _draw_jack_for_player(self, player):
         player.hand.append(self._draw_jack())
@@ -649,9 +650,9 @@ class Game(object):
                 self._log('{0} thinks for a Jack instead of following.'.format(p.name))
 
         else:
-            self._thinker_for_cards(p, self._max_hand_size(p))
+            n_cards = self._thinker_for_cards(p, self._max_hand_size(p))
 
-            n_cards = max(1, self._max_hand_size(p) - len(p.hand))
+            #n_cards = max(1, self._max_hand_size(p) - len(p.hand))
             noun = 'cards' if n_cards > 1 else 'card'
 
             if is_leader:
