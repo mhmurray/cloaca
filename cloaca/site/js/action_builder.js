@@ -1145,7 +1145,7 @@ function($, _, FSM, Util, Selectable){
                 var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                 var notComplete = !$building.data('complete');
                 var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
-                var scriptoriumMatch = hasScriptorium;
+                var scriptoriumMatch = hasScriptorium && cardMaterial === 'Marble';
                 var towerMatch = hasTower && (cardMaterial === 'Rubble');
 
                 return notComplete &&
@@ -1565,7 +1565,7 @@ function($, _, FSM, Util, Selectable){
                 var materialMatch = $.inArray(cardMaterial, materials) !== -1;
                 var notComplete = !$building.data('complete');
                 var roadMatch = hasRoad && $.inArray('Stone', materials) !== -1;
-                var scriptoriumMatch = hasScriptorium && $.inArray('Marble', materials) !== -1;
+                var scriptoriumMatch = hasScriptorium && cardMaterial === 'Marble';
                 var towerMatch = cardMaterial === 'Rubble';
 
                 return notComplete &&
