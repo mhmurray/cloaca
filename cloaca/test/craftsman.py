@@ -392,6 +392,49 @@ class TestFountainOutOfTown(unittest.TestCase):
         self.assertFalse(mon.modified(game))
 
 
+class TestAcademyFlag(unittest.TestCase):
+    """Test setting and clearing Game.performed_craftsman flag.
+    """
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Craftsman', follow=True,
+                clientele=[[], ['Dock']],
+                deck = d)
+
+        self.p1, self.p2 = self.game.players
+
+
+    def test_flag_set_and_reset(self):
+        """Test that Player.performed_craftsman is set and reset at the
+        end of the turn. It is not set if the player skips the action.
+        """
+        d = self.deck
+        self.p1.hand.set_content([d.atrium0, d.shrine0])
+        self.p2.hand.set_content([d.foundry0])
+
+        self.assertFalse(self.p1.performed_craftsman)
+
+        a = message.GameAction(message.CRAFTSMAN, d.atrium0, None, 'Brick')
+        self.game.handle(a)
+
+        self.assertTrue(self.p1.performed_craftsman)
+
+        self.assertFalse(self.p2.performed_craftsman)
+
+        a = message.GameAction(message.CRAFTSMAN, None, None, 'Brick')
+        self.game.handle(a)
+
+        self.assertFalse(self.p2.performed_craftsman)
+
+        a = message.GameAction(message.CRAFTSMAN, None, None, 'Brick')
+        self.game.handle(a)
+
+        self.assertFalse(self.p2.performed_craftsman)
+        self.assertFalse(self.p1.performed_craftsman)
+
 
 if __name__ == '__main__':
     unittest.main()
