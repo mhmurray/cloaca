@@ -1851,7 +1851,7 @@ class Game(object):
             self._log('{0} performs Merchant, selling a card from their hand.'
                 .format(p.name))
         else:
-            self._log('{0} skips Merchant action.')
+            self._log('{0} skips Merchant action.'.format(p.name))
 
         self._pump()
 
