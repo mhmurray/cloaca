@@ -56,31 +56,34 @@ def encode(obj):
     elif isinstance(obj, Game):
         d = dict(obj.__dict__)
 
+        # Encode first so that we have a copy of everything
+        enc_d = encode(d)
+
         # The args list of Frames sometimes contains a Player object.
         # To prevent duplication, we store just the player index.
         # However, to indicate that the stored int is supposed to be
         # a reference to the player, a list of ['Player', 2] is stored.
-        for i, frame in enumerate(d['stack'].stack):
+        for i, frame in enumerate(enc_d['stack']['stack']):
             new_args = []
-            for arg in frame.args:
+            for arg in frame['args']:
                 if type(arg) is Player:
                     player_ref = ['Player', obj.find_player_index(arg.name)]
                     new_args.append(player_ref)
                 else:
                     new_args.append(arg)
-            d['stack'].stack[i].args = new_args
+            enc_d['stack']['stack'][i]['args'] = new_args
 
-        if d['_current_frame'] is not None:
+        if enc_d['_current_frame'] is not None:
             new_args = []
-            for i, arg in enumerate(d['_current_frame'].args):
+            for i, arg in enumerate(enc_d['_current_frame']['args']):
                 if type(arg) is Player:
                     player_ref = ['Player', obj.find_player_index(arg.name)]
                     new_args.append(player_ref)
                 else:
                     new_args.append(arg)
-                d['_current_frame'].args = new_args
+                enc_d['_current_frame']['args'] = new_args
 
-        return encode(d)
+        return enc_d
 
     else:
         return obj
