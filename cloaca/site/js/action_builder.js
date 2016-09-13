@@ -204,11 +204,12 @@ function($, _, FSM, Util, Selectable){
 
         var sel = new Selectable($camp);
         sel.makeSelectAny();
+        sel.select($camp);
 
         $skipBtn.show().prop('disabled', false).click(function(e) {
             sel.reset();
             $dialog.text('');
-            actionCallback([null]);
+            actionCallback([]);
         });
 
         $okBtn.show().prop('disabled', false).click(function(e) {
