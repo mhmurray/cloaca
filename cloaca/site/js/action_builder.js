@@ -82,6 +82,43 @@ function($, _, FSM, Util, Selectable){
         return;
     };
     
+    AB.useSenate = function(display, actionCallback) {
+        var ip = AB.playerIndex+1;
+        var $campjacks = $('[id$=-camp] > .jack').not('#p'+ip+'-camp > .jack');
+        
+        if($campjacks.length == 0) {
+            actionCallback([]);
+            return;
+        }
+
+        var $dialog = display.dialog;
+        var $okBtn = display.button('ok');
+        var $skipBtn = display.button('skip');
+
+        var noun = $campjacks.length > 1 ? 'Jacks' : 'Jack';
+
+        $dialog.text('Take opponents\' '+noun+' at end of turn? ('+$campjacks.length+' '+noun+')');
+
+        var sel = new Selectable($campjacks);
+        sel.makeSelectAny();
+        sel.select($campjacks);
+        $okBtn.show().prop('disabled', false).one('click', function(e) {
+            var jacks = AB._extractCardIds(sel);
+            sel.reset();
+
+            $dialog.text('');
+            actionCallback(jacks);
+        });
+
+        $skipBtn.show().prop('disabled', false).one('click', function(e) {
+            sel.reset();
+            $dialog.text('');
+            actionCallback([]);
+        });
+
+        return;
+    };
+    
     AB.patronFromPool = function(display, actionCallback) {
         var $pool = display.zoneCards('pool');
         var $dialog = display.dialog;

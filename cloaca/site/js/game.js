@@ -177,11 +177,8 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.USESENATE) {
-            AB.singleChoice(this.display, 'Take opponent\'s Jack with Senate?',
-                    [{text: 'Yes', result: []},
-                     {text: 'No', result: []}
-                    ], function(use) {
-                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USESENATE, use);
+            AB.useSenate(this.display, function(jacks) {
+                Net.sendAction(gs.game_id, gs.action_number, Util.Action.USESENATE, jacks);
             });
 
         } else if (gs.expected_action == Util.Action.LABORER) {

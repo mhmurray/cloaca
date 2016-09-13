@@ -1856,9 +1856,7 @@ class Game(object):
 
 
     def _kids_in_pool(self):
-        """ Place cards in camp into the pool.
-        1) If Sewer, ask to move cards into stockpile.
-        2) If player has Senate, ask to take people's Jacks
+        """Place cards in camp into the pool.
         """
         self._log('Kids in the pool.')
         for p in self._players_in_turn_order()[::-1]:
@@ -1866,9 +1864,22 @@ class Game(object):
 
         for p in self._players_in_turn_order()[::-1]:
             if self._player_has_active_building(p, 'Senate'):
-                self.stack.push_frame('_await_action', message.USESENATE, p)
+                self.stack.push_frame('_do_senate', p)
 
         self._pump()
+
+
+    def _do_senate(self, p):
+        """Wait for a USESENATE action from player if opponent has Jack.
+        """
+        other_players = self._players_in_turn_order(p)
+        other_players.pop(0)
+
+        has_jack = next((True for pl in other_players if 'Jack' in pl.camp), False)
+        if has_jack:
+            self._await_action(message.USESENATE, p)
+        else:
+            self._pump()
 
 
     def _do_kids_in_pool(self, p):

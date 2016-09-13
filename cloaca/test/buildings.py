@@ -2138,6 +2138,27 @@ class TestScriptorium(unittest.TestCase):
 
 class TestSenate(unittest.TestCase):
 
+    def test_no_opponent_jack(self):
+        d = TestDeck()
+
+        # Player with Senate leads with Jack
+        game = test_setup.two_player_lead('Laborer',
+                buildings=[['Senate'],[]],
+                deck = d)
+
+        p1, p2 = game.players
+        p2.hand.set_content([])
+        jack_led = p1.camp.cards[0]
+
+        self.assertTrue(game._player_has_active_building(p1, 'Senate'))
+
+        self.assertEqual(game.expected_action, message.LABORER)
+        a = message.GameAction(message.LABORER)
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
     def test_take_jack_with_senate(self):
         d = TestDeck()
 
@@ -2193,7 +2214,7 @@ class TestSenate(unittest.TestCase):
         self.assertEqual(game.active_player, p2)
 
     
-    def test_three_players_one_with_senate(self):
+    def test_three_players_one_senate(self):
         """Three players, only one has Senate. Skip taking Jack
         from the leader.
         """
