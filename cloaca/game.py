@@ -1296,7 +1296,8 @@ class Game(object):
             # Construct moves the fountain card to foundation or materials and
             # sets player.fountain_card to None
             b = self._construct(p, building, material, site, None, fountain=True)
-            self._log('{0} performs Craftsman using card revealed with Fountain.')
+            self._log('{0} performs Craftsman using card revealed with Fountain.'
+                    .format(p.name))
             self._log_construct(p, building, material, site, ' using Fountain card')
 
             if b.complete:
