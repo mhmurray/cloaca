@@ -578,7 +578,7 @@ class TestBar(unittest.TestCase):
 
         self.p1, self.p2 = self.game.players
 
-        self.game.library.set_content([d.dock0])
+        self.game.library.set_content([d.dock0, d.dock1, d.dock2])
         self.game.pool.set_content([d.wall0])
 
         self.assertTrue(self.game._player_has_active_building(self.p1, 'Bar'))

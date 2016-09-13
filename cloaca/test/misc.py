@@ -60,6 +60,7 @@ class TestInitPool(unittest.TestCase):
         self.assertEqual(gs.pool.count('Dock'), 2)
 
     def test_resolve_tie(self):
+        d = TestDeck()
         g = Game()
         g.add_player(uuid4(), 'p1')
         g.add_player(uuid4(), 'p2')
@@ -68,9 +69,8 @@ class TestInitPool(unittest.TestCase):
         gs = g
         gs.library.set_content(cm.get_cards(
             ['Circus', 'Circus', 'Circus', 'Circus Maximus', 'Circus', 'Circus',
-             'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum',
+             'Ludus Magna', 'Ludus Magna', 'Statue', 'Coliseum', 'Atrium',
              ]))
-
 
         first = g._init_pool(len(gs.players))
 

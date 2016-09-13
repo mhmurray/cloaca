@@ -232,19 +232,19 @@ class TestFountain(unittest.TestCase):
         """Test using a fountain to look at the top card and then skip the action,
         drawing the card.
         """
-        bath = cm.get_card('Bath')
-        self.game.library.cards.insert(0,bath)
+        d = self.deck
+        self.game.library.set_content([d.bath0, d.wall0])
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.fountain_card, bath)
+        self.assertEqual(self.p1.fountain_card, d.bath0)
         self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
         a = message.GameAction(message.FOUNTAIN, None, None, None)
         self.game.handle(a)
 
-        self.assertIn(bath, self.p1.hand)
+        self.assertIn(d.bath0, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
         self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
 
@@ -253,19 +253,19 @@ class TestFountain(unittest.TestCase):
         """Test using a fountain to look at the top card and then start a
         building with it.
         """
-        bath = cm.get_card('Bath')
-        self.game.library.cards.insert(0,bath)
+        d = self.deck
+        self.game.library.set_content([d.bath0, d.wall0])
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.fountain_card, bath)
+        self.assertEqual(self.p1.fountain_card, d.bath0)
         self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, bath, None, 'Brick')
+        a = message.GameAction(message.FOUNTAIN, d.bath0, None, 'Brick')
         self.game.handle(a)
 
-        self.assertNotIn(bath, self.p1.hand)
+        self.assertNotIn(d.bath0, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
 
         self.assertIn('Bath', self.p1.building_names)
@@ -277,21 +277,21 @@ class TestFountain(unittest.TestCase):
         """Test using a fountain to look at the top card and then add it as
         a material to a building, completing it.
         """
-        bath, atrium, foundry = cm.get_cards(['Bath', 'Atrium', 'Foundry'])
-        self.game.library.cards.insert(0,bath)
+        d = self.deck
+        self.game.library.set_content([d.bath0, d.wall0])
 
-        self.p1.buildings.append(Building(atrium, 'Brick', materials=[foundry]))
+        self.p1.buildings.append(Building(d.atrium0, 'Brick', materials=[d.foundry0]))
 
         a = message.GameAction(message.USEFOUNTAIN, True)
         self.game.handle(a)
 
-        self.assertEqual(self.p1.fountain_card, bath)
+        self.assertEqual(self.p1.fountain_card, d.bath0)
         self.assertEqual(self.game.expected_action, message.FOUNTAIN)
 
-        a = message.GameAction(message.FOUNTAIN, atrium, bath, None)
+        a = message.GameAction(message.FOUNTAIN, d.atrium0, d.bath0, None)
         self.game.handle(a)
 
-        self.assertNotIn(bath, self.p1.hand)
+        self.assertNotIn(d.bath0, self.p1.hand)
         self.assertIsNone(self.p1.fountain_card)
 
         self.assertTrue(self.game._player_has_active_building(self.p1, 'Atrium'))
@@ -300,24 +300,25 @@ class TestFountain(unittest.TestCase):
 
 
     def test_fountain_end_game(self):
-        """Taking the last Orders card with the Fountain ends the game.
-        
-        The card is assigned to Game.fountain_card, though.
-
-        The rules are a little ambiguous, but here we say that you cannot
-        use the last card in the deck with a Fountain.
+        """Taking the last Orders card with the Fountain does not end the game.
         """
         d = self.deck
-
         self.game.library.set_content([d.bath0])
 
         a = message.GameAction(message.USEFOUNTAIN, True)
 
+        self.game.handle(a)
+
+        self.assertEqual(d.bath0, self.p1.fountain_card)
+        self.assertEqual(self.game.expected_action, message.FOUNTAIN)
+
+        a = message.GameAction(message.FOUNTAIN, d.bath0, None, 'Brick')
+
         with self.assertRaises(GameOver):
             self.game.handle(a)
 
-        self.assertEqual(d.bath0, self.p1.fountain_card)
         self.assertIsNotNone(self.game.winners)
+        self.assertIn('Bath', self.p1.building_names)
 
 
 class TestFountainOutOfTown(unittest.TestCase):

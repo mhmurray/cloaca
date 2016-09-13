@@ -479,8 +479,9 @@ class Game(object):
         if n_cards < 1: n_cards = 1
         lg.debug(
             'Adding {0} cards to {1}\'s hand'.format(n_cards, player.name))
-        player.hand.extend(self._draw_cards(n_cards))
-        return n_cards
+        drawn_cards = self._draw_cards(n_cards)
+        player.hand.extend(drawn_cards)
+        return len(drawn_cards)
 
     def _draw_jack_for_player(self, player):
         player.hand.append(self._draw_jack())
@@ -505,9 +506,17 @@ class Game(object):
         return c
 
     def _draw_cards(self, n_cards):
+        """Draws up to n_cards, less if the deck doesn't have that many cards.
+        """
         cards = []
         for i in range(0, n_cards):
-            cards.append(self.library.pop(0))
+            try:
+                card = self.library.pop(0)
+            except IndexError:
+                break
+            else:
+                cards.append(card)
+
         return cards
 
     def _log(self, msg):
@@ -660,11 +669,18 @@ class Game(object):
                 self._log('{0} thinks for {1} {2} instead of following.'
                     .format(p.name, n_cards, noun))
 
-            if len(self.library) == 0:
-                self._log('{0} has drawn the last Orders card. Game Over.'.format(p.name))
-                self._end_game()
+            self._check_library_empty()
 
         self._pump()
+
+
+    def _check_library_empty(self):
+        """Calls _end_game() if the library is empty.
+        """
+        if len(self.library) == 0:
+            self._log('The last Orders card has been drawn from the deck. Game Over.')
+            self._end_game()
+            
 
 
     def _handle_leadrole(self, a):
@@ -1067,6 +1083,7 @@ class Game(object):
                 raise GTRError(p.name + ' has no room in clientele')
 
             self.pool.move_card(card, p.clientele)
+            self._check_library_empty()
 
             if self._player_has_active_building(p, 'Bath'):
                 #TODO: Does Ludus Magna help with Bath. What about Circus Maximus?
@@ -1110,6 +1127,7 @@ class Game(object):
                     .format(p.name, card))
 
             self._check_forum()
+            self._check_library_empty()
 
         self._pump()
 
@@ -1256,21 +1274,16 @@ class Game(object):
 
 
     def _handle_usefountain(self, a):
-        # TODO: Does the _handle_fountain need to be different than
-        # _handle_craftsman? We could just check if we're Fountain-ing.
         use_fountain = a.args[0]
 
         p = self.active_player
 
         if use_fountain:
+            # Fountain allows the last card of the deck to be used, so 
+            # check_library_empty is in _handle_fountain().
             p.fountain_card = self._draw_cards(1)[0]
             self._log('{0} reveals {1} with Fountain.'
                 .format(p.name, p.fountain_card))
-
-            if len(self.library) == 0:
-                self._log('{0} has drawn the last Orders card with Fountain. Game Over.'
-                        .format(p.name))
-                self._end_game()
 
             self._await_action(message.FOUNTAIN, p)
 
@@ -1303,6 +1316,8 @@ class Game(object):
             if b.complete:
                 self._log('{0} completed.'.format(str(b)))
                 self._resolve_building(p, b)
+
+        self._check_library_empty()
 
         self._pump()
 
@@ -1829,29 +1844,37 @@ class Game(object):
             raise GTRError('Not enough room in {0}\'s vault for {1:d} additional cards. (Limit {2:d} more.)'
                 .format(p.name, n_cards, self._vault_limit(p)-len(p.vault)))
 
+        # If the Atrium card from the deck is the last Orders card, then the
+        # game is over and the Basilica doesn't function.
+        game_will_end = from_deck and len(self.library) == 1
+
         if stockpile_card:
             p.stockpile.move_card(stockpile_card, p.vault)
-
-        if hand_card:
-            p.hand.move_card(hand_card, p.vault)
 
         if from_deck:
             gtrutils.add_card_to_zone(self._draw_cards(1)[0], p.vault)
 
+        if hand_card and not game_will_end:
+            p.hand.move_card(hand_card, p.vault)
+
+        hand_log = hand_card and not game_will_end
+
         # Logging
         if stockpile_card:
             self._log(('{0} performs Merchant, selling a {1!s} from the stockpile'
-                      + (' and a card from their hand.' if hand_card else '.'))
+                      + (' and a card from their hand.' if hand_log else '.'))
                       .format(p.name, stockpile_card))
         elif from_deck:
             self._log(('{0} performs Merchant, selling a card from the deck'
-                      + (' and a card from their hand.' if hand_card else '.'))
+                      + (' and a card from their hand.' if hand_log else '.'))
                       .format(p.name))
-        elif hand_card:
+        elif hand_log:
             self._log('{0} performs Merchant, selling a card from their hand.'
                 .format(p.name))
         else:
             self._log('{0} skips Merchant action.'.format(p.name))
+
+        self._check_library_empty()
 
         self._pump()
 
