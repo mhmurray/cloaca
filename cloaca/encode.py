@@ -123,7 +123,7 @@ def decode_game(obj):
             else:
                 new_args.append(arg)
 
-        game_dict['stack'].stack[i].args = new_args
+        game_dict['stack'].stack[i].args = tuple(new_args)
 
     if game_dict['_current_frame'] is not None:
         new_args = []
@@ -134,7 +134,7 @@ def decode_game(obj):
             else:
                 new_args.append(arg)
 
-        game_dict['_current_frame'].args = new_args
+        game_dict['_current_frame'].args = tuple(new_args)
 
 
 
