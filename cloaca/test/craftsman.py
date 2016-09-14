@@ -22,7 +22,8 @@ class TestCraftsman(unittest.TestCase):
     def setUp(self):
         """ This is run prior to every test.
         """
-        self.game = test_setup.two_player_lead('Craftsman')
+        self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Craftsman', deck=self.deck)
         self.p1, self.p2 = self.game.players
 
 
@@ -45,15 +46,15 @@ class TestCraftsman(unittest.TestCase):
     def test_start_in_town(self):
         """ Start an in-town building.
         """
-        latrine = cm.get_card('Latrine')
-        self.p1.hand.set_content([latrine])
+        d = self.deck
+        self.p1.hand.set_content([d.latrine0])
 
-        a = message.GameAction(message.CRAFTSMAN, latrine, None, 'Rubble')
+        a = message.GameAction(message.CRAFTSMAN, d.latrine0, None, 'Rubble')
         self.game.handle(a)
 
-        self.assertNotIn(latrine, self.p1.hand)
+        self.assertNotIn(d.latrine0, self.p1.hand)
 
-        self.assertEqual(self.p1.buildings[0], Building(latrine, 'Rubble'))
+        self.assertEqual(self.p1.buildings[0], Building(d.latrine0, 'Rubble'))
 
         self.assertFalse(self.game._player_has_active_building(self.p1, 'Latrine'))
 
@@ -166,6 +167,7 @@ class TestCraftsman(unittest.TestCase):
         self.p1.hand.set_content([atrium])
 
         self.game.in_town_sites = ['Rubble']
+        self.assertFalse(self.game.oot_allowed)
 
         mon = Monitor()
         mon.modified(self.game)
@@ -212,6 +214,35 @@ class TestCraftsman(unittest.TestCase):
 
         self.assertFalse(mon.modified(self.game))
 
+
+class TestCraftsmanClient(unittest.TestCase):
+
+    def setUp(self):
+        self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Craftsman', 
+                clientele=[['Dock'],[]], deck = self.deck)
+        self.p1, self.p2 = self.game.players
+
+
+    def test_start_out_of_town(self):
+        """Start an out-of-town building.
+        """
+        d = self.deck
+        self.p1.hand.set_content([d.latrine0])
+        self.game.in_town_sites = ['Brick']
+
+        self.assertTrue(self.game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.latrine0, None, 'Rubble')
+        self.game.handle(a)
+
+        self.assertNotIn(d.latrine0, self.p1.hand)
+
+        self.assertEqual(self.p1.buildings[0], Building(d.latrine0, 'Rubble'))
+
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Latrine'))
+
+    
 
 class TestFountain(unittest.TestCase):
     """Test Craftsman with an active Fountain building.

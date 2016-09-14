@@ -1568,15 +1568,12 @@ class TestLudusMagna(unittest.TestCase):
 
         self.p1, self.p2 = self.game.players
 
+
+    def test_merchant_as_craftsman(self):
+
+
         a = message.GameAction(message.CRAFTSMAN, None, None, None)
         self.game.handle(a)
-
-        self.assertEqual(len(self.p1.clientele), 2)
-
-
-    def test_merchant_as_other_client(self):
-
-        a = message.GameAction(message.CRAFTSMAN, None, None, None)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.CRAFTSMAN)
@@ -1588,13 +1585,45 @@ class TestLudusMagna(unittest.TestCase):
         self.assertEqual(self.game.active_player, self.p2)
 
 
-    def test_merchant_as_other_client_not_following(self):
-        """Player 2 didn't follow, but both clientele get to act
-        anyway.
+    def test_merchant_as_craftsman_out_of_town(self):
+        """Start out of town, but with merchant as the second client in the
+        out-of-town pair.
+        """
+        d  = self.deck
+        self.p1.hand.set_content([d.latrine0])
+        self.game.in_town_sites = ['Brick']
+
+        self.assertEqual(self.game.active_player, self.p1)
+        self.assertEqual(self.game.expected_action, message.CRAFTSMAN)
+        self.assertTrue(self.game.oot_allowed)
+
+        # Use the Craftsman action from the camp.
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.CRAFTSMAN)
+        self.assertTrue(self.game.active_player, self.p1)
+        self.assertTrue(self.game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.latrine0, None, 'Rubble')
+        self.game.handle(a)
+
+        self.assertNotIn(d.latrine0, self.p1.hand)
+        self.assertIn('Latrine', self.p1.building_names)
+        self.assertFalse(self.game._player_has_active_building(self.p1, 'Latrine'))
+
+        self.assertEqual(self.game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(self.game.active_player, self.p2)
+        self.assertFalse(self.game.oot_allowed)
+
+
+    def test_merchant_as_craftsman_not_following(self):
+        """Player 2 didn't follow, but both clientele get to act anyway.
         """
         self.p2.buildings.append(Building(self.deck.ludusmagna, 'Marble', complete=True))
 
         a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
         self.game.handle(a)
         self.game.handle(a)
 
@@ -1625,8 +1654,7 @@ class TestLudusMagna(unittest.TestCase):
         # 2x Craftsman client for p1 (+1 already led)
         a = message.GameAction(message.CRAFTSMAN, None, None, None)
         self.game.handle(a)
-
-        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
         self.game.handle(a)
 
         self.assertEqual(self.game.active_player, self.p2)

@@ -879,7 +879,6 @@ class Game(object):
         is_leading_or_following = player.is_following_or_leading
 
 
-        # Only do these if the player has an active Ludus Magnus
         if role == 'Merchant' and role_led != 'Merchant':
             if has_ludus:
                 self.stack.push_frame('_perform_role_action', player, role_led)
@@ -887,7 +886,6 @@ class Game(object):
                     self.stack.push_frame('_perform_role_action', player, role_led)
             # Skip Merchant if that's not the role being led and no Ludus
         else:
-            # Do these for everyone
             self.stack.push_frame('_perform_role_action', player, role)
             if has_cm and is_leading_or_following:
                 self.stack.push_frame('_perform_role_action', player, role)
@@ -905,7 +903,7 @@ class Game(object):
             - A perform_clientele_action frame of the same role and player.
 
             - A perform_clientele_action frame of same player, and role Merchant
-            and we have a Ludus Magnus.
+            and we have a Ludus Magna.
 
             - We have a Tower.
 
@@ -917,7 +915,7 @@ class Game(object):
         if self._player_has_active_building(player, 'Tower'):
             return True
 
-        has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
+        has_ludus = self._player_has_active_building(player, 'Ludus Magna')
 
         f = self.stack.stack[-1]
 
@@ -937,9 +935,7 @@ class Game(object):
                 lg.warning('Called _check_oot_allowed for wrong player.')
                 return False
 
-            current_role = self._current_frame.args[1]
-
-            if p.name == player.name and role == current_role:
+            if p.name == player.name and role == self.role_led:
                 return True
 
         if f.function_name == '_perform_clientele_action':
@@ -1574,7 +1570,7 @@ class Game(object):
         """
         self.active_player = player
 
-        has_ludus = self._player_has_active_building(player, 'Ludus Magnus')
+        has_ludus = self._player_has_active_building(player, 'Ludus Magna')
         has_cm = self._player_has_active_building(player, 'Circus Maximus')
         is_following_or_leading = player.is_following_or_leading
         role_led = self.role_led
