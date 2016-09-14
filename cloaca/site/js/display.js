@@ -234,6 +234,54 @@ function(Util, $, _){
         };
 
 
+        var playerInfluence = [];
+
+        for(var i=0; i<gs.players.length; i++) {
+            var influence = gs.players[i].influence;
+            var points = { Rubble: 1, Wood: 1, Concrete: 2, Brick: 2, Stone: 3, Marble: 3};
+            var playerPoints = 2;
+            for(var j=0; j<influence.length; j++) {
+                playerPoints += points[influence[j]];
+            }
+            playerInfluence.push(playerPoints);
+        }
+
+
+        var clienteleLimit = [];
+        for(var i=0; i<gs.players.length; i++) {
+            var limit = playerInfluence[i];
+            if(Util.playerHasActiveBuilding(gs, i, 'Insula')) {
+                limit += 2;
+            }
+            if(Util.playerHasActiveBuilding(gs, i, 'Aqueduct')) {
+                limit *= 2;
+            }
+            clienteleLimit.push(limit);
+        }
+
+        var vaultLimit = [];
+        for(var i=0; i<gs.players.length; i++) {
+            var limit = playerInfluence[i];
+            if(Util.playerHasActiveBuilding(gs, i, 'Market')) {
+                limit += 2;
+            }
+            vaultLimit.push(limit);
+        }
+
+        var visibleScore = [];
+        for(var i=0; i<gs.players.length; i++) {
+            var score = playerInfluence[i];
+            if(Util.playerHasActiveBuilding(gs, i, 'Statue')) {
+                score += 3;
+            }
+            if(Util.playerHasActiveBuilding(gs, i, 'Wall')) {
+                wallScore = Math.floor(gs.players[i].stockpile.length/2);
+                score += wallScore;
+            }
+            visibleScore.push(score);
+        }
+
+
         var in_town_counts = {
             Rubble : 0,
             Wood : 0,
@@ -287,6 +335,13 @@ function(Util, $, _){
 
                 $influence.append($site);
             }
+
+            $('#'+prefix+'clientele-title').text(
+                    'Clientele ('+player.clientele.length+'/'+clienteleLimit[i]+')');
+            $('#'+prefix+'vault-title').text(
+                    'Vault ('+player.vault.length+'/'+vaultLimit[i]+')');
+            $('#'+prefix+'influence-title').text(
+                    'Influence ('+visibleScore[i]+')');
 
             var buildings = player.buildings;
             var $buildings = zones.buildings;

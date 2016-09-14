@@ -77,7 +77,7 @@ function($, AB, Games, Display, Net, Util) {
         for(var i=0; i<gs.players.length; i++) {
             var influence = gs.players[i].influence;
             var points = { Rubble: 1, Wood: 1, Concrete: 2, Brick: 2, Stone: 3, Marble: 3};
-            var playerPoints = 0;
+            var playerPoints = 2;
             for(var j=0; j<influence.length; j++) {
                 playerPoints += points[influence[j]];
             }

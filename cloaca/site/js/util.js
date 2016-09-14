@@ -111,9 +111,12 @@ function($){
         });
         var $zone = $('<div />', {
             class: 'card-zone',
+        });
+        var $zonetitle = $('<span />', {
+            id: id_+'-title',
             text: title
         });
-        $zone.append($container);
+        $zone.append($zonetitle, $container);
         return $zone;
     };
 
