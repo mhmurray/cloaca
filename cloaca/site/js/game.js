@@ -72,6 +72,52 @@ function($, AB, Games, Display, Net, Util) {
             return;
         }
 
+        var playerInfluence = [];
+
+        for(var i=0; i<gs.players.length; i++) {
+            var influence = gs.players[i].influence;
+            var points = { Rubble: 1, Wood: 1, Concrete: 2, Brick: 2, Stone: 3, Marble: 3};
+            var playerPoints = 0;
+            for(var j=0; j<influence.length; j++) {
+                playerPoints += points[influence[j]];
+            }
+            playerInfluence.push(playerPoints);
+        }
+
+        var clienteleLimit = [];
+        for(var i=0; i<gs.players.length; i++) {
+            var limit = playerInfluence[i];
+            if(Util.playerHasActiveBuilding(gs, i, 'Insula')) {
+                limit += 2;
+            }
+            if(Util.playerHasActiveBuilding(gs, i, 'Aqueduct')) {
+                limit *= 2;
+            }
+            clienteleLimit.push(limit);
+        }
+
+        var vaultLimit = [];
+        for(var i=0; i<gs.players.length; i++) {
+            var limit = playerInfluence[i];
+            if(Util.playerHasActiveBuilding(gs, i, 'Market')) {
+                limit += 2;
+            }
+            vaultLimit.push(limit);
+        }
+
+        var visibleScore = [];
+        for(var i=0; i<gs.players.length; i++) {
+            var score = playerInfluence[i];
+            if(Util.playerHasActiveBuilding(gs, i, 'Statue')) {
+                score += 3;
+            }
+            if(Util.playerHasActiveBuilding(gs, i, 'Wall')) {
+                wallScore = Math.floor(gs.players[i].stockpile.length/2);
+                score += wallScore;
+            }
+            visibleScore.push(score);
+        }
+
         if(gs.expected_action == Util.Action.THINKERORLEAD || gs.expected_action == Util.Action.LEADROLE) {
             var petitionMin = 3;
             var petitionMax = 3;
@@ -117,19 +163,36 @@ function($, AB, Games, Display, Net, Util) {
             );
 
         } else if (gs.expected_action == Util.Action.PATRONFROMHAND) {
-            AB.patronFromHand(this.display, function(card) {
+            var limit = clienteleLimit[AB.playerIndex];
+            function callback(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMHAND, [card]);
-            });
+            }
+            if(gs.players[AB.playerIndex].clientele.length < limit) {
+                AB.patronFromHand(this.display, limit, callback);
+            } else {
+                callback(null);
+            }
 
         } else if (gs.expected_action == Util.Action.PATRONFROMPOOL) {
-            AB.patronFromPool(this.display, function(card) {
+            var limit = clienteleLimit[AB.playerIndex];
+            function callback(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMPOOL, [card]);
-            });
+            }
+            if(gs.players[AB.playerIndex].clientele.length < limit) {
+                AB.patronFromPool(this.display, limit, callback);
+            } else {
+               callback(null);
+            }
 
         } else if (gs.expected_action == Util.Action.USELATRINE) {
-            AB.useLatrine(this.display, function(card) {
+            function callback(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USELATRINE, [card]);
-            });
+            }
+            if(gs.players[AB.playerIndex].hand.length > 0) {
+                AB.useLatrine(this.display, callback);
+            } else {
+                callback(null);
+            }
 
         } else if (gs.expected_action == Util.Action.USESEWER) {
             AB.useSewer(this.display, function(cards) {
@@ -137,28 +200,52 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.PATRONFROMDECK) {
-            AB.singleChoice(this.display, 'Patron from deck using Bar?',
-                    [{text: 'Yes', result: true},
-                     {text: 'No', result: false}
-                    ], function(useBar) {
+            var limit = clienteleLimit[AB.playerIndex];
+            function callback(useBar) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMDECK, [useBar]);
-            });
+            }
+            if(gs.players[AB.playerIndex].clientele.length < limit) {
+                AB.singleChoice(this.display, 'Patron from deck using Bar?',
+                        [{text: 'Yes', result: true},
+                         {text: 'No', result: false}
+                        ], callback);
+            } else {
+                callback(false);
+            }
 
         } else if (gs.expected_action == Util.Action.USEVOMITORIUM) {
-            AB.singleChoice(this.display, 'Discard hand before thinking with Vomitorium?',
-                    [{text: 'Yes', result: true},
-                     {text: 'No', result: false}
-                    ], function(use) {
+            function callback(use) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USEVOMITORIUM, [use]);
-            });
+            }
+            if(gs.players[AB.playerIndex].hand.length > 0) {
+                AB.singleChoice(this.display,
+                        'Discard hand before thinking with Vomitorium?',
+                        [{text: 'Yes', result: true},
+                         {text: 'No', result: false}
+                        ], callback);
+            } else {
+                callback(false);
+            }
 
         } else if (gs.expected_action == Util.Action.BARORAQUEDUCT) {
-            AB.singleChoice(this.display, 'Patron first with Bar or Aqueduct?',
-                    [{text: 'Bar', result: true},
-                     {text: 'Aqueduct', result: false}
-                    ], function(use) {
+            function callback(use) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.BARORAQUEDUCT, [use]);
-            });
+            }
+            var hasNonJackInHand = false;
+            var hand = gs.players[AB.playerIndex].hand;
+            for(var i=0; i<hand.length; i++) {
+                if(hand[i]>=6) { hasNonJackInHand = true; break; }
+            }
+
+            var limit = clienteleLimit[AB.playerIndex];
+            if(gs.players[AB.playerIndex].clientele.length < limit && hasNonJackInHand) {
+                AB.singleChoice(this.display, 'Patron first with Bar or Aqueduct?',
+                        [{text: 'Bar', result: true},
+                         {text: 'Aqueduct', result: false}
+                        ], callback);
+            } else {
+                callback(true);
+            };
 
         } else if (gs.expected_action == Util.Action.USEFOUNTAIN) {
             AB.singleChoice(this.display, 'Use Fountain to Craftsman from deck?',

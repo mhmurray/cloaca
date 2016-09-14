@@ -53,6 +53,12 @@ function($, _, FSM, Util, Selectable){
         var $okBtn = display.button('ok');
         var $skipBtn = display.button('skip');
 
+        // Check for unusable action
+        var viable_action = $pool.length > 0 || (hasDock && $handCards.length > 0);
+        if(!viable_action) {
+            actionCallback(null, null);
+        }
+
         if(hasDock) {
             $dialog.text('Select card from pool and/or hand.');
         } else { 
@@ -119,10 +125,14 @@ function($, _, FSM, Util, Selectable){
         return;
     };
     
-    AB.patronFromPool = function(display, actionCallback) {
+    AB.patronFromPool = function(display, limit, actionCallback) {
         var $pool = display.zoneCards('pool');
         var $dialog = display.dialog;
         var $skipBtn = display.button('skip');
+
+        if($pool.length == 0) {
+            actionCallback(null);
+        }
 
         $dialog.text('Select client from pool.');
 
@@ -144,10 +154,14 @@ function($, _, FSM, Util, Selectable){
         return;
     };
     
-    AB.patronFromHand = function(display, actionCallback) {
+    AB.patronFromHand = function(display, limit, actionCallback) {
         var $hand = display.zoneCards('hand', AB.playerIndex).not('.jack');
         var $dialog = display.dialog;
         var $skipBtn = display.button('skip');
+
+        if($hand.length == 0) {
+            actionCallback(null);
+        }
 
         $dialog.text('Select client from hand.');
 
@@ -228,7 +242,7 @@ function($, _, FSM, Util, Selectable){
         var $dialog = display.dialog;
         var $okBtn = display.button('ok');
 
-        $dialog.text('Reveal cards for Legionary. Press OK when finished.');
+        $dialog.text('Reveal up to '+count+' cards for Legionary. Press OK when finished.');
 
         var sel = new Selectable($hand);
         function finished($selected) {
