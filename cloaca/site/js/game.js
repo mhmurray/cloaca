@@ -283,8 +283,7 @@ function($, AB, Games, Display, Net, Util) {
         } else if (gs.expected_action == Util.Action.MERCHANT) {
             var hasBasilica = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Basilica');
             var hasAtrium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Atrium');
-            AB.merchant(this.display, hasBasilica, hasAtrium,
-                    function(fromStockpile, fromHand, fromDeck) {
+            function callback(fromStockpile, fromHand, fromDeck) {
                 var cards = [];
                 if(!(fromHand === null)) {
                     cards.push(fromHand);
@@ -294,7 +293,15 @@ function($, AB, Games, Display, Net, Util) {
                 }
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.MERCHANT,
                     [fromDeck].concat(cards));
-            });
+            };
+
+            if(gs.players[AB.playerIndex].vault.length < vaultLimit[AB.playerIndex]) {
+                AB.merchant(this.display, hasBasilica, hasAtrium, callback);
+            } else {
+                callback(null, null, false);
+            }
+
+
         } else if (gs.expected_action == Util.Action.CRAFTSMAN) {
             var hasRoad = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Road');
             var hasTower = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Tower');
