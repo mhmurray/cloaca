@@ -281,21 +281,21 @@ class Game(object):
             # Make list of (player, card) pairs
             cards = [(i,self._draw_cards(1)[0]) for i in player_indices]
             first = min(cards, key=lambda x : x[1])
-            players = [c[0] for c in cards if c[1].name == first[1].name]
+            player_indices = [c[0] for c in cards if c[1].name == first[1].name]
             all_cards.extend([c[1] for c in cards])
 
             s = ' '.join(['{0} reveals {1!s}.'.format(self.players[i].name, card)
                          for i, card in cards])
             self._log(s)
 
-            if len(players)==1:
+            if len(player_indices)==1:
                 has_winner = True
-                self._log('{0} plays first.'.format(self.players[players[0]].name))
+                self._log('{0} plays first.'.format(self.players[player_indices[0]].name))
             else:
                 self._log('Deal more cards into pool to break tie.')
 
         self.pool.extend(all_cards)
-        return players[0]
+        return player_indices[0]
 
     def _init_sites(self, n_players):
         n_out_of_town = 6 - n_players
