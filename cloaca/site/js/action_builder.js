@@ -1400,6 +1400,7 @@ function($, _, FSM, Util, Selectable){
                 { name: 'start', from: 'Start', to: 'SelectMaterial' },
                 { name: 'material', from: 'SelectMaterial', to: 'SelectBuilding' },
                 { name: 'building', from: 'SelectBuilding', to: 'Finish' },
+                { name: 'cancel', from: 'SelectBuilding', to: 'SelectMaterial' },
             ]
         });
 
