@@ -1328,8 +1328,8 @@ function($, _, FSM, Util, Selectable){
                 fsm.finish(ident, fountainCard, null);
             });
 
-            $dialog.text('Use Fountain card in building or start a new building '+
-                    'by clicking on a site. Skip action to draw the Fountain card.');
+            $dialog.text('Use '+cardName+' in building or start a new building '+
+                    'by clicking on a site. Skip action to draw it instead.');
 
             $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
                 fsm.finish(null, null, null);

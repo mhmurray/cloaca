@@ -1278,8 +1278,8 @@ class Game(object):
             # Fountain allows the last card of the deck to be used, so 
             # check_library_empty is in _handle_fountain().
             p.fountain_card = self._draw_cards(1)[0]
-            self._log('{0} reveals {1} with Fountain.'
-                .format(p.name, p.fountain_card))
+            self._log('{0} looks at a card with Fountain.'
+                .format(p.name))
 
             self._await_action(message.FOUNTAIN, p)
 
@@ -1297,16 +1297,16 @@ class Game(object):
         fountain_card = p.fountain_card
 
         if skip:
-            self._log('{0} skips Fountain, drawing {1}.'
-                .format(p.name, fountain_card))
+            self._log('{0} skips Fountain, drawing the card.'
+                .format(p.name))
             p.hand.append(p.fountain_card)
             p.fountain_card = None
         else:
             # Construct moves the fountain card to foundation or materials and
             # sets player.fountain_card to None
             b = self._construct(p, building, material, site, None, fountain=True)
-            self._log('{0} performs Craftsman using card revealed with Fountain.'
-                    .format(p.name))
+            self._log('{0} performs Craftsman using {1} with Fountain.'
+                    .format(p.name, fountain_card.name))
             self._log_construct(p, building, material, site, ' using Fountain card')
 
             if b.complete:
