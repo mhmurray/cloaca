@@ -237,14 +237,27 @@ function($, _, FSM, Util, Selectable){
         return;
     };
 
-    AB.legionary = function(display, count, actionCallback) {
+    AB.legionary = function(display, count, revealed, actionCallback) {
         var $hand = display.zoneCards('hand', AB.playerIndex).not('.jack');
         var $dialog = display.dialog;
         var $okBtn = display.button('ok');
 
-        $dialog.text('Reveal up to '+count+' cards for Legionary. Press OK when finished.');
+        var revealed_names = revealed.map(function(el) {
+            return Util.cardName(el);
+        });
 
-        var sel = new Selectable($hand);
+        var revText = '';
+        if(revealed.length > 0) {
+            revText = 'Already revealed '+revealed_names.join(', ')+'. ';
+        }
+        $dialog.text('Reveal up to '+count+' cards for Legionary. '+
+            revText+
+            'Press OK when finished.');
+
+        var revealed_ids = revealed.map(function(el) {
+            return '#card'+el;
+        });
+        var sel = new Selectable($hand.not(revealed_ids.join(',')));
         function finished($selected) {
             var cards = AB._extractCardIds(sel);
 

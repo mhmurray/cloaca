@@ -362,7 +362,8 @@ function($, AB, Games, Display, Net, Util) {
             });
 
         } else if (gs.expected_action == Util.Action.LEGIONARY) {
-            AB.legionary(this.display, gs.legionary_count, function(cards) {
+            var revealed = gs.players[AB.playerIndex].prev_revealed;
+            AB.legionary(this.display, gs.legionary_count, revealed, function(cards) {
                     Net.sendAction(gs.game_id, gs.action_number, Util.Action.LEGIONARY, cards);
             });
 
