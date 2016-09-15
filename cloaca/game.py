@@ -1610,12 +1610,6 @@ class Game(object):
 
         p = self.active_player
         hand = Zone([c for c in p.hand if c.name !='Jack'])
-        for c in p.prev_revealed:
-            try:
-                hand.cards.remove(c)
-            except ValueError:
-                pass # Possible that card is no longer in hand
-
         if not hand.contains(cards):
             raise GTRError('Demanding with cards not in hand: {0}.'
                     .format(', '.join(map(str,cards))))
@@ -1624,6 +1618,17 @@ class Game(object):
             raise GTRError('Too many cards specified for Legionary demand: {0} '
                     '({1:d} allowed)'
                     .format(', '.join(map(str,cards)), self.legionary_count))
+
+        cards_in_revealed = p.prev_revealed.intersection(cards)
+        if len(cards_in_revealed):
+            raise GTRError('Cannot use card for Legionary twice in one turn: {0}.'
+                    .format(', '.join(map(str,cards_in_revealed.elements()))))
+
+        for c in p.prev_revealed:
+            try:
+                hand.cards.remove(c)
+            except ValueError:
+                pass # Possible that card is no longer in hand
 
         p.revealed.set_content(hand.get_cards(cards))
         p.prev_revealed.extend(p.revealed)

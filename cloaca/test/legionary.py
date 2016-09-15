@@ -200,6 +200,100 @@ class TestLegionaryFivePlayersBridge(unittest.TestCase):
         self.assertEqual(self.game.active_player, self.game.players[1])
 
 
+class TestLegionaryWithBath(unittest.TestCase):
+    """Test multiple "disconnected" Legionaries, from separate instances
+    of hiring a Legionary client with a Patron action.
+    """
+
+    def test_use_card_twice(self):
+        """Using the same card in hand twice is an error.
+        """
+        d = self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Patron', deck=self.deck,
+                buildings=[['Bath'],[]],
+                clientele=[['Temple', 'Temple', 'Temple'],[]])
+
+        self.game.pool.set_content([d.atrium0, d.atrium1, d.atrium2, d.foundry0])
+        self.p1, self.p2 = self.game.players
+        self.p1.influence = ['Stone', 'Stone']
+
+        self.p1.hand.set_content([d.villa0, d.garden0])
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.atrium0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEGIONARY, d.villa0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.atrium1)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.LEGIONARY)
+
+        a = message.GameAction(message.LEGIONARY, d.villa0)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
+    def test_use_card_that_started_in_hand(self):
+        """Using a card that was in your hand but is no longer is an error.
+        """
+        d = self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Patron', deck=self.deck,
+                buildings=[['Bath', 'Aqueduct'],[]],
+                clientele=[['Temple', 'Temple', 'Temple'],[]])
+
+        self.game.pool.set_content([d.atrium0, d.atrium1, d.atrium2, d.foundry0])
+        self.p1, self.p2 = self.game.players
+        self.p1.influence = ['Stone', 'Stone']
+
+        self.p1.hand.set_content([d.villa0, d.garden0])
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.atrium0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.LEGIONARY, d.villa0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.PATRONFROMHAND, d.garden0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.MERCHANT, False)
+        self.game.handle(a)
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.atrium1)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.LEGIONARY)
+
+        a = message.GameAction(message.LEGIONARY, d.garden0)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
 
 class TestLegionary(unittest.TestCase):
 
