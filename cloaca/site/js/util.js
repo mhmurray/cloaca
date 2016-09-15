@@ -204,29 +204,36 @@ function($){
             complete: complete
         });
 
-        if(typeof(materials) === 'undefined') {
-            n_materials = 0
-        } else {
+        var n_materials = 0;
+        if(typeof(materials) !== 'undefined') {
             n_materials = materials.length;
         }
 
-        $site = util.makeSite(siteMaterial);
-        $site.text(n_materials+'/'+util.materialToValue(site));
+        var $site = util.makeSite(siteMaterial);
+        var value = util.materialToValue(site)
+        $site.text(n_materials+'/'+value);
         $container.append($site);
 
         if(typeof(materials) !== 'undefined') {
             $.each(materials, function(i, card) {
                 $container.append($('<div />', {
                     class: 'material',
-                }).text(util.cardName(card.ident)).addClass(siteClass));
+                }).addClass(util.cardProperties(card).material.toLowerCase()));
             });
+        }
+
+        for(var i=0; i<value-n_materials; i++) {
+            $container.append($('<div />', {
+                class: 'material',
+            }).addClass('missing'));
         }
         
         if(typeof(stairwayMaterials) !== 'undefined') {
             $.each(stairwayMaterials, function(i, card) {
                 $container.append($('<div />', {
                     class: 'material stairway',
-                }).text(util.cardName(card.ident)).addClass(siteClass));
+                    text: '(stairway)',
+                }).addClass(util.cardProperties(card).material.toLowerCase()));
             });
         }
         
