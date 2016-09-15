@@ -362,9 +362,10 @@ function($, _, FSM, Util, Selectable){
                 var takeAll = materialCounts[mat] === $cards.length;
                 if(materialCounts[mat]) {
                     var sel = new Selectable($cards);
-                    if(takeAll && !immune) {
+                    // the "|| zone..." preselects, even if there is a choice.
+                    if((takeAll || zones[i] !== 'hand') && !immune) {
                         sel.makeSelectN(materialCounts[mat], null);
-                        sel.select($cards);
+                        sel.select($cards.slice(0, materialCounts[mat]));
                         sel.finishedCallback = checkFinished;
                     } else {
                         sel.makeSelectN(materialCounts[mat], checkFinished, true);
@@ -399,38 +400,53 @@ function($, _, FSM, Util, Selectable){
                 materialCounts[item]+=1;
         });
 
-        var cards = [];
-        var selectables = {};
+        var allowChoice = false;
 
-        for(var m in materialCounts) {
-            var $cards = $pool.filter('.'+m.toLowerCase());
-            materialCounts[m] = Math.min(materialCounts[m], $cards.length);
-            var count = materialCounts[m];
-            if(count) {
-                var sel = new Selectable($cards);
-                sel.makeSelectN(count, function($selected) {
-                    // Check if all Selectables are done. Return if not.
-                    for(var mat in selectables) {
-                        if(selectables[mat].selected().length !== materialCounts[mat]) {
-                            return;
+        if(allowChoice) {
+            var cards = [];
+            var selectables = {};
+
+            for(var m in materialCounts) {
+                var $cards = $pool.filter('.'+m.toLowerCase());
+                materialCounts[m] = Math.min(materialCounts[m], $cards.length);
+                var count = materialCounts[m];
+                if(count) {
+                    var sel = new Selectable($cards);
+                    sel.makeSelectN(count, function($selected) {
+                        // Check if all Selectables are done. Return if not.
+                        for(var mat in selectables) {
+                            if(selectables[mat].selected().length !== materialCounts[mat]) {
+                                return;
+                            }
                         }
-                    }
-                    // If done, accumulate cards from all and reset them.
-                    for(var mat in selectables) {
-                        var sel = selectables[mat];
-                        cards.push.apply(cards, AB._extractCardIds(sel));
-                        sel.reset();
-                    }
-                    $dialog.text('');
-                    actionCallback(cards);
-                });
-                selectables[m] = sel;
+                        // If done, accumulate cards from all and reset them.
+                        for(var mat in selectables) {
+                            var sel = selectables[mat];
+                            cards.push.apply(cards, AB._extractCardIds(sel));
+                            sel.reset();
+                        }
+                        $dialog.text('');
+                        actionCallback(cards);
+                    });
+                    selectables[m] = sel;
+                }
             }
-        }
 
-        // If we don't have any of the materials, no Selectables will be made.
-        if(Object.keys(selectables).length == 0) {
-            actionCallback([]);
+            // If we don't have any of the materials, no Selectables will be made.
+            if(Object.keys(selectables).length == 0) {
+                actionCallback([]);
+            }
+        } else {
+            var card_ids = [];
+            for(var m in materialCounts) {
+                var $cards = $pool.filter('.'+m.toLowerCase());
+                count = Math.min(materialCounts[m], $cards.length);
+                var ids = $cards.slice(0, count).map(function(){
+                    return $(this).data('ident');
+                });
+                card_ids.push.apply(card_ids, ids);
+            }
+            actionCallback(card_ids);
         }
 
         return;
