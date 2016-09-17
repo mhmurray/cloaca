@@ -54,7 +54,7 @@ function($, _, FSM, Util, Selectable){
         var $skipBtn = display.button('skip');
 
         // Check for unusable action
-        var viable_action = $pool.length > 0 || (hasDock && $handCards.length > 0);
+        var viable_action = $pool.length > 0 || (hasDock && $handcards.length > 0);
         if(!viable_action) {
             actionCallback(null, null);
         }
