@@ -87,7 +87,7 @@ class TestCommandJSON(unittest.TestCase):
         """Convert Command to JSON.
         """
         a = GameAction(message.THINKERORLEAD, True)
-        c = Command(1, a)
+        c = Command(1, 0, a)
 
         c_json = c.to_json()
 
@@ -95,8 +95,10 @@ class TestCommandJSON(unittest.TestCase):
 
         self.assertIn('action', d.keys())
         self.assertIn('game', d.keys())
+        self.assertIn('number', d.keys())
         
-        action, args, game = d['action']['action'], d['action']['args'], d['game']
+        action, args = d['action']['action'], d['action']['args']
+        game, number = d['game'], d['number']
 
         self.assertEqual(action, message.THINKERORLEAD)
         self.assertEqual(args, [True])
@@ -105,8 +107,8 @@ class TestCommandJSON(unittest.TestCase):
     def test_from_json(self):
         """Convert JSON dictionary to Command.
         """
-        c_json = '{"game":1, "action":{"action": 0, "args": [true]}}'
-        c = Command.from_json(c_json)
+        c_json = '{"game":1, "number": 0, "action":{"action": 0, "args": [true]}}'
+        c = Command.from_json(c_json)[0]
 
         self.assertEqual(c.action.action, message.THINKERORLEAD)
         self.assertEqual(c.game, 1)
@@ -124,13 +126,65 @@ class TestCommandJSON(unittest.TestCase):
         """Raises GameActionError if the valid JSON doesn't
         represent a valid Command.
         """
-        c_json = '{"game":"notagame", "action":{"action": 0, "args": [true]}}'
+        c_json = '{"game":"notagame", "number": 0, "action":{"action": 0, "args": [true]}}'
         with self.assertRaises(GameActionError):
             a = Command.from_json(c_json)
 
-        c_json = '{"game":"0", "action":{"args": [true]}}'
+        c_json = '{"game":"0", "number": 0, "action":{"args": [true]}}'
         with self.assertRaises(ParsingError):
             a = Command.from_json(c_json)
+
+
+    def test_multiple_commands_from_json(self):
+        """Convert a list of Commands to JSON.
+        """
+        a0 = GameAction(message.THINKERORLEAD, True)
+        a1 = GameAction(message.THINKERTYPE, True)
+        c0 = Command(1, 0, a0)
+        c1 = Command(1, 1, a1)
+
+        c0_json, c1_json = [c.to_json() for c in (c0,c1)]
+
+        list_json = '[{0},{1}]'.format(c0_json, c1_json)
+
+        commands = Command.from_json(list_json)
+
+        self.assertEqual(len(commands), 2)
+
+        for c, c_orig in zip(commands, (c0,c1)):
+            self.assertEqual(c_orig.action.action, c.action.action)
+            self.assertEqual(c_orig.action.args, c.action.args)
+            self.assertEqual(c_orig.number, c.number)
+            self.assertEqual(c_orig.game, c.game)
+
+
+    def test_multiple_commands_to_json_different_games(self):
+        a0 = GameAction(message.THINKERORLEAD, True)
+        a1 = GameAction(message.THINKERTYPE, True)
+        c0 = Command(1, 0, a0)
+        c1 = Command(2, 1, a1)
+
+        c0_json, c1_json = [c.to_json() for c in (c0,c1)]
+
+        list_json = '[{0},{1}]'.format(c0_json, c1_json)
+
+        with self.assertRaises(ParsingError):
+            commands = Command.from_json(list_json)
+
+
+    def test_multiple_commands_to_json_non_sequential_numbers(self):
+        a0 = GameAction(message.THINKERORLEAD, True)
+        a1 = GameAction(message.THINKERTYPE, True)
+        c0 = Command(1, 0, a0)
+        c1 = Command(1, 3, a1)
+
+        c0_json, c1_json = [c.to_json() for c in (c0,c1)]
+
+        list_json = '[{0},{1}]'.format(c0_json, c1_json)
+
+        with self.assertRaises(ParsingError):
+            commands = Command.from_json(list_json)
+
 
 
 if __name__ == '__main__':
