@@ -281,16 +281,46 @@ function($, AB, Games, Display, Net, Util) {
 
         } else if (gs.expected_action === Util.Action.LABORER) {
             var hasDock = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Dock');
-            AB.laborer(this.display, hasDock, function(handCard, poolCard) {
-                var cards = [];
-                if(!(handCard === null)) {
-                    cards.push(handCard);
+            var hasLudus = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Ludus Magna');
+            var hasCM = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Circus Maximus');
+
+            var n_actions = 1; // Current action is 1. Stack has the rest.
+            var stack = gs.stack.stack;
+            for(var i=stack.length-1; i>=0; i--) {
+                var func_name = stack[i].function_name;
+                var is_clientele = func_name === '_perform_clientele_action';
+                var is_role = func_name === '_perform_role_action';
+                if(!(is_role || is_clientele)) {
+                    break;
                 }
-                if(!(poolCard === null)) {
-                    cards.push(poolCard);
+
+                var is_laborer = stack[i].args[1] === 'Laborer';
+                var is_merchant = stack[i].args[1] === 'Merchant';
+                var led_or_followed = gs.role_led === 'Laborer'
+                        && gs.players[AB.playerIndex].camp.length > 0;
+
+                if(is_laborer || (is_merchant && hasLudus && gs.role_led === 'Laborer')) {
+                    n_actions++;
+                    if(is_clientele && hasCM && led_or_followed) {
+                        n_actions++;
+                    }
+                } else {
+                    break;
                 }
-                Net.sendAction(gs.game_id, gs.action_number, Util.Action.LABORER, cards);
+
+            }
+            AB.laborer(this.display, hasDock, n_actions, function(handCards, poolCards) {
+                var actions = [];
+                for(var i=0; i<n_actions; i++) {
+                    var cards = []
+                    if(i<handCards.length) { cards.push(handCards[i]); }
+                    if(i<poolCards.length) { cards.push(poolCards[i]); }
+                    actions.push([gs.game_id, gs.action_number+i,
+                            Util.Action.LABORER, cards]);
+                }
+                Net.sendActions(actions)
             });
+
         } else if (gs.expected_action === Util.Action.MERCHANT) {
             var hasBasilica = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Basilica');
             var hasAtrium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Atrium');

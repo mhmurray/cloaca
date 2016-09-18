@@ -44,9 +44,9 @@ function($, _, FSM, Util, Selectable){
         return cards.length ? Util.extractCardIds(cards)[0] : null;
     };
 
-    AB.laborer = function(display, hasDock, actionCallback) {
-        var $poolpick = null;
-        var $handpick = null;
+    AB.laborer = function(display, hasDock, n_actions, actionCallback) {
+        var $poolpicks = null;
+        var $handpicks = null;
         var $pool = display.zoneCards('pool');
         var $handcards = display.zoneCards('hand', AB.playerIndex).not('.jack');
         var $dialog = display.dialog;
@@ -59,29 +59,31 @@ function($, _, FSM, Util, Selectable){
             actionCallback(null, null);
         }
 
+        var noun = n_actions==1 ? 'card' : 'cards';
         if(hasDock) {
-            $dialog.text('Select card from pool and/or hand.');
+            $dialog.text('Laborer: Select up to '+n_actions+' '+noun+' from pool and/or hand.');
         } else { 
-            $dialog.text('Select card from pool.');
+            $dialog.text('Laborer: Select up to '+n_actions+' '+noun+' from pool.');
         }
 
         var selPool = new Selectable($pool);
-        selPool.makeSelectN(1);
+        selPool.makeSelectN(n_actions);
         if(hasDock) {
             var selHand = new Selectable($handcards);
-            selHand.makeSelectN(1);
+            selHand.makeSelectN(n_actions);
         }
         $okBtn.show().prop('disabled', false).one('click', function(e) {
-            var frompool = AB._extractCardId(selPool);
+            var frompool = AB._extractCardIds(selPool);
             selPool.reset();
 
-            var fromhand = null;
+            var fromhand = [];
             if(hasDock) {
-                fromhand = AB._extractCardId(selHand);
+                fromhand = AB._extractCardIds(selHand);
                 selHand.reset();
             }
 
             $dialog.text('');
+            console.log('Laborer with ', fromhand, frompool);
             actionCallback(fromhand, frompool);
         });
 
@@ -492,13 +494,13 @@ function($, _, FSM, Util, Selectable){
         var $okBtn = display.button('ok');
 
         if(hasAtrium && hasBasilica) {
-            $dialog.text('Select card from stockpile or deck, and one from your hand.');
+            $dialog.text('Merchant: Select card from stockpile or deck, and one from your hand.');
         } else if(hasAtrium) { 
-            $dialog.text('Select card from stockpile or deck.');
+            $dialog.text('Merchant: Select card from stockpile or deck.');
         } else if(hasBasilica) { 
-            $dialog.text('Select card from stockpile and/or hand.');
+            $dialog.text('Merchant: Select card from stockpile and/or hand.');
         } else { 
-            $dialog.text('Select card from stockpile.');
+            $dialog.text('Merchant: Select card from stockpile.');
         }
 
         if(hasAtrium) {
