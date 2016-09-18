@@ -1,12 +1,11 @@
-define(['sockjs', 'util', 'fsm', 'jscookie'],
-function(SockJS, Util, FSM, Cookies) {
+define(['util', 'fsm'],
+function(Util, FSM) {
     var Net = {
         socket: null,
         user: null
     }
 
     Net.connect = function(url, onopen, onmessage) {
-        //Net.socket = SockJS(url);
         Net.socket = new WebSocket(url);
 
         // Handle any errors that occur.
@@ -19,18 +18,6 @@ function(SockJS, Util, FSM, Cookies) {
             var socketStatus = $('.status');
             socketStatus.text('Connected.');
             socketStatus.removeClass('closed').addClass('open');
-
-            /*
-            uid = Cookies.get('TWISTED_SESSION');
-            console.log('Read TWISTED_SESSION cookie:', uid);
-
-            console.log('Try to read invalid cookie');
-            console.log(Cookies.get('NotARealCookie'));
-
-            if(uid !== null) {
-                Net.sendAction(0, Util.Action.LOGIN, [uid]);
-            }
-            */
 
             onopen();
         };
@@ -91,6 +78,21 @@ function(SockJS, Util, FSM, Cookies) {
         var s = {'game':game_id, 'number':number, 'action':{'action':action, 'args':args}};
         console.log('Sending action: ' + JSON.stringify(s));
         Net._sendString(JSON.stringify(s));
+    };
+
+    // Send a list of game commands. Argument is list of lists with the 
+    // same arguments as sendAction.
+    Net.sendActions = function(commands) {
+        var l = [];
+        for(var i=0; i<commands.length; i++) {
+            var c = commands[i];
+            var s = {'game':c[0], 'number':c[1], 'action':{'action':c[2], 'args':c[3]}};
+            l.push(s);
+        }
+
+        var json = JSON.stringify(l);
+        console.log('Sending actions: ' + json);
+        Net._sendString(json);
     };
 
     return Net;
