@@ -155,7 +155,14 @@ def decode_player(obj):
             'revealed', 'prev_revealed', 'clients_given')
 
     for k in zones:
-        player_dict[k] = decode_zone(player_dict[k], k)
+        try:
+            zone_list = player_dict[k]
+        except KeyError as e:
+            # Without a marker for a bad decoding, we'll raise here.
+            #zone_list = []
+            raise GTREncodingError('Error decoding zone: ' + e.message)
+
+        player_dict[k] = decode_zone(zone_list, k)
 
     f_card = player_dict['fountain_card']
     player_dict['fountain_card'] = Card(f_card) if f_card is not None else None
