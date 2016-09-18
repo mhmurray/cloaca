@@ -23,6 +23,7 @@ class Player(object):
     def __init__(self, uid, name, hand=None, stockpile=None, clientele=None,
             vault=None, camp=None, fountain_card=None, n_camp_actions=0,
             buildings=None, influence=None, revealed=None, prev_revealed=None,
+            clients_given=None,
             performed_craftsman=False):
 
         self.name = name
@@ -38,6 +39,7 @@ class Player(object):
         self.influence = influence if influence is not None else []
         self.revealed = revealed if revealed is not None else Zone(name='revealed')
         self.prev_revealed = prev_revealed if prev_revealed is not None else Zone(name='prev_revealed')
+        self.clients_given = clients_given if clients_given is not None else Zone(name='clients_given')
         self.performed_craftsman = performed_craftsman
 
     def __repr__(self):

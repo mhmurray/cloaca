@@ -1749,7 +1749,7 @@ class Game(object):
             unmatched_mats = demanded_mats - given_mats
             extra_mats = given_mats - demanded_mats
             remaining_mats = zone_mats - given_mats
-            ungiven_mats = unmatched_mats & remaining_mats # Set intersection
+            ungiven_mats = unmatched_mats & remaining_mats # intersection
 
             if len(extra_mats):
                 lg.debug('Too many cards given : ' + str(extra_mats))
@@ -1798,8 +1798,47 @@ class Game(object):
         for c in stockpile_cards_to_move:
             p.stockpile.move_card(c, leg_p.stockpile)
 
-        for c in clientele_cards_to_move:
-            p.clientele.move_card(c, leg_p.vault)
+        # Don't move cards if leg. player would go over vault limit.
+        # Instead, mark the cards as given, then wait for a TAKECLIENTS action.
+        vault_space = self._vault_limit(leg_p)-len(leg_p.vault)
+        if vault_space > 0:
+            if vault_space >= len(clientele_cards_to_move):
+                for c in clientele_cards_to_move:
+                    p.clientele.move_card(c, leg_p.vault)
+            else:
+                p.clients_given.set_content(clientele_cards_to_move)
+                self.stack.push_frame('_await_action', message.TAKECLIENTS, leg_p)
+
+
+
+    def _handle_takeclients(self, a):
+        clients = a.args
+
+        p = self.active_player
+        victim = next((p for p in self.players if len(p.clients_given)), None)
+        if victim is None:
+            raise GTRError('Received TAKECLIENTS without victim.')
+
+        extra_taken = [c for c in clients if c not in victim.clients_given]
+        if len(extra_taken):
+            raise GTRError('Clients picked that were not given: {0}'
+                    .format(', '.join(map(str, extra_taken))))
+
+        vault_space = self._vault_limit(p)-len(p.vault)
+        if len(clients) != vault_space:
+            raise GTRError('Must take exactly {0:d} clients.'
+                    .format(vault_space))
+
+        for c in clients:
+           victim.clientele.move_card(c, p.vault)
+
+        victim.clients_given.set_content([])
+
+        self._log('{0} chooses clients from {1}: {2}'
+                .format(p.name, victim.name, ', '.join(map(str, clients))))
+
+
+        self._pump()
 
 
     def _handle_merchant(self, a):

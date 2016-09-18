@@ -821,6 +821,162 @@ class TestLegionaryColiseum(unittest.TestCase):
         self.assertTrue(d.road1 in self.p1.vault)
         self.assertTrue(d.latrine0 in self.p2.clientele)
 
-    
+
+class TestLegionaryColiseumVaultLimit(unittest.TestCase):
+    """Test taking cards with the Coliseum near the vault limit.
+    """
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Legionary',
+                buildings=[['Coliseum'],[]],
+                clientele=[['Atrium'],[]],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.road0, d.insula0])
+        self.p1.vault.set_content([d.road2])
+
+        self.p2.clientele.set_content([d.latrine0, d.road1])
+
+        a = message.GameAction(message.LEGIONARY, d.road0, d.insula0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.road1, d.latrine0)
+        self.game.handle(a)
+
+
+    def test_coliseum_to_vault_limit(self):
+        """TAKECLIENTS action required if enough clientele are given that
+        the vault would be filled.
+        """
+        d = self.deck
+
+        self.assertEqual(self.game.expected_action, message.TAKECLIENTS)
+        self.assertEqual(self.game.active_player, self.p1)
+
+        a = message.GameAction(message.TAKECLIENTS, d.road1)
+        self.game.handle(a)
+
+        self.assertIn(d.road1, self.p1.vault)
+        self.assertNotIn(d.latrine0, self.p1.vault)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_coliseum_at_vault_limit_illegal_actions(self):
+        """TAKECLIENTS misapplied.
+        """
+        d = self.deck
+
+        self.assertEqual(self.game.expected_action, message.TAKECLIENTS)
+        self.assertEqual(self.game.active_player, self.p1)
+
+        mon = Monitor()
+        mon.modified(self.game)
+
+        # too many clients taken
+        a = message.GameAction(message.TAKECLIENTS, d.road1, d.latrine0)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        # non-given cards
+        a = message.GameAction(message.TAKECLIENTS, d.dock0, d.atrium1)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+        # not enough clients taken
+        a = message.GameAction(message.TAKECLIENTS)
+        with self.assertRaises(GTRError):
+            self.game.handle(a)
+
+        self.assertFalse(mon.modified(self.game))
+
+
+class TestLegionaryColiseumToExactlyVaultLimit(unittest.TestCase):
+    """Test taking cards with the Coliseum near the vault limit.
+    If we'll hit the vault limit or we're already full, no TAKECLIENTS
+    action is required.
+    """
+
+    def test_vault_will_be_exactly_full(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Legionary',
+                buildings=[['Coliseum'],[]],
+                clientele=[['Atrium'],[]],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.road0, d.insula0])
+        self.p1.vault.set_content([d.road2])
+
+        self.p2.clientele.set_content([d.latrine0, d.road1])
+
+        a = message.GameAction(message.LEGIONARY, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.road1)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+        self.assertIn(d.road1, self.p1.vault)
+        self.assertNotIn(d.road1, self.p2.clientele)
+
+
+    def test_vault_already_full(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Legionary',
+                buildings=[['Coliseum'],[]],
+                clientele=[['Atrium'],[]],
+                deck = self.deck)
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.road0, d.insula0])
+        self.p1.vault.set_content([d.road2, d.road3])
+
+        self.p2.clientele.set_content([d.latrine0, d.road1])
+
+        a = message.GameAction(message.LEGIONARY, d.road0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.GIVECARDS)
+
+        a = message.GameAction(message.GIVECARDS, d.road1)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+        self.assertNotIn(d.road1, self.p1.vault)
+        self.assertIn(d.road1, self.p2.clientele)
+
+
 if __name__ == '__main__':
     unittest.main()

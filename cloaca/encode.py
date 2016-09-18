@@ -152,7 +152,7 @@ def decode_player(obj):
     player_dict = copy.deepcopy(obj)
 
     zones = ('hand', 'stockpile', 'clientele', 'vault', 'camp',
-            'revealed', 'prev_revealed')
+            'revealed', 'prev_revealed', 'clients_given')
 
     for k in zones:
         player_dict[k] = decode_zone(player_dict[k], k)
