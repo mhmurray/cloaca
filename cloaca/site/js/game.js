@@ -424,6 +424,22 @@ function($, AB, Games, Display, Net, Util) {
                         Net.sendAction(gs.game_id, gs.action_number, Util.Action.GIVECARDS, cards);
                     }
             );
+        } else if (gs.expected_action === Util.Action.TAKECLIENTS) {
+            var given_cards = [];
+            var victim_index = null;
+            for(var i=0; i<gs.players.length; i++) {
+                if(gs.players[i].clients_given.length > 0) {
+                    given_cards = gs.players[i].clients_given;
+                    player_index = i;
+                }
+            }
+
+            var vault_space = vaultLimit[AB.playerIndex] - gs.players[AB.playerIndex].vault.length
+            AB.takeClients(this.display, vault_space, victim_index, given_cards,
+                    function(cards) {
+                        Net.sendAction(gs.game_id, gs.action_number, Util.Action.TAKECLIENTS, cards);
+                    }
+            );
         } else if (gs.expected_action === Util.Action.TAKEPOOLCARDS) {
             var revealed = gs.players[gs.legionary_player_index].revealed;
             var materials = $.map(revealed, function(card) {

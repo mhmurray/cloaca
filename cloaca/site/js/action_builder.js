@@ -83,7 +83,6 @@ function($, _, FSM, Util, Selectable){
             }
 
             $dialog.text('');
-            console.log('Laborer with ', fromhand, frompool);
             actionCallback(fromhand, frompool);
         });
 
@@ -453,6 +452,32 @@ function($, _, FSM, Util, Selectable){
 
         return;
     };
+
+    AB.takeClients = function(display, vault_space, victim_index, given_cards, actionCallback)
+    {
+        var $cards = display.zoneCards('clientele', victim_index);
+        var $okBtn = display.button('ok');
+        var $dialog = display.dialog;
+
+        $dialog.text('Vault limit will be reached. '+
+            'Select '+vault_space+' of opponent\'s clientele.');
+
+
+        var selector = '#card'+given_cards.join(',#card');
+        var sel = new Selectable(selector);
+        sel.makeSelectN(vault_space);
+
+        $okBtn.show().prop('disabled', false).one('click', function(e) {
+            var cards = AB._extractCardIds(sel);
+            sel.reset();
+
+            $dialog.text('')
+            actionCallback(cards);
+        });
+    }
+
+
+
 
     /* Action builder for a simple choice among a few options.
      *
