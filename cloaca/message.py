@@ -195,20 +195,62 @@ class Command(object):
 
     @staticmethod
     def from_json(s):
-        """Parse a JSON string and return a Command object.
+        """Parse a JSON string and return a list of Command objects.
 
         Raises ParsingError if s is not a valid command object
         or is invalid JSON.
         """
         try:
-            d = json.loads(s)
+            commands = json.loads(s)
         except ValueError:
             raise ParsingError('Failed to parse JSON: ' + s)
 
+        # Determine if this is a list or a single command.
         try:
-            game, number, action_dict = d['game'], d['number'], d['action']
+            game = commands['game']
         except KeyError:
-            raise ParsingError('Failed to decode Command object from JSON: '+s)
+                raise ParsingError('Failed to decode Command object(s) from JSON: '+s)
+        except TypeError:
+            try:
+                game = commands[0]['game']
+            except (IndexError, KeyError):
+                raise ParsingError('Failed to decode Command object(s) from JSON: '+s)
+            else:
+                is_list = True
+        else:
+            is_list = False
+
+        if not is_list:
+            commands = [commands]
+
+        ret = []
+        last_game, last_n = None, None
+        for d in commands:
+            game = d['game']
+            if last_game is None:
+                last_game = game
+            if last_game != game:
+                raise ParsingError('A list of Commands must apply to the '
+                        'same game. ({0:d} != {1:d}'.format(last_game, game))
+
+            number = d['number']
+            if last_n is not None and number != last_n+1:
+                raise ParsingError('A list of Commands must have sequential '
+                        'action numbers. ({0:d}, {1:d})'.format(last_n, number))
+            last_n = number
+
+            action_dict = d['action']
+            try:
+                action, args = action_dict['action'], action_dict['args']
+            except KeyError:
+                raise ParsingError('Failed to decode GameAction when '
+                        'parsing Command from JSON.')
+            else:
+                ret.append(Command(game, number, GameAction(action, *args)))
+
+        return ret
+
+
 
         try:
             action, args = action_dict['action'], action_dict['args']

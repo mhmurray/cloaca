@@ -162,7 +162,30 @@ class GTRServer(object):
 
 
     @gen.coroutine
-    def handle_game_action(self, game_id, user_id, action_number, action):
+    def handle_game_actions(self, game_id, user_id, actions):
+        """Process a list of game actions. The actions argument
+        is of the form 
+        [[action_number_1, GameAction1], [action_number_2, GameAction2]]
+
+        The game is retrieved once and all GameActions are applied in 
+        sequence.
+
+        If there is an error processing one of the actions, the rest
+        are ignored, but as long as one action was successfully processed,
+        the game is stored and distributed to all players.
+
+        The action number(s) must be equal to Game.action_number. If the
+        provided action number is too low, that action is skipped, in case
+        this is just a re-submission of a previous action list.
+        If the provided action number is larger than Game.action_number or
+        if the last (largest) action number in the list of actions is smaller
+        than Game.action_number, an error is sent to the client and the game
+        is not altered.
+
+        The ability to process multiple actions at once avoids the overhead
+        of acquiring a lock on the game and retrieving it from the database.
+        No yield of program flow occurs while actions are being processed.
+        """
         userdict = yield self.db.retrieve_user(user_id)
 
         # Check the lock to see if the game is in use.
@@ -193,45 +216,66 @@ class GTRServer(object):
                 self._send_error(user_id, msg)
                 return
 
-            if action_number != game.action_number:
-                msg = ('Received action_number {0:d}, but require {1:d}.'
-                        ).format(action_number, game.action_number)
-                lg.warning(msg)
+            # Ignore actions if they're old, with too-low action_number.
+            # It's probably the client re-sending a list of actions.
+            # However, if no actions are applicable, send an error.
+            if(game.action_number > actions[-1][0]):
+                msg = ('Received latest action_number {0:d}, but require {1:d}.'
+                        ).format(actions[-1][0], game.action_number)
                 self._send_error(user_id, msg)
                 return
 
-            lg.debug('Handling action: {0}'.format(repr(action)))
+            did_one = False
+            for action_number, action in actions:
+                if action_number > game.action_number:
+                    msg = ('Received action_number {0:d}, but require {1:d}.'
+                            ).format(action_number, game.action_number)
+                    lg.warning(msg)
+                    self._send_error(user_id, msg)
+                    return
+                elif action_number < game.action_number:
+                    lg.debug('Skipping action {0:d}, {1}. (Game.action_number'
+                            ' = {2}): '.format(action_number, repr(action),
+                                    game.action_number))
+                    continue
 
-            if game.finished:
-                msg = 'Game {0} has finished.'.format(game_id)
-                lg.warning(msg)
-                self._send_error(user_id, msg)
+                lg.debug('Handling action: {0}'.format(repr(action)))
 
-            i_active_p = game.active_player_index
+                if game.finished:
+                    msg = 'Game {0} has finished.'.format(game_id)
+                    lg.debug(msg)
+                    self._send_error(user_id, msg)
 
-            if i_active_p == player_index:
+                i_active_p = game.active_player_index
+
+                if i_active_p != player_index:
+                    msg = ('Received action for player {0!s} ({1}), '
+                        'but waiting on player {2!s} ({3}).'
+                        ).format(player_index, game.players[player_index].name,
+                                i_active_p, game.players[i_active_p].name)
+
+                    lg.warning(msg)
+                    self._send_error(user_id, msg)
+                    break
+
                 try:
                     game.handle(action)
                 except GTRError as e:
                     lg.warning(e.message)
                     self._send_error(user_id, e.message)
-                    return
+                    break
                 except GameOver:
                     lg.info('Game {0} has ended.'.format(game_id))
+                    did_one = True
+                else:
+                    did_one = True
 
+            if did_one:
                 yield self.store_game(game)
 
                 for u in [p.uid for p in game.players]:
                     yield self._retrieve_and_send_game(u, game_id)
 
-            else:
-                msg = ('Received action for player {0!s} ({1}), '
-                    'but waiting on player {2!s} ({3}).'
-                    ).format(player_index, game.players[player_index].name,
-                            i_active_p, game.players[i_active_p].name)
-
-                lg.warning(msg)
-                self._send_error(user_id, msg)
 
 
     @gen.coroutine

@@ -371,7 +371,7 @@ class GameWSHandler(WebSocketHandler):
     def on_message(self, message):
         lg.debug('WS handler received message: '+str(message))
         try:
-            command = Command.from_json(message)
+            commands = Command.from_json(message)
         except ParsingError as e:
             self.message_error_count += 1
             if self.message_error_count >= self.MESSAGE_ERROR_THRESHOLD:
@@ -379,15 +379,14 @@ class GameWSHandler(WebSocketHandler):
             else:
                 self.send_command(
                         Command(None, None, GameAction(cloaca.message.SERVERERROR, 
-                                'Error parsing message.')))
+                                'Error parsing message: '+e.message)))
             return
         else:
             user_id = self.current_user['user_id']
-            game_id = command.game
-            action_number = command.number
-            if command.action.action == cloaca.message.LOGIN:
+            game_id = commands[0].game
+            if commands[0].action.action == cloaca.message.LOGIN:
                 lg.debug('Ignoring deprecated LOGIN message.')
-            elif command.action.action == cloaca.message.REQGAMESTATE:
+            elif commands[0].action.action == cloaca.message.REQGAMESTATE:
                 lg.debug('Received request for game {0!s}.'.format(game_id))
                 try:
                     game_json = yield self.server.get_game_json(user_id, game_id)
@@ -399,7 +398,8 @@ class GameWSHandler(WebSocketHandler):
                     lg.debug('Sending game '+str(game_id))
                     self.send_command(resp)
             else:
-                yield self.server.handle_game_action(game_id, user_id, action_number, command.action)
+                yield self.server.handle_game_actions(
+                        game_id, user_id, [[c.number, c.action] for c in commands])
 
 
     def send_command(self, command):
