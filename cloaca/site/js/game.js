@@ -67,7 +67,10 @@ function($, AB, Games, Display, Net, Util) {
             return;
         }
 
-        if(active_player_index !== player_index) {
+        if(active_player_index === player_index) {
+            document.title = 'Your turn!'
+        } else {
+            document.title = 'GtR'
             $('#dialog').text('Waiting on ' + active_player.name + '...');
             return;
         }
