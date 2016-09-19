@@ -92,8 +92,21 @@ function(Util, $, _){
             var ip = i_rot+1;
 
             var $p = $('<div />').addClass('player-box').appendTo(this.playerInfo);
+
+            var $p_title = $('<span />', {
+                id: 'p'+ip+'-title',
+            }).addClass('player-title');
+            $p.append($p_title)
+
             var player = players[i_rot];
-            $p.html('<b>Player '+(ip)+': ' + player+'</b>');
+            $p_title.text('Player '+(ip)+': ' + player);
+
+            $p_score = $('<span />', {
+                text: 'Score : 2',
+                id: 'p'+ip+'-score'
+            }).addClass('player-score');
+
+            $p.append($p_score);
 
             var playerZones = this.playerZones[i_rot];
             $p.append(playerZones.hand);
@@ -341,7 +354,9 @@ function(Util, $, _){
             $('#'+prefix+'vault-title').text(
                     'Vault ('+player.vault.length+'/'+vaultLimit[i]+')');
             $('#'+prefix+'influence-title').text(
-                    'Influence ('+visibleScore[i]+')');
+                    'Influence ('+playerInfluence[i]+')');
+
+            $('#'+prefix+'score').text('Score : ' +visibleScore[i]);
 
             var buildings = player.buildings;
             var $buildings = zones.buildings;

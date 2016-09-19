@@ -140,6 +140,11 @@ li.ui-tabs-active a {
   margin-bottom: 2px;
 }
 
+.player-title {
+  font-weight: bold;
+  padding-right: 15px;
+}
+
 #dialog-wrapper {
   border: 1px solid black;
   padding: 2px;
