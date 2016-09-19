@@ -15,10 +15,6 @@ function($, _, Util, Display, Games, FSM, Game, Net){
         }
         var ws_uri = ws_proto+'//'+location.host + ws_uri_path;
 
-        var tabs = $('#tabs').tabs({
-            active: 0, // Default to game list
-        });
-
         var heading = $('<div/>').attr('id', 'heading');
         var $gloryTitle = $('<span/>').text('Glory to Rome').addClass('title');
         var socketStatus = $('<span/>').text('Connecting...').addClass('status');
@@ -64,8 +60,6 @@ function($, _, Util, Display, Games, FSM, Game, Net){
                     var game_obj = new Game(Games.records[game], Games.user);
                     Games.games[game] = game_obj;
                     game_obj.initialize();
-                    var tabs = $('#tabs').tabs('refresh');
-                    tabs.tabs('option', 'active', -1); // switch to new tab.
                 }
             } else if (action == Util.Action.SERVERERROR) {
                 var message = args[0];
@@ -245,8 +239,6 @@ function($, _, Util, Display, Games, FSM, Game, Net){
                     var game_obj = new Game(Games.records[_id], Games.user);
                     Games.games[_id] = game_obj;
                     game_obj.initialize();
-                    var tabs = $('#tabs').tabs('refresh');
-                    tabs.tabs('option', 'active', -1); // switch to new tab.
                     sendAction(_id, null, Util.Action.REQGAMESTATE);
                 }
             }
@@ -263,8 +255,6 @@ function($, _, Util, Display, Games, FSM, Game, Net){
                 var game_obj = new Game(game_id, players);
                 Games.games[game_id] = game_obj;
                 game_obj.initialize();
-                var tabs = $('#tabs').tabs('refresh');
-                tabs.tabs('option', 'active', -1); // switch to new tab.
             }
 
             var game = Games.games[game_id];

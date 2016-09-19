@@ -121,11 +121,9 @@ function(Util, $, _){
     };
 
 
-    // Adds game div to #page-wrapper and an anchor to the #tabs list.
-    // Does not refresh the tab list.
+    // Adds game div to #page-wrapper
     Display.prototype.initialize = function() {
         var $pageWrapper = $('#page-wrapper');
-        var $tabList = $('#tabs > ul');
 
         this.gameWrapper = $('<div/>').attr('id', 'game-wrapper')
                 .addClass('game-wrapper');
@@ -149,6 +147,8 @@ function(Util, $, _){
         this.pool = this.poolWrapper.find('.card-container');
 
         this.createPlayerZones();
+
+        this.gamePanel = $('<div/>').attr('id', 'game-panel');
 
         // display for leader, turn, game id, etc.
         this.gameInfo = $('<div/>').attr('id', 'gameinfo');
@@ -208,16 +208,12 @@ function(Util, $, _){
 
         this.cardsPanel.append(this.gameControls, this.poolWrapper, this.playerInfo);
 
-        this.gameWrapper.append(
-                this.cardsPanel, this.gameInfo,
-                this.decks, this.sites, this.dialogWrapper, this.gameLog
-                );
+        this.gamePanel.append(this.gameInfo, this.decks, this.sites,
+            this.dialogWrapper, this.gameLog);
+
+        this.gameWrapper.append(this.cardsPanel, this.gamePanel);
 
         $pageWrapper.append(this.gameWrapper);
-        var $li = $('<li/>');
-        $li.append($('<a/>').prop('href','#game-wrapper').text('Game '+this.id));
-
-        $tabList.append($li);
     };
 
     Display.prototype.updateGameState = function(gs) {

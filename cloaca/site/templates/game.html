@@ -13,50 +13,23 @@
 <body>
     <h1 id="the_game_id">{{ escape(str(game_id)) }}</h1><span id="the_username">{{ escape(username) }}</span>
     <a href="/">Game List</a>
-    <div id="tabs">
-        <ul>
-            <li><a href="#gamelist-wrapper">Game List</a></li>
-            <li><a href="#devtools">DevTools</a></li>
-        </ul>
-        <div id="page-wrapper">
-            <div id="error-container">
-              <div id="error-dialog">
-                <a href="#" class="close"></a>
-                <ul></ul>
-              </div>
-            </div>
+    <div id="page-wrapper">
+        <div id="error-container">
+          <div id="error-dialog">
+            <a href="#" class="close"></a>
+            <ul></ul>
+          </div>
+        </div>
 
-            <div id="gamelist-wrapper">
-                <div id="gamelist-canvas">
-                    <ul id="gamelist"></ul>
-                </div>
-
-                <button id="refresh">Refresh</button>
-                <button id="creategame">New Game</button>
-                <button id="close">Close Connection</button>
-
-                <div>
-                    <span id="login-status" class='closed'>Not logged in.</span>
-                    <span id="username">{{ escape(username) }}</span>
-                </div>
-
-                <form id="login-form" action="/login" method="post">
-                    <textarea id='login-text' required>reasgt</textarea>
-                    <button type="submit">Login</button>
-                </form>
-                <button id="logout-btn">Logout</button>
-            </div>
-
-            <div id="devtools">
-                <h3>Send GameAction</h3>
-                <form id="message-form" action="#" method="post">
-                    <textarea id="custom-action" 
-                        required>{"game":{{ escape(str(game_id)) }}, "number":0, "action":2, "args":[false]}</textarea>
-                    <button type="submit">Send Custom Action</button>
-                </form>
-                <h3>Game State (JSON)</h3>
-                <textarea id="gamestate-copy"></textarea>
-            </div>
+        <div id="devtools" style="display:none">
+            <h3>Send GameAction</h3>
+            <form id="message-form" action="#" method="post">
+                <textarea id="custom-action" 
+                    required>{"game":{{ escape(str(game_id)) }}, "number":0, "action":2, "args":[false]}</textarea>
+                <button type="submit">Send Custom Action</button>
+            </form>
+            <h3>Game State (JSON)</h3>
+            <textarea id="gamestate-copy"></textarea>
         </div>
     </div>
 
