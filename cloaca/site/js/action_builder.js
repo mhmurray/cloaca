@@ -56,7 +56,7 @@ function($, _, FSM, Util, Selectable){
         // Check for unusable action
         var viable_action = $pool.length > 0 || (hasDock && $handcards.length > 0);
         if(!viable_action) {
-            actionCallback(null, null);
+            actionCallback([], []);
         }
 
         var noun = n_actions==1 ? 'card' : 'cards';
