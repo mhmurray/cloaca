@@ -1,5 +1,5 @@
-define(['jquery', 'jqueryui', 'sockjs', 'util', 'display', 'games', 'fsm', 'game', 'net'],
-function($, _, SockJS, Util, Display, Games, FSM, Game, Net){
+define(['jquery', 'jqueryui', 'util', 'display', 'games', 'fsm', 'game', 'net'],
+function($, _, Util, Display, Games, FSM, Game, Net){
     var App = {
         game_id: null,
         playerIndex: null,
