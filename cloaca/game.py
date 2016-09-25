@@ -941,8 +941,9 @@ class Game(object):
         if f.function_name == '_perform_clientele_action':
             p, role = f.args
 
+            current_role = self._current_frame.args[1]
             if p.name == player.name and \
-                    ((role=='Merchant' and has_ludus) or role == self.role_led):
+                    ((role=='Merchant' and has_ludus) or role == current_role):
                 return True
 
         return False
@@ -2194,7 +2195,7 @@ class Game(object):
                 .format(player.name, n))
 
             for _ in range(n):
-                self.stack.push_frame('_await_action', message.LABORER, player)
+                self.stack.push_frame('_perform_role_action', player, 'Laborer')
 
         elif str(building_obj) == 'Garden':
             n = player.influence_points
