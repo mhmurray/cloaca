@@ -207,6 +207,347 @@ class TestBuildingResolution(unittest.TestCase):
         self.assertIn(self.p1, self.game.winners)
 
 
+class TestFoundry(unittest.TestCase):
+    """Test finishing Foundry leading to a Laborer for each influence.
+    """
+
+    def test_finish_foundry(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman',
+                deck=d)
+
+        p1, p2 = game.players
+
+        p1.hand.set_content([d.academy0])
+        p1.buildings.append(Building(d.foundry0, 'Brick', materials=[d.school0]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.foundry0, d.academy0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.LABORER)
+
+        # Should have 4 influence now and 4 laborer actions stacked up
+        for i in range(4):
+            a = message.GameAction(message.LABORER)
+            game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+class TestAmphitheatre(unittest.TestCase):
+    """Finish Amphitheatre gives craftsman actions equal to influence.
+    
+    Also test all the ways we could get Craftsman actions and combine them
+    to start out of town. These are:
+
+        - Two Amphitheatre actions
+        - The last Amphitheatre action and another Palace Craftsman action.
+        - The last Amphitheatre action and another Craftsman client
+        - The last Amphitheatre action and a Merchant client with Ludus
+        - The last Amphitheatre action and the second half of a
+          Circus Maximus client.
+        - Finish Amphitheatre with Architect and start with two of the
+          Craftsman actions.
+        - (Not allowed to combine Architect+Craftsman action.)
+    """
+
+    def test_finish_amphitheatre_with_craftsman(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d)
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Should have 4 influence now and 4 craftsman actions stacked up
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_start_out_of_town(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d)
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertTrue(game.oot_allowed)
+
+        # Use first 2 of 4 actions to out-of-town Dock.
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        for i in range(2):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_start_out_of_town_with_client(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d,
+                clientele=[['Palisade'],[]])
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Skip first 3 of 4 actions and use last+client to out-of-town Dock.
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+
+        self.assertTrue(game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_start_out_of_town_with_merchant_client(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d,
+                clientele=[['Villa'],[]],
+                buildings=[['Ludus Magna'],[]])
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Skip first 3 of 4 actions and use last+client to out-of-town Dock.
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+
+        self.assertTrue(game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_start_out_of_town_with_second_circus_maximus(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d,
+                clientele=[['Palisade'],[]],
+                buildings=[['Circus Maximus'],[]])
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        # Skip first action from leading
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        game.handle(a)
+
+        # Finish Amphitheatre with first action off client + CM
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Skip first 3 of 4 actions and use last+client to out-of-town Dock.
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+
+        self.assertTrue(game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_start_out_of_town_with_second_circus_maximus_and_ludus(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d,
+                clientele=[['Villa'],[]],
+                buildings=[['Circus Maximus', 'Ludus Magna'],[]])
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        # Skip first action from leading
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        game.handle(a)
+
+        # Finish Amphitheatre with first action off client + CM
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Skip first 3 of 4 actions and use last+client to out-of-town Dock.
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+
+        self.assertTrue(game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_start_out_of_town_with_remaining_palace_action(self):
+        d = TestDeck()
+        game = test_setup.simple_two_player(deck=d,
+                buildings=[['Palace'],[]])
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0, d.wall0, d.jack0, d.jack1])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.THINKERORLEAD, False)
+        game.handle(a)
+        a = message.GameAction(message.LEADROLE, 'Craftsman', 2, d.jack0, d.jack1)
+        game.handle(a)
+
+        # p2 thinks
+        a = message.GameAction(message.FOLLOWROLE, 0)
+        game.handle(a)
+        a = message.GameAction(message.THINKERTYPE, True)
+        game.handle(a)
+
+        # Finish Amphitheatre with first camp action
+        a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Skip first 3 of 4 actions and use last+remaining camp action to out-of-town Dock.
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+
+        self.assertTrue(game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_finish_amphitheatre_with_architect(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Architect', deck=d)
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0])
+        p1.stockpile.set_content([d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        self.assertEqual(game.expected_action, message.ARCHITECT)
+
+        a = message.GameAction(message.ARCHITECT, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Should have 4 influence now and 4 craftsman actions stacked up
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_amphitheatre_out_of_town_with_architect_and_craftsman_not_allowed(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Architect', deck=d,
+                clientele=[['Tower'],[]])
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0])
+        p1.stockpile.set_content([d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.ARCHITECT, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        # Skip first 3 of 4 actions and try using last+client to out-of-town Dock.
+        for i in range(3):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+
+        self.assertFalse(game.oot_allowed)
+
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        with self.assertRaises(GTRError):
+            game.handle(a)
+
+
 class TestStairway(unittest.TestCase):
     """Test using a Stairway.
     """
