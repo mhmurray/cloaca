@@ -1568,6 +1568,12 @@ class Game(object):
         Nothing about the active player's buildings can change via a Legionary
         action, so we can evaluate the Circus Maximus and Ludus Magna on the
         listed stack frames.
+
+        However, if this legionary is the product of a Patron action hiring a
+        Legionary client, and the next stack frame is a Merchant while we have
+        a Ludus Magna, this should not combine into two Legionary actions.
+        This is easiest to achieve by checking that Legionary is the led role
+        before combining Merchants.
         """
         self.active_player = player
 
@@ -1590,7 +1596,8 @@ class Game(object):
             elif f.function_name == '_perform_clientele_action':
                 role = f.args[1]
 
-                if role == 'Legionary' or (has_ludus and role == 'Merchant'):
+                legionary_led = self.role_led == 'Legionary'
+                if role == 'Legionary' or (has_ludus and role == 'Merchant' and legionary_led):
                     self.legionary_count += 1
                     if has_cm and role_led == 'Legionary' and is_following_or_leading:
                         self.legionary_count += 1
@@ -2108,7 +2115,7 @@ class Game(object):
             max_hand = len(winners[0].hand)
             real_winners =  [winners[0]]
 
-            for p in winners:
+            for p in winners[1:]:
                 hand = len(p.hand)
 
                 if hand > max_hand:
