@@ -262,8 +262,6 @@ class TestAmphitheatre(unittest.TestCase):
         p1.hand.set_content([d.dock0, d.wall0])
         p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
 
-        self.assertEqual(game.expected_action, message.CRAFTSMAN)
-
         a = message.GameAction(message.CRAFTSMAN, d.amphitheatre0, d.wall0, None)
         game.handle(a)
 
@@ -499,8 +497,6 @@ class TestAmphitheatre(unittest.TestCase):
         p1.stockpile.set_content([d.wall0])
         p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
 
-        self.assertEqual(game.expected_action, message.ARCHITECT)
-
         a = message.GameAction(message.ARCHITECT, d.amphitheatre0, d.wall0, None)
         game.handle(a)
 
@@ -517,6 +513,28 @@ class TestAmphitheatre(unittest.TestCase):
         # Now it's p2's turn
         self.assertEqual(game.active_player, p2)
         self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
+    def test_finish_amphitheatre_with_architect_out_of_town(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Architect', deck=d)
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0])
+        p1.stockpile.set_content([d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.ARCHITECT, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+
+        self.assertTrue(game.oot_allowed)
+
+        # Should have 4 influence now and 4 craftsman actions stacked up
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
 
 
     def test_amphitheatre_out_of_town_with_architect_and_craftsman_not_allowed(self):
