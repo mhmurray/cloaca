@@ -917,31 +917,31 @@ class Game(object):
 
         has_ludus = self._player_has_active_building(player, 'Ludus Magna')
 
+        current_function = self._current_frame.function_name
+        if current_function != '_perform_role_action':
+            lg.warning('Called _check_oot_allowed during action: {0}'
+                    .format(current_function))
+            return False
+
+        current_player = self._current_frame.args[0]
+        if current_player.name != player.name:
+            lg.warning('Called _check_oot_allowed for wrong player.')
+            return False
+
+        current_role = self._current_frame.args[1]
+
         f = self.stack.stack[-1]
 
         # Args are (player, role)
         if f.function_name == '_perform_role_action':
             p, role = f.args
 
-            current_function = self._current_frame.function_name
-            if current_function != '_perform_role_action':
-                lg.warning('Called _check_oot_allowed during action: {0}'
-                        .format(current_function))
-                return False
-
-            current_player = self._current_frame.args[0]
-
-            if current_player.name != player.name:
-                lg.warning('Called _check_oot_allowed for wrong player.')
-                return False
-
-            if p.name == player.name and role == self.role_led:
+            if p.name == player.name and role == current_role:
                 return True
 
         if f.function_name == '_perform_clientele_action':
             p, role = f.args
 
-            current_role = self._current_frame.args[1]
             if p.name == player.name and \
                     ((role=='Merchant' and has_ludus) or role == current_role):
                 return True
