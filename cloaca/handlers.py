@@ -138,7 +138,21 @@ class StartGameHandler(BaseHandler):
     @gen.coroutine
     def get(self, game_id):
         user_id = self.current_user['user_id']
-        game_id = yield self.server.start_game(user_id, game_id)
+
+        try:
+            game = yield self.server.start_game(user_id, game_id)
+        except GTRError:
+            # Game already started
+            pass
+        else:
+            for p in game.players:
+                try:
+                    client_cxn = GameWSHandler.client_cxn_by_user_id[p.uid]
+                except KeyError:
+                    pass
+                else:
+                    resp = Command(game_id, None, GameAction(cloaca.message.STARTGAME))
+                    client_cxn.send_command(resp)
 
         self.redirect('/')
         return

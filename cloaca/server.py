@@ -431,3 +431,5 @@ class GTRServer(object):
 
         game.start()
         self.store_game(game)
+
+        raise gen.Return(game)
