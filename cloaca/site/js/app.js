@@ -52,15 +52,7 @@ function($, _, Util, Display, Games, FSM, Game, Net){
                 sendAction(0, null, Util.Action.REQGAMELIST);
 
             } else if (action == Util.Action.STARTGAME) {
-                console.log('Received STARTGAME');
-                if(game in Games.games) {
-                    console.log('Game '+game+' already started.');
-                } else {
-                    console.log('Starting game ' + game);
-                    var game_obj = new Game(Games.records[game], Games.user);
-                    Games.games[game] = game_obj;
-                    game_obj.initialize();
-                }
+                Net.sendAction(game_id, null, Util.Action.REQGAMESTATE);
             } else if (action == Util.Action.SERVERERROR) {
                 var message = args[0];
                 displayError(message);
