@@ -55,17 +55,6 @@ function(Util, FSM) {
             socketStatus.removeClass('open').addClass('closed');
         };
         
-        // Close the WebSocket connection when the close button is clicked.
-        var closeBtn = document.getElementById('close');
-        closeBtn.onclick = function(e) {
-            e.preventDefault();
-
-            // Close the WebSocket.
-            socket.close();
-
-            return false;
-        };
-
         return;
     };
 

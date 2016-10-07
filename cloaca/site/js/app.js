@@ -142,16 +142,6 @@ function($, _, Util, Display, Games, FSM, Game, Net){
         var newGameBtn = document.getElementById('creategame');
         var refreshBtn = document.getElementById('refresh');
 
-        refreshBtn.onclick = function() {
-            sendAction(0, null, Util.Action.REQGAMELIST);
-        };
-
-        newGameBtn.onclick = function() {
-            console.log('create new game');
-            sendAction(0, null, Util.Action.REQCREATEGAME);
-        };
-        
-
         function update_game_list(json_list) {
             // The args is a json formated list of GameRecord dicts, with
             // keys game_id and players.
