@@ -379,7 +379,7 @@ function($, _, FSM, Util, Selectable){
         }
 
         if(addedOne) {
-            $okBtn.show().prop('disabled', false).click(function(event) {
+            $okBtn.show().prop('disabled', false).click(function() {
                 checkFinished();
             });
         } else {
@@ -539,7 +539,7 @@ function($, _, FSM, Util, Selectable){
             selHand.makeSelectN(1);
         }
 
-        $okBtn.show().prop('disabled', false).click(function(event) {
+        $okBtn.show().prop('disabled', false).click(function() {
             var $stockpilePick = selStockpile.selected();
 
             var fromStockpile = null;
@@ -578,8 +578,8 @@ function($, _, FSM, Util, Selectable){
      *   actionCallback -- func(action, args) fire this with LEADROLE
      *          or THINKERTYPE action.
      */
-    AB.leadRole = function(display, hasPalace, petitionMin,
-            petitionMax, actionCallback)
+    AB.leadRole = function(display, hasPalace, hasLatrine, hasVomitorium,
+            petitionMin, petitionMax, expectedAction, actionCallback)
     {
         var $dialog = display.dialog;
 
@@ -599,18 +599,38 @@ function($, _, FSM, Util, Selectable){
         var $cancelBtn = display.button('cancel');
         var $okBtn = display.button('ok');
         var $petitionBtn = display.button('petition');
+        var $skipBtn = display.button('skip');
 
         var $deck = display.deck;
         var $jacks = display.jacks;
         var $leadBtn = display.button('lead-role');
+        var $latrineBtn = display.button('latrine');
+        var $vomitoriumBtn = display.button('vomitorium');
+
 
         var fsm = FSM.create({
             initial: 'Start',
 
             events: [
-                { name: 'start', from: 'Start', to: 'ThinkerOrLead' },
+                { name: 'start', from: 'Start', to: 'Switchhouse' },
+                { name: 'thinkerorlead', from: 'Switchhouse', to: 'ThinkerOrLead' },
+                { name: 'skipthinker', from: 'Switchhouse', to: 'SkippableThinker' },
+                { name: 'leadrole', from: 'Switchhouse', to: 'SelectingCards' },
+                { name: 'uselatrine', from: 'Switchhouse', to: 'Latrine' },
+                { name: 'usevomitorium', from: 'Switchhouse', to: 'Vomitorium' },
+                { name: 'think', from: 'SkippableThinker', to: 'Thinker' },
+                { name: 'latrine', from: 'SkippableThinker', to: 'Latrine' },
+                { name: 'vomitorium', from: 'SkippableThinker', to: 'Vomitorium' },
                 { name: 'lead', from: 'ThinkerOrLead', to: 'SelectingCards' },
                 { name: 'think', from: 'ThinkerOrLead', to: 'Thinker' },
+                { name: 'latrine', from: 'ThinkerOrLead', to: 'Latrine' },
+                { name: 'think', from: 'Latrine', to: 'Thinker' },
+                { name: 'cancel', from: 'Latrine', to: 'ThinkerOrLead' },
+                { name: 'returntoskippable', from: 'Latrine', to: 'SkippableThinker' },
+                { name: 'vomitorium', from: 'ThinkerOrLead', to: 'Vomitorium' },
+                { name: 'think', from: 'Vomitorium', to: 'Thinker' },
+                { name: 'cancel', from: 'Vomitorium', to: 'ThinkerOrLead' },
+                { name: 'returntoskippable', from: 'Vomitorium', to: 'SkippableThinker' },
                 { name: 'orders', from: 'SelectingCards', to: 'HaveRole' },
                 { name: 'cancel', from: 'SelectingCards', to: 'ThinkerOrLead' },
                 { name: 'jack', from: 'SelectingCards', to: 'JackRole' },
@@ -637,35 +657,180 @@ function($, _, FSM, Util, Selectable){
             ]
         });
 
+        fsm.onenterSwitchhouse = function() {
+            if(expectedAction === Util.Action.LEADROLE) { fsm.leadrole(); }
+            else if(expectedAction === Util.Action.USELATRINE) { fsm.uselatrine(); }
+            else if(expectedAction === Util.Action.USEVOMITORIUM) { fsm.usevomitorium(); }
+            else if(expectedAction === Util.Action.SKIPTHINKER) { fsm.skipthinker(); }
+            else { fsm.thinkerorlead(); }
+        };
+
         fsm.onenterThinkerOrLead = function() {
             $dialog.text('Thinker or lead a role?');
 
             if($jacks.data('nCards') > 0) {
                 $jacks.addClass('selectable');
-                $jacks.off('click').one('click', function(ev) {
+                $jacks.off('click').one('click', function() {
                     fsm.think(true);
                 });
             }
 
             $deck.addClass('selectable');
-            $deck.off('click').one('click', function(ev) {
+            $deck.off('click').one('click', function() {
                 fsm.think(false);
             });
 
-            $leadBtn.show().prop('disabled', false).one('click', function(ev) {
+            $leadBtn.show().prop('disabled', false).one('click', function() {
                 fsm.lead();
             });
+
+            if(hasLatrine) {
+                $latrineBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.latrine();
+                });
+            }
+
+            if(hasVomitorium) {
+                $vomitoriumBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.vomitorium();
+                });
+            }
         };
 
         fsm.onleaveThinkerOrLead = function() {
-            Util.off($leadBtn, $deck, $jacks);
+            Util.off($leadBtn, $deck, $jacks, $vomitoriumBtn, $latrineBtn);
             $jacks.removeClass('selectable');
             $deck.removeClass('selectable');
             $dialog.text('');
         };
 
-        fsm.onenterThinker = function(event, from, to, forJack) {
-            actionCallback(Util.Action.THINKERTYPE, [forJack]);
+        fsm.onenterSkippableThinker = function() {
+            $dialog.text('Thinker or skip?');
+
+            if($jacks.data('nCards') > 0) {
+                $jacks.addClass('selectable');
+                $jacks.off('click').one('click', function() {
+                    fsm.think(true);
+                });
+            }
+
+            $deck.addClass('selectable');
+            $deck.off('click').one('click', function() {
+                fsm.think(false);
+            });
+
+            $skipBtn.show().prop('disabled', false).off('click').click(function() {
+                actionCallback([ [Util.Action.SKIPTHINKER, [true]] ]);
+            });
+
+            if(hasLatrine) {
+                $latrineBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.latrine();
+                });
+            }
+
+            if(hasVomitorium) {
+                $vomitoriumBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.vomitorium();
+                });
+            }
+        };
+
+        fsm.onleaveSkippableThinker = function() {
+            Util.off($deck, $jacks, $vomitoriumBtn, $latrineBtn);
+            $jacks.removeClass('selectable');
+            $deck.removeClass('selectable');
+            $dialog.text('');
+        };
+
+        fsm.onenterLatrine = function(event, from, to) {
+            $dialog.text('Pick card from hand to discard with Latrine. Thinker for Jack or cards?');
+
+            if(expectedAction != Util.Action.USELATRINE) {
+                $cancelBtn.show().prop('disabled', false).one('click', function() {
+                    if(from === 'SkippableThinker') {
+                        fsm.returntoskippable();
+                    } else {
+                        fsm.cancel();
+                    }
+                });
+            }
+
+            selHand.makeSelectN(1);
+
+            if($jacks.data('nCards') > 0) {
+                $jacks.addClass('selectable');
+                $jacks.off('click').one('click', function() {
+                    fsm.think(true, AB._extractCardId(selHand));
+                });
+            }
+
+            $deck.addClass('selectable');
+            $deck.off('click').one('click', function() {
+                fsm.think(false, AB._extractCardId(selHand));
+            });
+        };
+
+        fsm.onleaveLatrine = function() {
+            selHand.reset();
+            Util.off($deck, $jacks);
+        };
+
+        fsm.onenterVomitorium = function(event, from, to) {
+            $dialog.text('Discarding hand with Vomitorium. Thinker for Jack or cards?');
+
+            if(expectedAction !== Util.Action.USEVOMITORIUM) {
+                $cancelBtn.show().prop('disabled', false).one('click', function() {
+                    if(from === 'SkippableThinker') {
+                        fsm.returntoskippable();
+                    } else {
+                        fsm.cancel();
+                    }
+                });
+            }
+
+            if($jacks.data('nCards') > 0) {
+                $jacks.addClass('selectable');
+                $jacks.off('click').one('click', function() {
+                    fsm.think(true, true);
+                });
+            }
+
+            $deck.addClass('selectable');
+            $deck.off('click').one('click', function() {
+                fsm.think(false, true);
+            });
+        };
+
+        fsm.onleaveVomitorium = function() {
+            selHand.reset();
+            Util.off($deck, $jacks);
+        };
+
+        fsm.onenterThinker = function(event, from, to, forJack, discard) {
+            // <discard> is either the Latrine card ID or true/false for Vomitorium.
+            // If we don't use the Latrine / Vomitorium, append blank actions.
+            // If the Vomitorium is used, the Latrine is automatically skipped.
+            if(from === 'Latrine') {
+                var actions = [];
+                if(hasVomitorium) { actions.push([Util.Action.USEVOMITORIUM, [false]]); }
+                actions.push([Util.Action.USELATRINE, [discard]]);
+                actions.push([Util.Action.THINKERTYPE, [forJack]]);
+                actionCallback(actions);
+
+            } else if(from === 'Vomitorium') {
+                actionCallback([
+                    [Util.Action.USEVOMITORIUM, [discard]],
+                    [Util.Action.THINKERTYPE, [forJack]]
+                ]);
+            } else { // ThinkerOrLead or SkippableThinker
+                var actions = [];
+                if(hasVomitorium) { actions.push([Util.Action.USEVOMITORIUM, [false]]); }
+                if(hasLatrine) { actions.push([Util.Action.USELATRINE, [null]]); }
+                actions.push([Util.Action.THINKERTYPE, [forJack]]);
+                actionCallback(actions);
+            }
+
         };
 
         fsm.onenterSelectingCards = function() {
@@ -674,12 +839,14 @@ function($, _, FSM, Util, Selectable){
             nActions = 1;
             role = null;
 
-            $cancelBtn.show().prop('disabled', false).one('click', function(event) {
-                selHand.reset();
-                fsm.cancel();
-            });
+            if(expectedAction != Util.Action.LEADROLE) {
+                $cancelBtn.show().prop('disabled', false).one('click', function() {
+                    selHand.reset();
+                    fsm.cancel();
+                });
+            }
 
-            $petitionBtn.show().prop('disabled', false).one('click', function(event) {
+            $petitionBtn.show().prop('disabled', false).one('click', function() {
                 fsm.petition();
             });
             
@@ -704,7 +871,7 @@ function($, _, FSM, Util, Selectable){
         fsm.onenterJackRole = function() {
             $dialog.text('Pick role for Jack.');
 
-            $cancelBtn.show().prop('disabled', false).one('click', function(event) {
+            $cancelBtn.show().prop('disabled', false).one('click', function() {
                 selRole.reset();
                 selHand.reset();
                 fsm.cancel();
@@ -734,7 +901,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.first($selected);
             });
 
-            $cancelBtn.show().prop('disabled', false).one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).one('click', function() {
                 selHandNoJacks.reset();
                 fsm.cancel();
             });
@@ -753,12 +920,12 @@ function($, _, FSM, Util, Selectable){
                 selHand.select($(el));
             });
 
-            $cancelBtn.show().prop('disabled', false).one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).one('click', function() {
                 selHand.reset();
                 fsm.cancel();
             });
 
-            $okBtn.show().prop('disabled', false).on('click', function(ev) {
+            $okBtn.show().prop('disabled', false).on('click', function() {
                 var $selected = selHand.selected();
                 if($selected.length < petitionMin) {
                     $dialog.text('Not enough cards. Pick at least ' +
@@ -777,7 +944,7 @@ function($, _, FSM, Util, Selectable){
         fsm.onenterPetitionRole = function() {
             $dialog.text('Pick role for Petition.');
 
-            $cancelBtn.prop('disabled', false).one('click', function(event) {
+            $cancelBtn.prop('disabled', false).one('click', function() {
                 selRole.reset();
                 selHand.reset();
                 fsm.cancel();
@@ -807,7 +974,9 @@ function($, _, FSM, Util, Selectable){
 
         fsm.onenterLeadRole = function() {
             var card_ids = AB._extractCardIds(selHand);
-            actionCallback(Util.Action.LEADROLE, [role, nActions].concat(card_ids));
+            actionCallback([
+                [Util.Action.LEADROLE, [role, nActions].concat(card_ids)]
+            ]);
             $dialog.text('');
 
             selRole.reset();
@@ -817,16 +986,16 @@ function($, _, FSM, Util, Selectable){
         fsm.onenterPalace = function() {
             $dialog.text('Select additional '+role+' actions card with Palace.');
 
-            $cancelBtn.show().prop('disabled', false).off('click').one('click', function(event) {
+            $cancelBtn.show().prop('disabled', false).off('click').one('click', function() {
                 selHand.reset();
                 fsm.cancel();
             });
 
-            $petitionBtn.show().prop('disabled', false).off('click').one('click', function(event) {
+            $petitionBtn.show().prop('disabled', false).off('click').one('click', function() {
                 fsm.palacepetition();
             });
 
-            $okBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $okBtn.show().prop('disabled', false).off('click').one('click', function() {
                 fsm.finishpalace();
             });
             
@@ -864,7 +1033,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.palacefirst($selected);
             });
 
-            $cancelBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).off('click').one('click', function() {
                 selPalacePetition.reset();
                 fsm.cancel();
             });
@@ -879,12 +1048,12 @@ function($, _, FSM, Util, Selectable){
             selPalacePetition = new Selectable($cards);
             selPalacePetition.makeSelectN(petitionMax);
 
-            $cancelBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).off('click').one('click', function() {
                 selPalacePetition.reset();
                 fsm.cancel();
             });
 
-            $okBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $okBtn.show().prop('disabled', false).off('click').one('click', function() {
                 var $selected = selPalacePetition.selected();
                 if($selected.length < petitionMin) {
                     $dialog.text('Not enough cards. Pick at least ' +
@@ -912,7 +1081,7 @@ function($, _, FSM, Util, Selectable){
 
         if($jacks.data('nCards') > 0) {
             $jacks.addClass('selectable');
-            $jacks.off('click').one('click', function(ev) {
+            $jacks.off('click').one('click', function() {
                 Util.off($deck, $jacks);
                 $jacks.removeClass('selectable');
                 $deck.removeClass('selectable');
@@ -923,7 +1092,7 @@ function($, _, FSM, Util, Selectable){
         }
 
         $deck.addClass('selectable');
-        $deck.off('click').one('click', function(ev) {
+        $deck.off('click').one('click', function() {
             Util.off($deck, $jacks);
             $jacks.removeClass('selectable');
             $deck.removeClass('selectable');
@@ -933,15 +1102,18 @@ function($, _, FSM, Util, Selectable){
         });
     };
 
-    AB.followRole = function(display, role, hasPalace, petitionMin,
-            petitionMax, actionCallback)
+    AB.followRole = function(display, role, hasPalace, hasLatrine, hasVomitorium,
+            petitionMin, petitionMax, actionCallback)
     {
         var materialLed = Util.roleToMaterial(role);
         var $dialog = display.dialog;
 
         var $hand = display.zoneCards('hand', AB.playerIndex);
+        var selHand = new Selectable($hand);
+
         var $handNoJacks = $hand.not('.jack');
         var selHandNoJacks = new Selectable($handNoJacks);
+
         var $matchingHand = display.zoneCards('hand', AB.playerIndex).filter(
                 '.'+materialLed.toLowerCase()+',.jack');
         var selMatching = new Selectable($matchingHand);
@@ -957,6 +1129,8 @@ function($, _, FSM, Util, Selectable){
         var $cancelBtn = display.button('cancel');
         var $okBtn = display.button('ok');
         var $petitionBtn = display.button('petition');
+        var $latrineBtn = display.button('latrine');
+        var $vomitoriumBtn = display.button('vomitorium');
 
         var $piles = display.decks;
         var $deck = display.deck;
@@ -967,6 +1141,13 @@ function($, _, FSM, Util, Selectable){
 
             events: [
                 { name: 'start', from: 'Start', to: 'SelectingCards' },
+                { name: 'think', from: 'SelectingCards', to: 'Thinker' },
+                { name: 'latrine', from: 'SelectingCards', to: 'Latrine' },
+                { name: 'think', from: 'Latrine', to: 'Thinker' },
+                { name: 'cancel', from: 'Latrine', to: 'SelectingCards' },
+                { name: 'vomitorium', from: 'SelectingCards', to: 'Vomitorium' },
+                { name: 'think', from: 'Vomitorium', to: 'Thinker' },
+                { name: 'cancel', from: 'Vomitorium', to: 'SelectingCards' },
                 { name: 'follow', from: 'SelectingCards', to: 'HaveFirst' },
                 { name: 'think', from: 'SelectingCards', to: 'Thinker' },
                 { name: 'petition', from: 'SelectingCards', to: 'PetitionFirst' },
@@ -993,37 +1174,118 @@ function($, _, FSM, Util, Selectable){
 
             if($jacks.data('nCards') > 0) {
                 $jacks.addClass('selectable');
-                $jacks.one('click', function(ev) {
-                    actionCallback(Util.Action.FOLLOWROLE, [0]);
-                    actionCallback(Util.Action.THINKERTYPE, [true]);
-                    fsm.think();
-                    $dialog.text('');
+                $jacks.one('click', function() {
+                    fsm.think(true);
                 });
             }
 
             $deck.addClass('selectable');
-            $deck.one('click', function(ev) {
-                actionCallback(Util.Action.FOLLOWROLE, [0]);
-                actionCallback(Util.Action.THINKERTYPE, [false]);
-                fsm.think();
-                $dialog.text('');
+            $deck.one('click', function() {
+                fsm.think(false);
             });
 
-            $petitionBtn.show().prop('disabled', false).one('click', function(event) {
+            $petitionBtn.show().prop('disabled', false).one('click', function() {
                 fsm.petition();
             });
             
             selMatching.makeSelectN(1, function($selected) {
                 selMatching.makeUnselectable();
+                $followCard = selMatching.selected();
                 fsm.follow();
             });
+
+            if(hasLatrine) {
+                $latrineBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.latrine();
+                });
+            }
+
+            if(hasVomitorium) {
+                $vomitoriumBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.vomitorium();
+                });
+            }
         };
 
         fsm.onleaveSelectingCards = function() {
-            $followCard = selMatching.selected();
             Util.off($deck, $jacks, $petitionBtn);
             $jacks.removeClass('selectable');
             $deck.removeClass('selectable');
+            $dialog.text('');
+        };
+
+        fsm.onenterLatrine = function(event, from, to) {
+            $dialog.text('Pick card from hand to discard with Latrine. Thinker for Jack or cards?');
+
+            $cancelBtn.show().prop('disabled', false).one('click', function() {
+                fsm.cancel();
+            });
+
+            selHand.makeSelectN(1);
+
+            if($jacks.data('nCards') > 0) {
+                $jacks.addClass('selectable');
+                $jacks.off('click').one('click', function() {
+                    fsm.think(true, AB._extractCardId(selHand));
+                });
+            }
+
+            $deck.addClass('selectable');
+            $deck.off('click').one('click', function() {
+                fsm.think(false, AB._extractCardId(selHand));
+            });
+        };
+
+        fsm.onleaveLatrine = function() {
+            selHand.reset();
+            Util.off($deck, $jacks);
+        };
+
+        fsm.onenterVomitorium = function() {
+            $dialog.text('Discarding hand with Vomitorium. Thinker for Jack or cards?');
+
+            $cancelBtn.show().prop('disabled', false).one('click', function() {
+                fsm.cancel();
+            });
+
+            if($jacks.data('nCards') > 0) {
+                $jacks.addClass('selectable');
+                $jacks.off('click').one('click', function() {
+                    fsm.think(true, true);
+                });
+            }
+
+            $deck.addClass('selectable');
+            $deck.off('click').one('click', function() {
+                fsm.think(false, true);
+            });
+        };
+
+        fsm.onleaveVomitorium = function() {
+            selHand.reset();
+            Util.off($deck, $jacks);
+        };
+
+        fsm.onenterThinker = function(event, from, to, forJack, discard) {
+            if(from === 'Latrine') {
+                var actions = [];
+                if(hasVomitorium) { actions.push([Util.Action.USEVOMITORIUM, [false]]); }
+                actions.push([Util.Action.USELATRINE, [discard]]);
+                actions.push([Util.Action.THINKERTYPE, [forJack]]);
+                actionCallback(actions);
+
+            } else if(from === 'Vomitorium') {
+                actionCallback([
+                    [Util.Action.USEVOMITORIUM, [discard]],
+                    [Util.Action.THINKERTYPE, [forJack]]
+                ]);
+            } else { // SelectingCards
+                var actions = [];
+                if(hasVomitorium) { actions.push([Util.Action.USEVOMITORIUM, [false]]); }
+                if(hasLatrine) { actions.push([Util.Action.USELATRINE, [null]]); }
+                actions.push([Util.Action.THINKERTYPE, [forJack]]);
+                actionCallback(actions);
+            }
         };
 
         fsm.onenterPetitionFirst = function() {
@@ -1036,7 +1298,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.first($selected);
             });
 
-            $cancelBtn.show().prop('disabled', false).one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).one('click', function() {
                 selHandNoJacks.reset();
                 fsm.cancel();
             });
@@ -1055,12 +1317,12 @@ function($, _, FSM, Util, Selectable){
                 selHandNoJacks.select($(el));
             });
 
-            $cancelBtn.show().prop('disabled', false).on('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).on('click', function() {
                 selHandNoJacks.reset();
                 fsm.cancel();
             });
 
-            $okBtn.show().prop('disabled', false).on('click', function(ev) {
+            $okBtn.show().prop('disabled', false).on('click', function() {
                 var $selected = selHandNoJacks.selected();
                 if($selected.length < petitionMin) {
                     $dialog.text('Not enough cards. Pick at least ' +
@@ -1091,22 +1353,24 @@ function($, _, FSM, Util, Selectable){
             selHand.reset();
 
             $dialog.text('');
-            actionCallback(Util.Action.FOLLOWROLE, [nActions].concat(cardIds));
+            actionCallback([
+                [Util.Action.FOLLOWROLE, [nActions].concat(cardIds)]
+            ]);
         };
 
         fsm.onenterPalace = function() {
             $dialog.text('Select additional '+role+' actions card with Palace.');
 
-            $cancelBtn.show().prop('disabled', false).off('click').one('click', function(event) {
+            $cancelBtn.show().prop('disabled', false).off('click').one('click', function() {
                 selHandNoJacks.reset();
                 fsm.cancel();
             });
 
-            $petitionBtn.show().prop('disabled', false).off('click').one('click', function(event) {
+            $petitionBtn.show().prop('disabled', false).off('click').one('click', function() {
                 fsm.palacepetition();
             });
 
-            $okBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $okBtn.show().prop('disabled', false).off('click').one('click', function() {
                 fsm.finishpalace();
             });
             
@@ -1137,7 +1401,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.palacefirst($selected);
             });
 
-            $cancelBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).off('click').one('click', function() {
                 selPalacePetition.reset();
                 fsm.cancel();
             });
@@ -1152,12 +1416,12 @@ function($, _, FSM, Util, Selectable){
             selPalacePetition = new Selectable($cards);
             selPalacePetition.makeSelectN(petitionMax);
 
-            $cancelBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $cancelBtn.show().prop('disabled', false).off('click').one('click', function() {
                 selPalacePetition.reset();
                 fsm.cancel();
             });
 
-            $okBtn.show().prop('disabled', false).off('click').one('click', function(ev) {
+            $okBtn.show().prop('disabled', false).off('click').one('click', function() {
                 var $selected = selPalacePetition.selected();
                 if($selected.length < petitionMin) {
                     $dialog.text('Not enough cards. Pick at least ' +
@@ -1209,7 +1473,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.card();
             });
 
-            $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $skipBtn.show().prop('disabled', false).off('click').click(function() {
                 selHand.reset();
                 fsm.finish(null, null, null);
             });
@@ -1267,7 +1531,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.finish(ident, cardIdent, null);
             });
 
-            $cancelBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $cancelBtn.show().prop('disabled', false).off('click').click(function() {
                 fsm.cancel();
             });
         };
@@ -1358,12 +1622,12 @@ function($, _, FSM, Util, Selectable){
             $dialog.text('Use '+cardName+' in building or start a new building '+
                     'by clicking on a site. Skip action to draw it instead.');
 
-            $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $skipBtn.show().prop('disabled', false).off('click').click(function() {
                 fsm.finish(null, null, null);
             });
         };
 
-        fsm.onleaveSelect = function(event, from, to) {
+        fsm.onleaveSelect = function() {
             selBuilding.reset();
             selSite.reset();
             $skipBtn.show().prop('disabled', true).off('click');
@@ -1386,7 +1650,7 @@ function($, _, FSM, Util, Selectable){
 
         var $skipBtn = display.button('skip');
 
-        $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
+        $skipBtn.show().prop('disabled', false).off('click').click(function() {
             selBuilding.reset();
             actionCallback(null);
         });
@@ -1467,7 +1731,7 @@ function($, _, FSM, Util, Selectable){
                 });
             }
 
-            $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $skipBtn.show().prop('disabled', false).off('click').click(function() {
                 selStockpile.reset();
                 selPool.reset()
                 actionCallback(null, null);
@@ -1514,7 +1778,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.finish();
             });
 
-            $cancelBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $cancelBtn.show().prop('disabled', false).off('click').click(function() {
                 fsm.cancel();
             });
         };
@@ -1598,7 +1862,7 @@ function($, _, FSM, Util, Selectable){
                 });
             }
 
-            $skipBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $skipBtn.show().prop('disabled', false).off('click').click(function() {
                 selHand.reset();
                 selStockpile.reset();
                 selPool.reset()
@@ -1689,7 +1953,7 @@ function($, _, FSM, Util, Selectable){
                 fsm.finish();
             });
 
-            $cancelBtn.show().prop('disabled', false).off('click').click(function(event) {
+            $cancelBtn.show().prop('disabled', false).off('click').click(function() {
                 fsm.cancel();
             });
         };

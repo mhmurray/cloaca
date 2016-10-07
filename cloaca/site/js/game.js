@@ -122,34 +122,46 @@ function($, AB, Games, Display, Net, Util) {
         }
 
         if(gs.expected_action === Util.Action.THINKERORLEAD 
-                || gs.expected_action === Util.Action.LEADROLE)
+                || gs.expected_action === Util.Action.SKIPTHINKER
+                || gs.expected_action === Util.Action.LEADROLE
+                || gs.expected_action === Util.Action.USELATRINE
+                || gs.expected_action === Util.Action.USEVOMITORIUM)
         {
             var petitionMin = 3;
             var petitionMax = 3;
             var hasPalace = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Palace');
             var hasCircus = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Circus');
+            var hasLatrine = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Latrine');
+            var hasVomitorium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Vomitorium');
             if(hasCircus) {
                 petitionMin = 2;
             }
-            AB.leadRole(this.display, hasPalace, petitionMin, petitionMax, function(action, args) {
-                if(action === Util.Action.THINKERTYPE) {
-                    Net.sendActions([
-                        [gs.game_id, gs.action_number, Util.Action.THINKERORLEAD, [true]],
-                        [gs.game_id, gs.action_number+1, action, args],
-                    ]);
-                } else {
-                    var actions = [
-                        [gs.game_id, gs.action_number, Util.Action.THINKERORLEAD, [false]],
-                        [gs.game_id, gs.action_number+1, Util.Action.LEADROLE, args],
-                    ];
-                    if(gs.expected_action === Util.Action.LEADROLE) {
-                        actions = [
-                            [gs.game_id, gs.action_number, Util.Action.LEADROLE, args],
-                        ];
+            AB.leadRole(this.display, hasPalace, hasLatrine, hasVomitorium,
+                petitionMin, petitionMax, gs.expected_action,
+                function(actions) {
+                    var complete_actions = [];
+                    var a_num = gs.action_number;
+
+                    if(gs.expected_action === Util.Action.SKIPTHINKER
+                            && actions[0][0] !== Util.Action.SKIPTHINKER) {
+                        complete_actions.push(
+                                [gs.game_id, a_num,
+                                    Util.Action.SKIPTHINKER, [false]]);
+                        a_num++;
+                    } else if(gs.expected_action === Util.Action.THINKERORLEAD) {
+                        var do_thinker = actions[0][0] !== Util.Action.LEADROLE;
+                        complete_actions.push(
+                                [gs.game_id, a_num,
+                                    Util.Action.THINKERORLEAD, [do_thinker]]);
+                        a_num++;
                     }
-                    Net.sendActions(actions)
+
+                    for(var i=0; i<actions.length; i++) {
+                        complete_actions.push([gs.game_id, a_num+i, actions[i][0], actions[i][1]]);
+                    }
+                    Net.sendActions(complete_actions);
                 }
-            });
+            );
 
         } else if(gs.expected_action === Util.Action.THINKERTYPE) {
             AB.thinkerType(this.display,
@@ -169,10 +181,26 @@ function($, AB, Games, Display, Net, Util) {
                 petitionMin = 2;
             }
             var invocations = 0;
-            AB.followRole(this.display, roleLed, hasPalace, petitionMin, petitionMax,
-                    function(action, args) {
-                        Net.sendAction(gs.game_id, gs.action_number+invocations, action, args);
-                        invocations += 1;
+            var hasLatrine = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Latrine');
+            var hasVomitorium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Vomitorium');
+            AB.followRole(this.display, roleLed, hasPalace, hasLatrine, hasVomitorium,
+                    petitionMin, petitionMax,
+                    function(actions) {
+                        var complete_actions = [];
+                        var a_num = gs.action_number;
+
+                        var do_thinker = actions[0][0] !== Util.Action.FOLLOWROLE;
+                        if(do_thinker) {
+                            complete_actions.push(
+                                    [gs.game_id, a_num, Util.Action.FOLLOWROLE, [0]]);
+                            a_num++;
+                        }
+
+
+                        for(var i=0; i<actions.length; i++) {
+                            complete_actions.push([gs.game_id, a_num+i, actions[i][0], actions[i][1]]);
+                        }
+                        Net.sendActions(complete_actions);
                     }
             );
 
@@ -198,7 +226,7 @@ function($, AB, Games, Display, Net, Util) {
                callback(null);
             }
 
-        } else if (gs.expected_action === Util.Action.USELATRINE) {
+        } else if (false && gs.expected_action === Util.Action.USELATRINE) {
             function callback(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USELATRINE, [card]);
             }
@@ -227,7 +255,7 @@ function($, AB, Games, Display, Net, Util) {
                 callback(false);
             }
 
-        } else if (gs.expected_action === Util.Action.USEVOMITORIUM) {
+        } else if (false && gs.expected_action === Util.Action.USEVOMITORIUM) {
             function callback(use) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USEVOMITORIUM, [use]);
             }
@@ -269,7 +297,7 @@ function($, AB, Games, Display, Net, Util) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USEFOUNTAIN, [use]);
             });
 
-        } else if (gs.expected_action === Util.Action.SKIPTHINKER) {
+        } else if (false && gs.expected_action === Util.Action.SKIPTHINKER) {
             AB.singleChoice(this.display, 'Skip optional Thinker action?',
                     [{text: 'Thinker', result: false},
                      {text: 'Skip', result: true}
