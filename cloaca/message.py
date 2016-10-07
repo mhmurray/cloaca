@@ -301,13 +301,13 @@ class GameAction(object):
         
         if not spec.has_extended and len(self.args) != spec.n_req_args:
             raise GameActionError(
-                'Number of args doesn\'t match (args={0}, n_args must be {1})'
-                .format(self.args, spec.n_req_args))
+                'Number of args for {0} doesn\'t match (args={1}, n_args must be {2})'
+                .format(spec.name, self.args, spec.n_req_args))
 
         elif spec.has_extended and len(self.args) < spec.n_req_args:
             raise GameActionError(
-                'Number of args doesn\'t match (args={0}, n_args must be >= {1})'
-                .format(self.args, n_args))
+                'Number of args for {0} doesn\'t match (args={1}, n_args must be >= {2})'
+                .format(spec.name, self.args, n_args))
 
         # Regular args
         for i, arg, (_type,name) in izip(count(), self.args, spec.required_arg_specs):
