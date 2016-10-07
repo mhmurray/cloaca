@@ -603,7 +603,6 @@ function($, _, FSM, Util, Selectable){
 
         var $deck = display.deck;
         var $jacks = display.jacks;
-        var $leadBtn = display.button('lead-role');
         var $latrineBtn = display.button('latrine');
         var $vomitoriumBtn = display.button('vomitorium');
 
@@ -613,26 +612,23 @@ function($, _, FSM, Util, Selectable){
 
             events: [
                 { name: 'start', from: 'Start', to: 'Switchhouse' },
-                { name: 'thinkerorlead', from: 'Switchhouse', to: 'ThinkerOrLead' },
                 { name: 'skipthinker', from: 'Switchhouse', to: 'SkippableThinker' },
-                { name: 'leadrole', from: 'Switchhouse', to: 'SelectingCards' },
+                { name: 'thinkerorlead', from: 'Switchhouse', to: 'SelectingCards' },
                 { name: 'uselatrine', from: 'Switchhouse', to: 'Latrine' },
                 { name: 'usevomitorium', from: 'Switchhouse', to: 'Vomitorium' },
                 { name: 'think', from: 'SkippableThinker', to: 'Thinker' },
                 { name: 'latrine', from: 'SkippableThinker', to: 'Latrine' },
                 { name: 'vomitorium', from: 'SkippableThinker', to: 'Vomitorium' },
-                { name: 'lead', from: 'ThinkerOrLead', to: 'SelectingCards' },
-                { name: 'think', from: 'ThinkerOrLead', to: 'Thinker' },
-                { name: 'latrine', from: 'ThinkerOrLead', to: 'Latrine' },
+                { name: 'think', from: 'SelectingCards', to: 'Thinker' },
+                { name: 'latrine', from: 'SelectingCards', to: 'Latrine' },
                 { name: 'think', from: 'Latrine', to: 'Thinker' },
-                { name: 'cancel', from: 'Latrine', to: 'ThinkerOrLead' },
+                { name: 'cancel', from: 'Latrine', to: 'SelectingCards' },
                 { name: 'returntoskippable', from: 'Latrine', to: 'SkippableThinker' },
-                { name: 'vomitorium', from: 'ThinkerOrLead', to: 'Vomitorium' },
+                { name: 'vomitorium', from: 'SelectingCards', to: 'Vomitorium' },
                 { name: 'think', from: 'Vomitorium', to: 'Thinker' },
-                { name: 'cancel', from: 'Vomitorium', to: 'ThinkerOrLead' },
+                { name: 'cancel', from: 'Vomitorium', to: 'SelectingCards' },
                 { name: 'returntoskippable', from: 'Vomitorium', to: 'SkippableThinker' },
                 { name: 'orders', from: 'SelectingCards', to: 'HaveRole' },
-                { name: 'cancel', from: 'SelectingCards', to: 'ThinkerOrLead' },
                 { name: 'jack', from: 'SelectingCards', to: 'JackRole' },
                 { name: 'petition', from: 'SelectingCards', to: 'PetitionFirst' },
                 { name: 'first', from: 'PetitionFirst', to: 'PetitionRest' },
@@ -658,50 +654,10 @@ function($, _, FSM, Util, Selectable){
         });
 
         fsm.onenterSwitchhouse = function() {
-            if(expectedAction === Util.Action.LEADROLE) { fsm.leadrole(); }
-            else if(expectedAction === Util.Action.USELATRINE) { fsm.uselatrine(); }
+            if(expectedAction === Util.Action.USELATRINE) { fsm.uselatrine(); }
             else if(expectedAction === Util.Action.USEVOMITORIUM) { fsm.usevomitorium(); }
             else if(expectedAction === Util.Action.SKIPTHINKER) { fsm.skipthinker(); }
             else { fsm.thinkerorlead(); }
-        };
-
-        fsm.onenterThinkerOrLead = function() {
-            $dialog.text('Thinker or lead a role?');
-
-            if($jacks.data('nCards') > 0) {
-                $jacks.addClass('selectable');
-                $jacks.off('click').one('click', function() {
-                    fsm.think(true);
-                });
-            }
-
-            $deck.addClass('selectable');
-            $deck.off('click').one('click', function() {
-                fsm.think(false);
-            });
-
-            $leadBtn.show().prop('disabled', false).one('click', function() {
-                fsm.lead();
-            });
-
-            if(hasLatrine) {
-                $latrineBtn.show().prop('disabled', false).one('click', function() {
-                    fsm.latrine();
-                });
-            }
-
-            if(hasVomitorium) {
-                $vomitoriumBtn.show().prop('disabled', false).one('click', function() {
-                    fsm.vomitorium();
-                });
-            }
-        };
-
-        fsm.onleaveThinkerOrLead = function() {
-            Util.off($leadBtn, $deck, $jacks, $vomitoriumBtn, $latrineBtn);
-            $jacks.removeClass('selectable');
-            $deck.removeClass('selectable');
-            $dialog.text('');
         };
 
         fsm.onenterSkippableThinker = function() {
@@ -823,7 +779,7 @@ function($, _, FSM, Util, Selectable){
                     [Util.Action.USEVOMITORIUM, [discard]],
                     [Util.Action.THINKERTYPE, [forJack]]
                 ]);
-            } else { // ThinkerOrLead or SkippableThinker
+            } else { // SelectingCards or SkippableThinker
                 var actions = [];
                 if(hasVomitorium) { actions.push([Util.Action.USEVOMITORIUM, [false]]); }
                 if(hasLatrine) { actions.push([Util.Action.USELATRINE, [null]]); }
@@ -834,17 +790,34 @@ function($, _, FSM, Util, Selectable){
         };
 
         fsm.onenterSelectingCards = function() {
-            $dialog.text('Select a card to lead.');
+            $dialog.text('Thinker or lead a role?');
+
+            if($jacks.data('nCards') > 0) {
+                $jacks.addClass('selectable');
+                $jacks.off('click').one('click', function() {
+                    fsm.think(true);
+                });
+            }
+
+            $deck.addClass('selectable');
+            $deck.off('click').one('click', function() {
+                fsm.think(false);
+            });
+
+            if(hasLatrine) {
+                $latrineBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.latrine();
+                });
+            }
+
+            if(hasVomitorium) {
+                $vomitoriumBtn.show().prop('disabled', false).one('click', function() {
+                    fsm.vomitorium();
+                });
+            }
 
             nActions = 1;
             role = null;
-
-            if(expectedAction != Util.Action.LEADROLE) {
-                $cancelBtn.show().prop('disabled', false).one('click', function() {
-                    selHand.reset();
-                    fsm.cancel();
-                });
-            }
 
             $petitionBtn.show().prop('disabled', false).one('click', function() {
                 fsm.petition();
@@ -865,7 +838,11 @@ function($, _, FSM, Util, Selectable){
         };
 
         fsm.onleaveSelectingCards = function() {
-            Util.off($cancelBtn, $petitionBtn);
+            Util.off($deck, $jacks, $vomitoriumBtn, $latrineBtn,
+                    $cancelBtn, $petitionBtn);
+            $jacks.removeClass('selectable');
+            $deck.removeClass('selectable');
+            $dialog.text('');
         };
 
         fsm.onenterJackRole = function() {

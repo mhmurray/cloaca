@@ -39,7 +39,7 @@ function(Util, $, _){
     };
 
     // Return the button using a title from 
-    // refresh, exit, ok, cancel, skip, petition, lead-role, glory, 
+    // refresh, exit, ok, cancel, skip, petition, glory, 
     // latrine, vomitorium,
     // patron, laborer, architect, craftsman, legionary, merchant
     Display.prototype.button = function(title) {
@@ -186,7 +186,6 @@ function(Util, $, _){
             $('<button/>').attr('id', 'cancel-btn').text('Cancel'),
             $('<button/>').attr('id', 'skip-btn').text('Skip'),
             $('<button/>').attr('id', 'petition-btn').text('Petition'),
-            $('<button/>').attr('id', 'lead-role-btn').text('Lead a Role'),
             $('<button/>').attr('id', 'latrine-btn').text('Use Latrine'),
             $('<button/>').attr('id', 'vomitorium-btn').text('Use Vomitorium'),
             $('<button/>').attr('id', 'glory-btn').text('Glory to Rome!'),
