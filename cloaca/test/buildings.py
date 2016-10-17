@@ -308,6 +308,35 @@ class TestAmphitheatre(unittest.TestCase):
         self.assertEqual(game.expected_action, message.THINKERORLEAD)
 
 
+    def test_amphitheatre_start_out_of_town_leading_architect(self):
+        d = TestDeck()
+        game = test_setup.two_player_lead('Architect', deck=d)
+        game.in_town_sites = ['Brick'] # No wood site for Dock
+
+        p1, p2 = game.players
+        p1.hand.set_content([d.dock0])
+        p1.stockpile.set_content([d.wall0])
+        p1.buildings.append(Building(d.amphitheatre0, 'Concrete', materials=[d.bridge0]))
+
+        a = message.GameAction(message.ARCHITECT, d.amphitheatre0, d.wall0, None)
+        game.handle(a)
+
+        self.assertEqual(game.active_player, p1)
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertTrue(game.oot_allowed)
+
+        # Use first 2 of 4 actions to out-of-town Dock.
+        a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        game.handle(a)
+        for i in range(2):
+            a = message.GameAction(message.CRAFTSMAN, None, None, None)
+            game.handle(a)
+        
+        # Now it's p2's turn
+        self.assertEqual(game.active_player, p2)
+        self.assertEqual(game.expected_action, message.THINKERORLEAD)
+
+
     def test_amphitheatre_start_out_of_town_with_client(self):
         d = TestDeck()
         game = test_setup.two_player_lead('Craftsman', deck=d,
