@@ -50,7 +50,7 @@ class Zone(object):
             i = self.index(card)
         except ValueError:
             raise GTRError('Source zone "{0}" does not contain {1}. '
-                    'Move to zone "{1}" failed.'
+                    'Move to zone "{2}" failed.'
                     .format(self.name, str(card), target_zone.name))
 
         target_zone.append(self.pop(i))
