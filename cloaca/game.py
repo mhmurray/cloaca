@@ -856,6 +856,9 @@ class Game(object):
         role = self.role_led
         self._log('{0} is performing {1}'.format(player.name, role))
 
+        # Reset used_oot flag. It can linger if prev. player started oot with Tower.
+        self.used_oot = False
+
         n_merchants = self._player_client_count(player, 'Merchant')
         n_role = self._player_client_count(player, role)
 
@@ -1346,7 +1349,7 @@ class Game(object):
         caller must grab them.
 
         If the site is not None, _construct the specified building on it.
-        If it's out of town, set the GameState.used_oot flag.
+        If it's out of town, set the Game.used_oot flag.
         (The perform_role_action() function consumes this flag.)
 
         Else, if the site is None, add the material to the building.
