@@ -605,5 +605,54 @@ class TestEndOfTurnOutOfTownFlags(unittest.TestCase):
         self.assertFalse(self.game.used_oot)
 
 
+class TestPlayerWithTowerOutOfTownFlag(unittest.TestCase):
+    """It's possible to leave the Game.used_oot flag set if the first player
+    has a Tower and uses the last action to start out of town. The flag
+    should be reset before the second player tries to use their action.
+    """
+
+    def test_oot_reset_with_craftsman(self):
+        d = test_setup.TestDeck()
+        game = test_setup.two_player_lead('Craftsman', deck=d, follow=True,
+                buildings=[['Tower',],[]],)
+        p1, p2 = game.players
+        
+        p1.hand.set_content([d.latrine0])
+        game.in_town_sites = ['Stone', 'Concrete']
+        p2.hand.set_content([d.wall0])
+
+        # Start out of town
+        a = message.GameAction(message.CRAFTSMAN, d.latrine0, None, 'Rubble')
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.CRAFTSMAN)
+        self.assertEqual(game.active_player, p2)
+        self.assertFalse(game.used_oot)
+
+        a = message.GameAction(message.CRAFTSMAN, d.wall0, None, 'Concrete')
+        game.handle(a)
+
+    def test_oot_reset_with_architect(self):
+        d = test_setup.TestDeck()
+        game = test_setup.two_player_lead('Architect', deck=d, follow=True,
+                buildings=[['Tower',],[]],)
+        p1, p2 = game.players
+        
+        p1.hand.set_content([d.latrine0])
+        game.in_town_sites = ['Stone', 'Concrete']
+        p2.hand.set_content([d.wall0])
+
+        # Start out of town
+        a = message.GameAction(message.ARCHITECT, d.latrine0, None, 'Rubble')
+        game.handle(a)
+
+        self.assertEqual(game.expected_action, message.ARCHITECT)
+        self.assertEqual(game.active_player, p2)
+        self.assertFalse(game.used_oot)
+
+        a = message.GameAction(message.ARCHITECT, d.wall0, None, 'Concrete')
+        game.handle(a)
+
+
 if __name__ == '__main__':
     unittest.main()
