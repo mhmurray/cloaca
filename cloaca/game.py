@@ -185,20 +185,24 @@ class Game(object):
 
         Do not hide Jacks in hand.
         
-        Don't hide anything but the library if the game is over.
+        Don't hide anything if the game is over.
 
         Return a new game state object
         """
         gs = copy.deepcopy(self)
 
-        gs.library.set_content([Card(-1)]*len(gs.library))
+        if self.winners is None:
 
-        if self.winners == None:
+            gs.library.set_content([Card(-1)]*len(gs.library))
+
             for p in gs.players:
                 p.vault.set_content([Card(-1)]*len(p.vault))
 
                 if p.name != player_name:
-                    p.hand.set_content([c if c.name == 'Jack' else Card(-1) for c in p.hand ])
+                    p.hand.set_content(sorted(
+                            [c if c.name == 'Jack' else Card(-1) for c in p.hand],
+                            cmp=cm.cmp_jacks_first_alphabetical_by_material))
+
                     p.fountain_card = Card(-1) if p.fountain_card else None
                     p.revealed.set_content([cm.get_card(c.name) for c in p.revealed])
                     p.prev_revealed.set_content([cm.get_card(c.name) for c in p.prev_revealed])
