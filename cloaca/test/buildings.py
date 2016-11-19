@@ -677,6 +677,30 @@ class TestStairway(unittest.TestCase):
         self.assertFalse(mon.modified(self.game))
 
 
+    def test_stairway_building_resolution_order(self):
+        """Finish a building with Architect action and it resolves before
+        the STAIRWAY action.
+        """
+        d = self.deck
+
+        self.p1.buildings.append( Building(d.foundry0, 'Brick',
+                complete=False, materials=[d.foundry1]))
+        self.p1.stockpile.set_content([d.shrine0])
+
+        a = GameAction(message.ARCHITECT, d.foundry0, d.shrine0, None)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.LABORER)
+
+        a = GameAction(message.LABORER)
+        self.game.handle(a)
+        self.game.handle(a)
+        self.game.handle(a)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.STAIRWAY)
+
+
 class TestPrison(unittest.TestCase):
     """Test completeing a prison and stealing buildings.
     """
