@@ -14,6 +14,10 @@ from collections import Counter
 
 _deck = ()
 
+# Dictionary of {material name : ordinal rank} in the order
+# None, Marble, Rubble, Concrete, Wood, Brick, Stone
+MATERIAL_ORDER = {None: -1, 'Marble':0, 'Rubble':1, 'Concrete':2, 'Wood':3, 'Brick':4, 'Stone':5}
+
 def _get_deck():
     """Initialize or return the list of card names. Six Jacks plus
     the Orders cards in alphabetical order.
@@ -223,8 +227,9 @@ def get_all_materials():
     ]
     return foundations
 
+
 def cmp_jacks_first(c1, c2):
-    """ Comparator that alphabetizes cards, but puts Jacks before all
+    """Comparator that alphabetizes cards, but puts Jacks before all
     Orders cards.
     """
     if c1 == c2:
@@ -234,6 +239,18 @@ def cmp_jacks_first(c1, c2):
     if c2 == 'Jack':
         return 1
     return cmp(c1,c2)
+
+
+def cmp_jacks_first_alphabetical_by_material(c1, c2):
+    """Comparator that sorts Jacks first, then all Marble cards alphabetically,
+    then likewise all Rubble, Concrete, Wood, Brick, Stone.
+    If the cards are the same (name), sort by id.
+    Anonymous cards, with ident < 0 are sorted after Jacks but before Orders.
+    """
+    c1_tuple = (c1.name!='Jack', c1.ident>=0, MATERIAL_ORDER[c1.material], c1.name, c1.ident)
+    c2_tuple = (c2.name!='Jack', c2.ident>=0, MATERIAL_ORDER[c2.material], c2.name, c2.ident)
+    return cmp(c1_tuple, c2_tuple)
+
 
 
 class Card(object):

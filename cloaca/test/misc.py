@@ -108,30 +108,27 @@ class TestGameStatePrivatize(unittest.TestCase):
 
     def test_privatize_hands(self):
         """Test hiding opponents' hands.
+
+        Jacks should be before all anonymous cards.
         """
+        d = TestDeck()
         g = Game()
         g.add_player(uuid4(), 'p0')
         g.add_player(uuid4(), 'p1')
-        gs = g
 
-        p0, p1 = gs.players
+        p0, p1 = g.players
 
-        latrine, insula, jack, road = cm.get_cards(['Latrine', 'Insula', 'Jack', 'Road'])
-        p0.hand.set_content([latrine, insula])
-        p1.hand.set_content([jack, road])
+        p0.hand.set_content([d.latrine0, d.insula0])
+        p1.hand.set_content([d.road0, d.jack0, d.temple0])
 
-        gs_private = g.privatized_game_state_copy('p0')
-        p0, p1 = gs_private.players
-
-        self.assertIn(jack, p1.hand)
-        self.assertIn(Card(-1), p1.hand)
-        self.assertNotIn(road, p1.hand)
-
-        self.assertIn(latrine, p0.hand)
-        self.assertIn(insula, p0.hand)
+        g_private = g.privatized_game_state_copy('p0')
+        p0, p1 = g_private.players
 
         self.assertEqual(len(p0.hand), 2)
-        self.assertEqual(len(p1.hand), 2)
+        self.assertEqual(len(p1.hand), 3)
+
+        self.assertEqual(p1.hand.cards, [Card(0), Card(-1), Card(-1)])
+        self.assertEqual(p0.hand.cards, [d.latrine0, d.insula0])
 
     
     def test_privatize_vaults(self):
@@ -695,6 +692,75 @@ class TestVaultScoring(unittest.TestCase):
         self.assertEqual(self.game._player_score(self.p1), 3)
         self.assertEqual(self.game._player_score(self.p2), 7)
         self.assertEqual(self.game._player_score(self.p3), 7)
+
+class TestCardComparison(unittest.TestCase):
+    """Test comparison of cards in order Jack, material, alphabetical, ident.
+    Anonymous cards, with Card.ident == -1 are listed after Jacks, before
+    any other Orders cards.
+    """
+
+    def setUp(self):
+        self.cmp = cm.cmp_jacks_first_alphabetical_by_material
+
+    def test_jacks_before_materials(self):
+        d = TestDeck()
+        
+        self.assertLess(self.cmp(d.jack0, d.bar0), 0)
+        self.assertGreater(self.cmp(d.temple0, d.jack1), 0)
+        self.assertGreater(self.cmp(d.atrium0, d.jack2), 0)
+        self.assertGreater(self.cmp(d.dock0, d.jack2), 0)
+        self.assertGreater(self.cmp(d.villa0, d.jack2), 0)
+        self.assertGreater(self.cmp(d.wall0, d.jack2), 0)
+
+    def test_materials_in_order(self):
+        d = TestDeck()
+
+        self.assertLess(self.cmp(d.temple0, d.bar0), 0)
+        self.assertLess(self.cmp(d.bar0, d.wall0), 0)
+        self.assertLess(self.cmp(d.wall0, d.dock0), 0)
+        self.assertLess(self.cmp(d.dock0, d.atrium0), 0)
+        self.assertLess(self.cmp(d.atrium0, d.villa0), 0)
+
+    def test_names_in_order(self):
+        d = TestDeck()
+
+        self.assertLess(self.cmp(d.ludusmagna0, d.temple0), 0)
+        self.assertLess(self.cmp(d.forum0, d.temple0), 0)
+        self.assertGreater(self.cmp(d.temple0, d.stairway0), 0)
+
+    def test_cards_in_ident_order(self):
+        d = TestDeck()
+        
+        self.assertLess(self.cmp(d.jack0, d.jack1), 0)
+        self.assertLess(self.cmp(d.jack0, d.jack2), 0)
+        self.assertLess(self.cmp(d.jack2, d.jack3), 0)
+        self.assertEqual(self.cmp(d.jack2, d.jack2), 0)
+        
+        self.assertLess(self.cmp(d.wall0, d.wall1), 0)
+        self.assertLess(self.cmp(d.wall0, d.wall2), 0)
+        self.assertLess(self.cmp(d.wall1, d.wall2), 0)
+
+    def test_anonymous_before_orders(self):
+        d = TestDeck()
+        
+        self.assertGreater(self.cmp(d.bar0, Card(-1)), 0)
+        self.assertGreater(self.cmp(d.temple0, Card(-1)), 0)
+        self.assertGreater(self.cmp(d.atrium0, Card(-1)), 0)
+        self.assertGreater(self.cmp(d.dock0, Card(-1)), 0)
+        self.assertGreater(self.cmp(d.villa0, Card(-1)), 0)
+        self.assertGreater(self.cmp(d.wall0, Card(-1)), 0)
+
+    def test_anonymous_after_jack(self):
+        d = TestDeck()
+        
+        self.assertLess(self.cmp(d.jack0, Card(-1)), 0)
+
+    def test_equality(self):
+        d = TestDeck()
+
+        self.assertEqual(self.cmp(d.wall2, d.wall2), 0)
+        self.assertEqual(self.cmp(d.jack2, d.jack2), 0)
+        self.assertEqual(self.cmp(Card(-1), Card(-1)), 0)
 
 
 if __name__ == '__main__':
