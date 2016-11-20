@@ -295,6 +295,46 @@ class TestLegionaryWithBath(unittest.TestCase):
         self.assertFalse(mon.modified(self.game))
 
 
+    def test_no_combine_with_bath(self):
+        """Several camp Legionaries from leading/following + clientele are
+        combined into a single demand for multiple resources. Multiple 
+        Legionary actions in a row are not possible any other way, so
+        legionaries with the Bath should not do the stacking. However,
+        the situation where a Merchant client + Ludus Magna is next on the
+        stack looks like two legionaries in a row if this situation is not
+        checked (simply by checking if Legionary is the led role).
+        """
+        d = self.deck = TestDeck()
+        self.game = test_setup.two_player_lead('Patron', deck=self.deck,
+                buildings=[['Bath', 'Ludus Magna'],[]],
+                clientele=[['Villa'],[]])
+
+        self.game.pool.set_content([d.atrium0])
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.villa0])
+
+        a = message.GameAction(message.PATRONFROMPOOL, d.atrium0)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.LEGIONARY)
+        self.assertEqual(self.game.legionary_count, 1)
+
+        a = message.GameAction(message.LEGIONARY, d.villa0)
+        self.game.handle(a)
+
+        a = message.GameAction(message.TAKEPOOLCARDS)
+        self.game.handle(a)
+
+        a = message.GameAction(message.GIVECARDS)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.PATRONFROMPOOL)
+
+        a = message.GameAction(message.PATRONFROMPOOL, None)
+        self.game.handle(a)
+
+
 class TestLegionary(unittest.TestCase):
 
     def setUp(self):
