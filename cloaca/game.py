@@ -1502,6 +1502,11 @@ class Game(object):
             self._log('{0} performs Architect.'.format(p.name))
             self._log_construct(p, foundation, material, site, s)
 
+            # In case Stairway is completed, check after construct()
+            has_stairway = self._player_has_active_building(p, 'Stairway')
+            if has_stairway:
+                self.stack.push_frame('_await_action', message.STAIRWAY, p)
+
             if b.complete:
                 self._log('{0} completed'.format(str(b)))
                 self._resolve_building(p, b)
@@ -1509,10 +1514,10 @@ class Game(object):
         else:
             self._log('{0} skips Architect action.'.format(p.name))
 
-        has_stairway = self._player_has_active_building(p, 'Stairway')
-        if has_stairway:
-            self._await_action(message.STAIRWAY, p)
-            return
+            # Skipping architect still allows Stairway
+            has_stairway = self._player_has_active_building(p, 'Stairway')
+            if has_stairway:
+                self.stack.push_frame('_await_action', message.STAIRWAY, p)
 
         self._pump()
 
