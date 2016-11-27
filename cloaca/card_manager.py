@@ -298,6 +298,8 @@ class Card(object):
     value = property(lambda self: get_value_of_card(self.name))
     role = property(lambda self: get_role_of_card(self.name))
     text = property(lambda self: get_function_of_card(self.name))
+    is_jack = property(lambda self: 0 <= self.ident <= 6)
+    is_anon = property(lambda self: self.ident == -1)
 
     def __repr__(self):
         rep = ('Card({ident!r})')
