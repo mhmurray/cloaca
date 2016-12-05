@@ -65,6 +65,8 @@ class Player(object):
 
         return d_self == d_other
 
+    def __ne__(self, other):
+        return not self == other
 
     def owns_building(self, building):
         """Whether this player owns a building, complete or otherwise.

@@ -14,6 +14,12 @@ class Stack(object):
     def __repr__(self):
         return 'Stack({0!r})'.format(self.stack)
 
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self == other
+
 
 class Frame(object):
     def __init__(self, function_name, *args, **kwargs):
@@ -26,3 +32,9 @@ class Frame(object):
 
     def __repr__(self):
         return 'Frame({0}, args={1})'.format(self.function_name, self.args)
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self == other

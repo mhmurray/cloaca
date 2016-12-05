@@ -127,6 +127,27 @@ class Game(object):
     def legionary_player(self, player):
         self.legionary_player_index = self.players.index(player)
 
+    def __eq__(self, other):
+        """Compare to another game. This compares the two objects' __dict__
+        attributes, with the exception of the sites, which are treated
+        as a multi-set (Counter).
+        """
+        d_self = copy.copy(self.__dict__)
+        d_other = copy.copy(other.__dict__)
+
+        d_self['in_town_sites'] = Counter(d_self['in_town_sites'])
+        d_other['in_town_sites'] = Counter(d_other['in_town_sites'])
+
+        d_self['out_of_town_sites'] = Counter(d_self['out_of_town_sites'])
+        d_other['out_of_town_sites'] = Counter(d_other['out_of_town_sites'])
+
+        return d_self == d_other
+
+
+    def __ne__(self, other):
+        return not self == other
+
+
     def start(self):
         if self.started:
             raise GTRError('Game has already started.')
