@@ -17,6 +17,58 @@ import cloaca.test.test_setup as test_setup
 from cloaca.test.test_setup import TestDeck
 
 import unittest
+import copy
+
+
+class TestObjectComparison(unittest.TestCase):
+    """Test equality comparison for objects.
+    """
+
+    def setUp(self):
+        self.game = test_setup.two_player_lead('Craftsman',
+                buildings=[['Temple', 'Wall'], ['Road']],
+                clientele=[['Fountain'],['Dock']])
+
+        self.p0, self.p1 = self.game.players
+
+    def test_game(self):
+        game_copy = copy.deepcopy(self.game)
+
+        self.assertEqual(game_copy, self.game)
+        game_copy.used_oot = not game_copy.used_oot
+        self.assertNotEqual(game_copy, self.game)
+
+    def test_player(self):
+        d = TestDeck()
+        for p in self.game.players:
+            p_copy = copy.deepcopy(p)
+            
+            self.assertEqual(p_copy, p)
+            p_copy.hand.append(d.road0)
+            self.assertNotEqual(p_copy, p)
+
+    def test_zone(self):
+        d = TestDeck()
+        pool_copy = copy.deepcopy(self.game.pool)
+
+        self.assertEqual(pool_copy, self.game.pool)
+        pool_copy.cards.append(d.road0)
+        self.assertNotEqual(pool_copy, self.game.pool)
+
+    def test_frame(self):
+        current_frame_copy = copy.deepcopy(self.game._current_frame)
+
+        self.assertEqual(current_frame_copy, self.game._current_frame)
+        current_frame_copy.function_name = 'test_function'
+        self.assertNotEqual(current_frame_copy, self.game._current_frame)
+
+    def test_stack(self):
+        stack_copy = copy.deepcopy(self.game.stack)
+
+        self.assertEqual(stack_copy, self.game.stack)
+        stack_copy.stack[0].function_name = 'test_function'
+        self.assertNotEqual(stack_copy, self.game.stack)
+
 
 class TestEncodeDecodeGame(unittest.TestCase):
     """Tests to ensure the consistency of the encoding and decoding
@@ -141,6 +193,29 @@ class TestPublicZoneEncode(unittest.TestCase):
         self.assertEqual(g.jacks, gpriv.jacks)
 
 
+class TestStack(unittest.TestCase):
+    """Test the python objects that are encoded and decoded to ensure
+    they are the same.
+    """
+
+    def setUp(self):
+        """Initialize a three-player game before the first turn."""
+        self.d = TestDeck()
+        self.game = test_setup.simple_n_player(3, deck=self.d)
+        self.p0, self.p1, self.p2 = self.game.players
+
+    def test_stack(self):
+        g = _encode_decode(self.game)
+
+        self.assertEqual(g.stack, self.game.stack)
+
+    def test_privatized_stack(self):
+        gpriv = self.game.privatized_game_state_copy(self.p0.name)
+
+        g = _encode_decode(gpriv)
+        self.assertEqual(g.stack, gpriv.stack)
+
+
 class TestPlayerProperties(unittest.TestCase):
     """Test the python objects that are encoded and decoded to ensure
     they are the same.
@@ -162,9 +237,15 @@ class TestPlayerProperties(unittest.TestCase):
 
         self.p0.performed_craftsman = True
 
-    def test_players_equal(self):
+    def test_players(self):
         g = _encode_decode(self.game)
         for p, q in zip(self.game.players, g.players):
+            self.assertEqual(p, q)
+
+    def test_privatized_players(self):
+        gpriv = self.game.privatized_game_state_copy(self.p0.name)
+        g = _encode_decode(gpriv)
+        for p, q in zip(gpriv.players, g.players):
             self.assertEqual(p, q)
 
 
@@ -194,6 +275,13 @@ class TestPlayerBuildings(unittest.TestCase):
         g = _encode_decode(self.game)
         for p, q in zip(self.game.players, g.players):
             self.assertEqual(p, q)
+
+    def test_privatized_players(self):
+        gpriv = self.game.privatized_game_state_copy(self.p0.name)
+        g = _encode_decode(gpriv)
+        for p, q in zip(gpriv.players, g.players):
+            self.assertEqual(p, q)
+
 
 class TestPlayerZone(unittest.TestCase):
     """Test the python objects that are encoded and decoded to ensure
