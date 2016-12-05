@@ -115,12 +115,12 @@ def encode_building(obj):
 
     stairway_mat_cards = [c.ident for c in obj.stairway_materials]
 
-    fmt = '!7B' + str(len(stairway_mat_cards)) + 'c'
+    fmt = '!7B' + str(len(stairway_mat_cards)) + 'B'
 
     return struct.pack(fmt, 6+len(stairway_mat_cards),
             obj.foundation.ident,
             site_to_int(obj.site),
-            obj.complete,
+            int(obj.complete),
             *(mat_cards+stairway_mat_cards))
 
 
@@ -371,7 +371,7 @@ def decode_player(buffer, offset):
         offset += n_bytes
         buildings.append(building)
 
-    p = Player(uid=uid, name='', hand=hand, stockpile=stockpile,
+    p = Player(uid=uid, name=name, hand=hand, stockpile=stockpile,
             clientele=clientele, vault=vault, camp=camp,
             fountain_card=fountain_card, n_camp_actions=n_camp_actions,
             buildings=buildings, influence=influence, revealed=revealed,
@@ -423,7 +423,7 @@ def encode_player(obj):
     chunks.append(struct.pack(fmt,
             obj.name,
             uuid.UUID(int=obj.uid).bytes,
-            obj.fountain_card if obj.fountain_card is not None else 0xFF,
+            obj.fountain_card.ident if obj.fountain_card is not None else 0xFF,
             obj.n_camp_actions,
             obj.performed_craftsman,
             *_convert_sites(obj.influence)))
