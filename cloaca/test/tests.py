@@ -36,9 +36,15 @@ def main():
     parser.add_argument('pattern', nargs='*',
             help=('pattern(s) to match against, eg. "buildings" or '
                 '"architect.TestArchitect.test_lead_architect".'))
+    parser.add_argument('--verbose', action='store_true',
+            help='Enable INFO/DEBUG logging output.')
     args = parser.parse_args()
 
     setup_logging()
+
+    if args.verbose:
+        # This catches the children loggers like cloaca.game
+        logging.getLogger('cloaca').setLevel(logging.DEBUG)
 
     loader = unittest.defaultTestLoader
 
