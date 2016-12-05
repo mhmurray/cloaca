@@ -174,7 +174,7 @@ class Zone(object):
         return out
 
     def __eq__(self, other):
-        return self.__dict__ == other.__dict__
+        return self.name == other.name and set(self.cards) == set(other.cards)
 
     def __iter__(self):
         return self.cards.__iter__()

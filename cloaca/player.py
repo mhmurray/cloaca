@@ -12,6 +12,7 @@ from cloaca.zone import Zone
 from cloaca.error import GTRError
 
 import logging
+from collections import Counter
 
 lg = logging.getLogger(__name__)
 lg.addHandler(logging.NullHandler())
@@ -47,6 +48,13 @@ class Player(object):
 
     def __str__(self):
         return self.name
+
+    def __eq__(self, other):
+        d, dother = self.__dict__, other.__dict__
+        for pdict in d, dother:
+            pdict['influence'] = Counter(pdict['influence'])
+
+        return d == dother
 
     def owns_building(self, building):
         """Whether this player owns a building, complete or otherwise.
