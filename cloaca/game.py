@@ -4,7 +4,7 @@ from cloaca.building import Building
 from cloaca.card import Card
 from cloaca.zone import Zone
 from cloaca.error import GTRError, GameOver
-import cloaca.stack as stack
+import cloaca.stack
 import cloaca.card_manager as cm
 
 import random
@@ -45,32 +45,71 @@ class Game(object):
     started = property(lambda self : self.turn_number > 0)
     finished = property(lambda self : self.winners is not None)
 
-    def __init__(self):
-        self.game_id = 0
-        self.players = []
-        self.leader_index = None
-        self.turn_number = 0
-        self.role_led = None
-        self.active_player_index = None
-        self.jacks = Zone(name='jacks')
-        self.library = Zone(name='library')
-        self.pool = Zone(name='pool')
-        self.in_town_sites = []
-        self.out_of_town_sites = []
-        self.oot_allowed = False
-        self.used_oot = False
-        self.stack = stack.Stack()
-        self.legionary_count = None
-        self.legionary_player_index = None
-        self.expected_action = None
-        self.host = None
-        self.winners = None
-        self.action_number = 0
+    def __init__(self, game_id=0, players=None, leader_index=None,
+            turn_number=0, role_led=None, active_player_index=None,
+            jacks=None, library=None, pool=None, in_town_sites=None,
+            out_of_town_sites=None, oot_allowed=False, used_oot=False,
+            stack=None, legionary_count=0, legionary_player_index=None,
+            expected_action=None, host='', winners=None, action_number=0,
+            current_frame=None, game_log=None):
+        """
+        Initialize Game object. Summary of arguments:
+
+            game_id -- (int) unique game number
+            players -- (list of Player objects)
+            leader_index -- (int) index of current leader or None.
+            turn_number -- (int)
+            role_led -- (string) Role led or None (e.g. 'Craftsman')
+            active_player_index -- (int) index of active player or None
+            jacks -- (iterable of Card objects)
+            library -- (iterable of Card objects)
+            pool -- (iterable of Card objects)
+            in_town_sites -- (iterable of strings) sites are strings,
+                e.g. ['Rubble', 'Rubble', 'Brick']
+            out_of_town_sites -- (iterable of strings) sites are strings,
+                e.g. ['Rubble', 'Rubble', 'Brick']
+            oot_allowed -- (boolean) out-of-town construction is allowed
+                by the next building action
+            used_oot -- (boolean) used out-of-town construction in the last
+                building action
+            stack -- (Stack object) stack of Frames objects for pending actions
+            legionary_count -- (int) count of number of Legionary actions
+                the active player is responding to
+            legionary_player_index -- (int) index of player demanding with Legionary.
+            expected_action -- (int) message.GameAction index of expected action
+                by active player, or None.
+            host -- (str) user name of game host
+            winners -- (iterable of Player objects) players that have won the game
+                or empty list
+            action_number -- (int) number of actions that have been executed this game
+            current_frame -- (Frame object) Frame that is currently being executed
+            game_log -- (list of strings) log messages as list of string
+        """
+        self.game_id = game_id
+        self.players = [] if players is None else players
+        self.leader_index = leader_index
+        self.turn_number = turn_number
+        self.role_led = role_led
+        self.active_player_index = active_player_index
+        self.jacks = Zone([] if jacks is None else jacks, name='jacks')
+        self.library = Zone([] if library is None else library, name='library')
+        self.pool = Zone([] if pool is None else pool, name='pool')
+        self.in_town_sites = [] if in_town_sites is None else in_town_sites
+        self.out_of_town_sites = [] if out_of_town_sites is None else out_of_town_sites
+        self.oot_allowed = oot_allowed
+        self.used_oot = used_oot
+        self.stack = cloaca.stack.Stack() if stack is None else stack
+        self.legionary_count = legionary_count
+        self.legionary_player_index = legionary_player_index
+        self.expected_action = expected_action
+        self.host = '' if host is None else host
+        self.winners = [] if winners is None else winners
+        self.action_number = action_number
 
         # Keep track of currently-executing stack frame.
-        self._current_frame = None
+        self._current_frame = current_frame
 
-        self.game_log = []
+        self.game_log = [] if game_log is None else game_log
 
     @property
     def active_player(self):
@@ -120,7 +159,7 @@ class Game(object):
         self.active_player = self.players[0]
         self.leader_index = 0
 
-        self.jacks = Zone([Card(i) for i in range(Game._initial_jack_count)])
+        self.jacks.set_content([Card(i) for i in range(Game._initial_jack_count)])
         self._init_sites(len(self.players))
 
         self.stack.push_frame('_take_turn_stacked', self.active_player)
@@ -191,7 +230,7 @@ class Game(object):
         """
         gs = copy.deepcopy(self)
 
-        if self.winners is None:
+        if self.winners is None or not len(self.winners):
 
             gs.library.set_content([Card(-1)]*len(gs.library))
 
@@ -310,7 +349,7 @@ class Game(object):
     def _init_library(self):
         """Initializes the library as a list of Card objects
         """
-        self.library = Zone(cm.get_orders_card_set())
+        self.library.set_content(cm.get_orders_card_set())
         self._shuffle_library()
 
     def _init_player_hands(self):
