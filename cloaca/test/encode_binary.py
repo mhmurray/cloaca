@@ -126,15 +126,154 @@ class TestPublicZoneEncode(unittest.TestCase):
         self.game = test_setup.simple_n_player(3, deck=self.d)
         self.p0, self.p1, self.p2 = self.game.players
 
-    def test_library(self):
+    def test_public_zones(self):
         g = _encode_decode(self.game)
-
         self.assertEqual(g.library, self.game.library)
         self.assertEqual(g.pool, self.game.pool)
         self.assertEqual(g.jacks, self.game.jacks)
 
+    def test_privatized_public_zones(self):
+        gpriv = self.game.privatized_game_state_copy(self.p0.name)
+
+        g = _encode_decode(gpriv)
+        self.assertEqual(g.library, gpriv.library)
+        self.assertEqual(g.pool, gpriv.pool)
+        self.assertEqual(g.jacks, gpriv.jacks)
 
 
+class TestPlayerProperties(unittest.TestCase):
+    """Test the python objects that are encoded and decoded to ensure
+    they are the same.
+    """
+
+    def setUp(self):
+        """Initialize a three-player game before the first turn."""
+        self.d = TestDeck()
+        self.game = test_setup.simple_n_player(3, deck=self.d)
+        self.p0, self.p1, self.p2 = self.game.players
+
+        self.p0.fountain_card = self.d.road0
+
+        self.p0.influence = ['Rubble', 'Wood']
+        self.p1.influence = []
+        self.p1.influence = ['Rubble', 'Rubble', 'Marble', 'Wood', 'Marble']
+
+        self.p1.n_camp_actions = 4
+
+        self.p0.performed_craftsman = True
+
+    def test_players_equal(self):
+        g = _encode_decode(self.game)
+        for p, q in zip(self.game.players, g.players):
+            self.assertEqual(p, q)
+
+
+class TestPlayerBuildings(unittest.TestCase):
+    """Test the python objects that are encoded and decoded to ensure
+    they are the same.
+    """
+
+    def setUp(self):
+        """Initialize a three-player game before the first turn."""
+        d = self.d = TestDeck()
+        self.game = test_setup.simple_n_player(3, deck=self.d)
+        self.p0, self.p1, self.p2 = self.game.players
+        
+        self.p0.buildings.extend([
+                Building(d.road0, 'Rubble', [d.road1], [d.road2], True),
+                Building(d.statue0, 'Wood', [d.temple0], [], True),
+                Building(d.temple0, 'Marble', [], [], False),
+                ])
+
+        self.p1.buildings.extend([
+                Building(d.wall0, 'Concrete', [d.bridge1, d.bridge0], [d.wall2], True),
+                Building(d.statue0, 'Marble', [d.temple0], [], True),
+                ])
+
+    def test_players_equal(self):
+        g = _encode_decode(self.game)
+        for p, q in zip(self.game.players, g.players):
+            self.assertEqual(p, q)
+
+class TestPlayerZone(unittest.TestCase):
+    """Test the python objects that are encoded and decoded to ensure
+    they are the same.
+    """
+
+    def setUp(self):
+        """Initialize a three-player game with a variety of
+        cards in each player's zones.
+        """
+        d = self.d = TestDeck()
+        self.game = test_setup.simple_n_player(3, deck=self.d)
+        self.p0, self.p1, self.p2 = self.game.players
+
+        self.p0.hand.set_content([d.jack0, d.latrine0])
+        self.p1.hand.set_content([d.atrium0, d.jack1])
+        self.p2.hand.set_content([d.jack3, d.jack2])
+
+        self.p0.camp.set_content([d.jack4])
+        self.p1.camp.set_content([])
+        self.p2.camp.set_content([d.jack5])
+
+        self.p0.stockpile.set_content([d.temple0, d.temple1])
+        self.p1.stockpile.set_content([d.road0, d.wall0])
+        self.p2.stockpile.set_content([d.insula0, d.insula1, d.insula2, d.insula3])
+
+        self.p0.vault.set_content([d.foundry0, d.temple2])
+        self.p1.vault.set_content([d.road1, d.wall1])
+        self.p2.vault.set_content([d.archway0, d.archway1, d.archway2])
+
+        self.p0.clientele.set_content([d.villa0, d.fountain0])
+        self.p1.clientele.set_content([])
+        self.p2.clientele.set_content([d.dock0, d.dock1, d.circus0])
+
+        self.p0.revealed.set_content([d.latrine0])
+        self.p1.revealed.set_content([d.atrium0, d.atrium1])
+        self.p2.revealed.set_content([])
+
+        self.p0.prev_revealed.set_content([d.latrine1])
+        self.p1.prev_revealed.set_content([d.school0, d.school1])
+        self.p2.prev_revealed.set_content([])
+
+        self.p0.clients_given.set_content([])
+        self.p1.clients_given.set_content([d.school1])
+        self.p2.clients_given.set_content([])
+
+    def test_player_zones(self):
+        g = _encode_decode(self.game)
+
+        for p, q in zip(self.game.players, g.players):
+            self.assertEqual(p.hand, q.hand)
+            self.assertEqual(p.stockpile, q.stockpile)
+            self.assertEqual(p.camp, q.camp)
+            self.assertEqual(p.clientele, q.clientele)
+            self.assertEqual(p.vault, q.vault)
+            self.assertEqual(p.revealed, q.revealed)
+            self.assertEqual(p.prev_revealed, q.prev_revealed)
+            self.assertEqual(p.clients_given, q.clients_given)
+
+
+    def test_player_equal(self):
+        g = _encode_decode(self.game)
+
+        for p, q in zip(self.game.players, g.players):
+            self.assertEqual(p, q)
+
+
+    def test_privatized_player_zones(self):
+        gpriv = self.game.privatized_game_state_copy(self.p0.name)
+        g = _encode_decode(gpriv)
+
+        for p, q in zip(gpriv.players, g.players):
+            self.assertEqual(p.hand, q.hand)
+            self.assertEqual(p.stockpile, q.stockpile)
+            self.assertEqual(p.camp, q.camp)
+            self.assertEqual(p.clientele, q.clientele)
+            self.assertEqual(p.vault, q.vault)
+            self.assertEqual(p.revealed, q.revealed)
+            self.assertEqual(p.prev_revealed, q.prev_revealed)
+            self.assertEqual(p.clients_given, q.clients_given)
 
 
 if __name__ == '__main__':
