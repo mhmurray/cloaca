@@ -13,6 +13,7 @@ from cloaca.error import GTRError
 
 import logging
 from collections import Counter
+import copy
 
 lg = logging.getLogger(__name__)
 lg.addHandler(logging.NullHandler())
@@ -50,11 +51,20 @@ class Player(object):
         return self.name
 
     def __eq__(self, other):
-        d, dother = self.__dict__, other.__dict__
-        for pdict in d, dother:
-            pdict['influence'] = Counter(pdict['influence'])
+        """Compare this to another Player. The comparison is
+        done using self.__dict__ == other.__dict__, with
+        the exception of Player.influence, which is treated
+        as a multi-set (Counter).
+        """
+        # We only need a shallow copy, since we only change influence.
+        d_self = copy.copy(self.__dict__)
+        d_other = copy.copy(other.__dict__)
 
-        return d == dother
+        d_self['influence'] = Counter(d_self['influence'])
+        d_other['influence'] = Counter(d_other['influence'])
+
+        return d_self == d_other
+
 
     def owns_building(self, building):
         """Whether this player owns a building, complete or otherwise.
