@@ -711,12 +711,10 @@ class Game(object):
         p = self.active_player
         for_jack = a.args[0]
 
-        is_leader = p == self.leader
-
         if for_jack:
             self._draw_jack_for_player(p)
 
-            if is_leader:
+            if p is self.leader:
                 self._log('{0} thinks for a Jack.'.format(p.name))
             else:
                 self._log('{0} thinks for a Jack instead of following.'.format(p.name))
@@ -727,7 +725,7 @@ class Game(object):
             #n_cards = max(1, self._max_hand_size(p) - len(p.hand))
             noun = 'cards' if n_cards > 1 else 'card'
 
-            if is_leader:
+            if p is self.leader:
                 self._log('{0} thinks for {1} {2}.'.format(p.name, n_cards, noun))
             else:
                 self._log('{0} thinks for {1} {2} instead of following.'
@@ -1003,13 +1001,13 @@ class Game(object):
         if f.function_name == '_perform_role_action':
             p, role = f.args
 
-            if p.name == player.name and role == current_role:
+            if p is player and role == current_role:
                 return True
 
         if f.function_name == '_perform_clientele_action':
             p, role = f.args
 
-            if p.name == player.name and \
+            if p is player and \
                     ((role=='Merchant' and has_ludus) or role == current_role):
                 return True
 
@@ -1658,7 +1656,7 @@ class Game(object):
 
         # Traverse the stack, remove Legionary frames and increment legionary count
         for f in self.stack.stack[::-1]:
-            if not len(f.args) or f.args[0] != player:
+            if not len(f.args) or f.args[0] is not player:
                 break
 
             if f.function_name == '_perform_role_action' and f.args[1] == 'Legionary':
