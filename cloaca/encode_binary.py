@@ -41,6 +41,8 @@ def encode_zone(obj, visible=None):
         in the zone are anonymous with the `ident` -1.
         3) Otherwise the zone is visible.
 
+    Anonymous cards with ident=-1 in visible zones are stored as if
+    their ident is 254.
     """
     if visible is None:
         all_anon = next((False for c in obj.cards if not c.is_anon), True)
@@ -53,11 +55,8 @@ def encode_zone(obj, visible=None):
 
 
 def _encode_visible_zone(obj):
-    """Returns number of bytes written to buffer starting at offset.
-    """
-    cards = [c.ident for c in obj.cards]
+    cards = [254 if c.ident == -1 else c.ident for c in obj.cards]
 
-    # Length of cards (unsigned char) + cards (unsigned chars)
     fmt = '!B'+str(len(cards))+'B'
     return struct.pack(fmt, len(cards), *cards)
 
@@ -83,9 +82,7 @@ def decode_zone(buffer, offset):
 
 
 def _encode_hidden_zone(obj):
-    """Returns number of bytes written to buffer starting at offset.
-
-    Encodes a hidden zone as the length of the zone and a single 0xFF byte.
+    """Encodes a hidden zone as the length of the zone and a single 0xFF byte.
     """
     n_cards = len(obj.cards)
 
@@ -524,7 +521,8 @@ def decode_game(bytes):
     if current_frame is not None:
         new_args = unconvert_frame_args(current_frame.args,
                 current_frame.function_name, players)
-        current_frame.args = new_args
+        # Frame.args must be a tuple
+        current_frame.args = tuple(new_args)
     
     fmt = '!B'
     n_stack_frames = struct.unpack_from(fmt, bytes, offset)[0]
@@ -536,7 +534,8 @@ def decode_game(bytes):
         offset += length
         if f is not None:
             new_args = unconvert_frame_args(f.args, f.function_name, players)
-            f.args = new_args
+            # Frame.args must be a tuple
+            f.args = tuple(new_args)
         stack_frames.append(f)
 
     stack = Stack(stack_frames)

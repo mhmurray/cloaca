@@ -8,6 +8,7 @@ from cloaca.zone import Zone
 import cloaca.card_manager as cm
 from cloaca.error import GTRError
 import cloaca.encode_binary as encode
+from cloaca.stack import Stack, Frame
 
 import cloaca.message as message
 from cloaca.message import GameAction
@@ -18,6 +19,7 @@ from cloaca.test.test_setup import TestDeck
 
 import unittest
 import copy
+import struct
 
 
 class TestObjectComparison(unittest.TestCase):
@@ -362,6 +364,127 @@ class TestPlayerZone(unittest.TestCase):
             self.assertEqual(p.revealed, q.revealed)
             self.assertEqual(p.prev_revealed, q.prev_revealed)
             self.assertEqual(p.clients_given, q.clients_given)
+
+
+class TestEncodingFormat(unittest.TestCase):
+    """Test the binary output of the encoding.
+    """
+
+    def test_zone(self):
+        """Cards are encoded by their ident, with the zone length at the
+        beginning.
+        """
+        z = Zone([Card(7), Card(8)])
+        ze = encode.encode_zone(z)
+
+        bytes = bytearray([2,7,8])
+        self.assertEqual(ze, str(bytes))
+
+
+    def test_hidden_zone(self):
+        """Zones with all anonymous cards (ident = -1) are compressed to only store
+        the length and a single byte 0xFF.
+        """
+        z = Zone([Card(-1), Card(-1)])
+        ze = encode.encode_zone(z)
+
+        bytes = bytearray([2, 255])
+        self.assertEqual(ze, str(bytes))
+
+
+    def test_partially_hidden_zone(self):
+        """Zones with some anonymous cards are not compressed and anonymous
+        cards are represented with ident 254.
+        """
+        z = Zone([Card(-1), Card(2), Card(-1)])
+        ze = encode.encode_zone(z)
+
+        bytes = bytearray([3, 254, 2, 254])
+        self.assertEqual(ze, str(bytes))
+
+
+    def test_complete_building(self):
+        """Buildings are the following bytes: <len>, <foundation>, <site>,
+        <complete>, <mat1>, <mat2>, <mat3>, [<stairway_mat1>], ...
+        """
+        d = TestDeck()
+        b = Building(d.statue0, 'Brick', materials=[d.atrium0, d.temple0],
+                stairway_materials=[d.atrium1], complete=True)
+        be = encode.encode_building(b)
+
+        bytes = bytearray([7, d.statue0.ident, 4, 1, d.atrium0.ident,
+                d.temple0.ident, 0, d.atrium1.ident])
+        self.assertEqual(be, str(bytes))
+
+
+    def test_incomplete_building(self):
+        d = TestDeck()
+        b = Building(d.temple0, 'Marble', materials=[],
+                stairway_materials=[], complete=False)
+        be = encode.encode_building(b)
+
+        bytes = bytearray([6, d.temple0.ident, 0, 0, 0, 0, 0])
+        self.assertEqual(be, str(bytes))
+
+    
+    def test_stack_frame(self):
+        """Stack frames are encoded with a numerical mapping for the
+        function name and arguments.
+
+        Possible functions are '_advance_turn', etc. listed in
+        encode_binary.py.
+        
+        If the frame has arguments, they must be converted using the
+        originating Game object. 
+        """
+        f = Frame('_advance_turn', executed=False)
+        fe = encode.encode_frame(f)
+        bytes = bytearray([2, 0, 0])
+        self.assertEqual(fe, str(bytes))
+
+
+    def test_stack_frame_none(self):
+        fe = encode.encode_frame(None)
+        bytes = bytearray([0])
+        self.assertEqual(fe, str(bytes))
+
+
+    def test_stack_frame_with_args(self):
+        game = test_setup.simple_two_player()
+        f = Frame('_await_action', message.THINKERORLEAD,
+                game.players[1], executed=False)
+
+        f.args = encode.convert_frame_args(f, game.players)
+        fe = encode.encode_frame(f)
+        bytes = bytearray([4, 1, 0, 0x30+message.THINKERORLEAD, 0x11])
+        self.assertEqual(fe, str(bytes))
+
+
+    def test_stack_frame_with_role_args(self):
+        game = test_setup.simple_two_player()
+        f = Frame('_perform_role_action', game.players[1],
+                'Craftsman', executed=False)
+
+        f.args = encode.convert_frame_args(f, game.players)
+        fe = encode.encode_frame(f)
+        bytes = bytearray([0x04, 0x09, 0x00, 0x11, 0x23])
+        self.assertEqual(fe, str(bytes))
+
+
+    def test_sites(self):
+        game = Game()
+        game.in_town_sites = []
+        game.out_of_town_sites = ['Rubble', 'Rubble', 'Wood']
+        ge = encode.encode_game(game)
+        SITES_OFFSET = struct.calcsize('!III21pBBBBBBBB')
+
+        in_town_sites = ge[SITES_OFFSET:SITES_OFFSET+6]
+        bytes = bytearray([0,0,0,0,0,0])
+        self.assertEqual(in_town_sites, str(bytes))
+
+        out_of_town_sites = ge[SITES_OFFSET+6:SITES_OFFSET+12]
+        bytes = bytearray([0,2,0,1,0,0])
+        self.assertEqual(out_of_town_sites, str(bytes))
 
 
 if __name__ == '__main__':
