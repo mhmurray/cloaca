@@ -64,8 +64,8 @@ Header
 A header includes non-game meta-information.
     
     0x47745221 : (4 bytes) magic number to identify Game encodings
-    <encoding_version> : (1 byte) version of this encoding.
-    <md5_hash> : (16 bytes) md5 hash of the Game encoding that follows.
+    <encoding_version> : (4 bytes) version of this encoding.
+    <checksum> : (4 bytes) CRC32 checksum of the remaining data section
 
 Game
 ----
@@ -243,7 +243,7 @@ import uuid
 import struct
 from collections import Counter
 import base64
-from hashlib import md5
+from binascii import crc32
 
 from cloaca.zone import Zone
 from cloaca.building import Building
@@ -840,10 +840,11 @@ def encode_game(obj):
 
 
     game_bytes = ''.join(chunks)
-    checksum = bytearray(md5(game_bytes).digest())
+    checksum = crc32(game_bytes)
     version = 1
 
-    header = struct.pack('!I17B', MAGIC_NUMBER, version, *checksum)
+    # crc32 returns an unsigned integer
+    header = struct.pack('!IIi', MAGIC_NUMBER, version, checksum)
 
     return ''.join([header, game_bytes])
 
@@ -862,23 +863,26 @@ def str_to_game(s):
     offset=0
 
     # Check magic number
-    magic_number = struct.unpack_from('!I', bytestring, offset)[0]
-    offset += 4
+    fmt='!I'
+    magic_number = struct.unpack_from(fmt, bytestring, offset)[0]
+    offset += struct.calcsize(fmt)
 
     if magic_number != MAGIC_NUMBER:
         raise GTREncodingError('Decoding error: invalid record format')
 
-    version = struct.unpack_from('!B', bytestring, offset)[0]
-    offset += 1
+    fmt = '!I'
+    version = struct.unpack_from(fmt, bytestring, offset)[0]
+    offset += struct.calcsize(fmt)
 
     if version != 1:
         raise GTREncodingError('Decoding error: format version {0:d} unsupported'.format(version))
 
-    record_md5 = bytearray(struct.unpack_from('!16B', bytestring, offset))
-    offset += 16
+    fmt = '!i'
+    record_checksum = struct.unpack_from(fmt, bytestring, offset)[0]
+    offset += struct.calcsize(fmt)
 
-    computed_md5 = bytearray(md5(bytestring[offset:]).digest())
-    if record_md5 != computed_md5:
+    computed_checksum = crc32(bytestring[offset:])
+    if record_checksum != computed_checksum:
         raise GTREncodingError('Decoding error: checksum mismatch.')
 
     game = decode_game(bytestring[offset:])
