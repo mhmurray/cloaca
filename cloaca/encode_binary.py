@@ -1,11 +1,249 @@
 """Encode and decode game objects for storage or network transmission.
+
+Top-level encoding is handled by the functions that convert a Game object
+into a base64-encoded bytestring and vice versa.
+    - game_to_str(game)
+    - str_to_game(buffer)
+
+Objects are encoded with the functions:
+    - encode_game(game)
+    - encode_zone(zone)
+    - encode_player(player)
+    - encode_frame(frame, players)
+    - encode_building(building)
+    - encode_stack(stack, players)
+
+and decoded by passing the binary buffer to these:
+    - decode_game(buffer)
+    - decode_zone(buffer, offset)
+    - decode_player(buffer, offset)
+    - decode_building(buffer, offset)
+    - decode_frame(buffer, offset)
+    - decode_stack(buffer, offset)
+
+where the offset into the buffer is used to decode more efficiently
+using struct.unpack_from().
+
+Additionally, the encoding header that includes a checksum and encoding
+version is manipulated with:
+    - make_header(encoded_game)
+    - decode_header(data)
+
+The magic number that prefixes all encoded games is available as the
+module-level property MAGIC_NUMBER.
+
+The following functions are available for formatting help,
+but these are specific to the encoding format, and may change
+in future versions:
+    - _material_to_int(material)
+    - _int_to_material(id)
+    - _role_to_int(role)
+    - _int_to_role(id)
+    - _frame_func_to_int(function_name)
+    - _int_to_frame_func(id)
+    - _encode_frame_args(args, players)
+    - _decode_frame_args(args, players)
+    - _encode_sites(sites)
+    - _decode_sites(sites_list)
+    - _encode_winners(winners, players)
+    - _decode_winners(winner_flags, players)
+
+Encoding and decoding errors are reported by raising GTREncodingError.
+
+
+Full format specification
+=========================
+
+Roles, Materials, and Sites are represented as integers in several
+places. They are placed in canonical order, which is Patron, Laborer,
+Architect, Craftsman, Legionary, Merchant, and likewise for the
+corresponding material or site.
+
+Header
+------
+A header includes non-game meta-information.
+    
+    0x47745221 : (4 bytes) magic number to identify Game encodings
+    <encoding_version> : (1 byte) version of this encoding.
+    <md5_hash> : (16 bytes) md5 hash of the Game encoding that follows.
+
+Game
+----
+First the fixed size set of game properties:
+
+    <game_id> : (4 byte integer)
+    <turn_number> : (4 byte integer)
+    <action_number> : (4 byte integer)
+    <hostname> : (21 byte pascal string) 
+    <legionary_count> : (1 byte integer)
+    <used_oot> : (1 byte boolean) 0 or 1
+    <oot_allowed> : (1 byte boolean) 0 or 1
+    <role_led> : (1 byte integer) 255 for None or Role 0-5 in canonical order
+    <expected_action> : (1 byte integer) 255 for None or action #.
+    <legionary_player_index> : (1 byte integer) 255 for None or player index 0-4
+    <leader_index> : (1 byte integer) 255 for None or player index 0-4
+    <active_player_index> : (1 byte integer) 255 for None or player index 0-4
+
+    <in_town_sites> : (6 bytes) count of Sites in canonical order.
+    <out_of_town_sites> : (6 bytes) count of Sites in canonical order
+    <winners> : (5 bytes) For each player, a True byte if that player is a winner.
+        All False if no winner.
+
+
+The global Game zones follow. See the Zone encoding for details.
+
+    <jacks> : (Zone)
+    <library> : (Zone)
+    <pool> : (Zone)
+
+The number of players and each player are encoded next. See Player encoding.
+
+    <n_players> : (1 byte) # of players
+    <player1> : (Player)
+    ...
+
+then the current frame:
+
+    <current_frame> : (Frame) current frame or 0-length frame if it's None
+
+and the stack, which is just a length and list of frames,
+
+    <n_stack_frames> : (4 bytes) # of stack frames. 0 for empty stack.
+    <stack_frame1> : (Frame)
+    ...
+
+Zone
+----
+A zone is either of the following two formats:
+
+    <length> (1 byte) number of cards in the zone.
+    <card1> (1 byte) Card.ident, or 254 if the card is anonymous (ident = -1).
+
+OR, if all cards in the zone are anonymous (ident = -1):
+
+    <length> (1 byte) number of cards
+    <0xFF> (1 byte) Fixed byte with value 255.
+
+Note that anonymous cards can be stored in a zone alongside non-anonymous
+cards, but the second format cannot be used. The intention is to compress
+the frequent situation where a Game object is privatized for presentation
+to a single player, who cannot see other players' hands, the deck, etc.
+
+
+Player
+------
+A player is stored first as the fixed-length properties
+
+    <name> : (21 byte pascal string)
+    <uid> : (16 bytes), player user id
+    <fountain_card> : (1 byte) fountain card ident or 254 for None or 255 for anonymous
+    <n_actions> : (1 byte) camp actions
+    <performed_craftsman> : (1 byte) 1 or 0
+    <influence> : (6 bytes) Count of sites in canonical order
+
+Followed by the player zones in the following order. The hand is split into
+Jacks and non-Jacks to facilitate the anonymous card compression. See
+Zone encoding for details.
+
+    <camp> : (Zone)
+    <jack_hand> : (Zone)
+    <non_jack_hand> : (Zone)
+    <stockpile> : (Zone)
+    <clientele> : (Zone)
+    <revealed> : (Zone)
+    <prev_revealed> : (Zone)
+    <clients_given> : (Zone)
+    <vault> : (Zone)
+
+Following these, the number of buildings and the buildings are encoded.
+See Building encoding for details.
+
+    <n_buildings> : (1 byte) number of buildings
+    <building1> : (Building)
+    <building2> : (Building)
+    ...
+
+
+Building
+--------
+A building is encoded as the building lenght and the fixed-length properties,
+including the materials, where invalid material slots are marked. There can be
+an arbitrary number of stairway materials following these.
+The site, foundation, materials, and stairway materials cannot be anonymous or
+None.
+    
+        <len> : (1 byte) length of encoded struct
+        <foundation> : (1 byte) Card ident
+        <site> : (1 byte) Site as canonically-numbered material.
+        <complete> : (1 byte) 1 or 0
+        <mat1> : (1 byte) Card ident
+        <mat2> : (1 byte) Card ident
+        <mat3> : (1 byte) Card ident
+        <stairway_mat1> : (1 byte) Card ident
+        ...
+
+
+Stack Frame
+-----------
+Frames are encoded using a mapping for the possible function names
+and an integer encoding for their arguments. The format is the following:
+
+    <len> : (1 byte) length of encoded struct
+    <function> : (1 byte) Function #
+    <executed> : (1 byte) boolean
+    <arg1> : (1 byte) Argument 1, integer-mapped
+    <arg2> : (1 byte)
+    ...
+
+The mapping for integer to function name and the types of arguments
+for that function is the following. An entry '-' indicate that the
+function takes no arguments.
+
+    Integer | Stack frame function name   | Argument types
+    -------------------------------------------------------
+          0 | '_advance_turn'             | -
+          1 | '_await_action'             | (ACTION, PLAYER)
+          2 | '_do_end_turn'              | (PLAYER)
+          3 | '_do_kids_in_pool'          | (PLAYER)
+          4 | '_do_senate'                | (PLAYER)
+          5 | '_end_turn'                 | -
+          6 | '_kids_in_pool'             | -
+          7 | '_perform_clientele_action' | (PLAYER, ROLE)
+          8 | '_perform_patron_action'    | (PLAYER)
+          9 | '_perform_role_action'      | (PLAYER, ROLE)
+         10 | '_perform_role_being_led'   | (PLAYER)
+         11 | '_perform_thinker_action'   | (PLAYER)
+         12 | '_take_turn_stacked'        | (PLAYER)
+
+The mapping for function arguments uses offsets to separate the types of the
+arguments. This is not strictly necessary, since the types of the arguments can
+be inferred from the function name, but it requires no more space and can help
+minimize ambiguity. The mapping is one-to-one, so the inverse mapping is used
+for decoding.
+
+    Stack frame function argument to integer mapping
+        None: 0
+        Player index N: (0x10 + N)
+        Role in canonical numbering 0-5, R: (0x20 + R)
+        GameAction as integer from cloaca.message, A: (0x30 + A)
+
+Stack
+-----
+The Stack object is encoded simply as a list of frames, with
+the number of frames first.
+    
+    <n_frames> (1 byte)
+    <frame1> (Frame)
+    ...
 """
+
 import json
 import copy
 import uuid
 import struct
 from collections import Counter
 import base64
+from hashlib import md5
 
 from cloaca.zone import Zone
 from cloaca.building import Building
@@ -15,74 +253,34 @@ from cloaca.player import Player
 from cloaca.stack import Stack
 from cloaca.stack import Frame
 
+MAGIC_NUMBER = 0x47745221
+
 class GTREncodingError(Exception):
     pass
 
-def _convert_sites(sites):
+def _encode_sites(sites):
     c = Counter(sites)
     return [c['Marble'], c['Rubble'], c['Concrete'], c['Wood'], c['Brick'], c['Stone']]
 
-_SITES = ['Marble', 'Rubble', 'Concrete', 'Wood', 'Brick', 'Stone']
+_MATERIALS = ['Marble', 'Rubble', 'Concrete', 'Wood', 'Brick', 'Stone']
 def _decode_sites(list_of_counts):
     sites = []
-    for count, material in zip(list_of_counts, _SITES):
+    for count, material in zip(list_of_counts, _MATERIALS):
         sites.extend([material]*count)
     return sites
 
-    
-
-def encode_zone(obj, visible=None):
-    """Encode a zone at the given `offset` into `buffer`, returning a bytearray.
-
-    Zones can be hidden or visible, which is determined with the following algorithm:
-
-        1) This function's parameter `visible` overrides other considerations.
-        2) The zone is hidden if the length is non-zero and all `Card` objects
-        in the zone are anonymous with the `ident` -1.
-        3) Otherwise the zone is visible.
-
-    Anonymous cards with ident=-1 in visible zones are stored as if
-    their ident is 254.
-    """
-    if visible is None:
-        all_anon = next((False for c in obj.cards if not c.is_anon), True)
-        visible = not(len(obj.cards) and all_anon)
-
-    if visible:
-        return _encode_visible_zone(obj)
-    else:
-        return _encode_hidden_zone(obj)
-
 
 def _encode_visible_zone(obj):
+    """Encode a zone of cards and return the bytestring."""
     cards = [254 if c.ident == -1 else c.ident for c in obj.cards]
 
     fmt = '!B'+str(len(cards))+'B'
     return struct.pack(fmt, len(cards), *cards)
 
-def decode_zone(buffer, offset):
-    """Decode an encoded zone. See `encode_zone` for format.
-
-    Returns a tuple (<bytes>. <zone>) where <bytes> is the total number
-    of bytes consumed from the buffer.
-    """
-    length = struct.unpack_from('!B', buffer, offset)[0]
-    hidden = False
-    if length:
-        first_byte = struct.unpack_from('!B', buffer, offset+1)[0]
-
-        hidden = (first_byte == 0xFF)
-
-    if hidden:
-        return (2, Zone([Card(-1)]*length))
-    else:
-        idents = struct.unpack_from('!'+str(length)+'B', buffer, offset+1)
-        cards = [Card(i) for i in idents]
-        return (length+1, Zone(cards))
-
 
 def _encode_hidden_zone(obj):
-    """Encodes a hidden zone as the length of the zone and a single 0xFF byte.
+    """Encode a zone that contains only anonymous cards and return the
+    bytestring.
     """
     n_cards = len(obj.cards)
 
@@ -90,58 +288,8 @@ def _encode_hidden_zone(obj):
     return struct.pack(fmt, n_cards, 0xFF)
 
 
-def encode_building(obj):
-    """Encodes building as the following 7 unsigned bytes.
-
-        <len> : (unsigned char) length of struct
-        <foundation> : (unsigned char) card ident
-        <site> : (unsigned char) ident
-        <complete> : (unsigned char) 1 if complete, 0 if not
-        <mat1> : (unsigned char) material 1 (0 if empty)
-        <mat2> : (unsigned char) material 2 (0 if empty)
-        <mat3> : (unsigned char) material 3 (0 if empty)
-
-    Followed by a variable number of stairway materials:
-
-        <stairway_mat1> : (unsigned char) Stairway material 1
-    
-    Returns number of bytes written to buffer starting at offset.
-    """
-    mat_cards = [c.ident for c in obj.materials]
-    mat_cards += [0]*(3-len(mat_cards))
-
-    stairway_mat_cards = [c.ident for c in obj.stairway_materials]
-
-    fmt = '!7B' + str(len(stairway_mat_cards)) + 'B'
-
-    return struct.pack(fmt, 6+len(stairway_mat_cards),
-            obj.foundation.ident,
-            site_to_int(obj.site),
-            int(obj.complete),
-            *(mat_cards+stairway_mat_cards))
-
-
-def decode_building(buffer, offset):
-    """Decode a building. See `encode_building` for format.
-
-    Returns a tuple (<bytes>. <building>) where <bytes> is the total number
-    of bytes consumed from the buffer and <building> is a Building object.
-    """
-    length = struct.unpack_from('!B', buffer, offset)[0]
-
-    fmt = '!'+str(length)+'B'
-    values = struct.unpack_from(fmt, buffer, offset+1)
-    foundation = Card(values[0])
-    site = int_to_site(values[1])
-    complete = bool(values[2])
-    materials = Zone([Card(i) for i in values[3:6] if i != 0])
-    stairway_materials = Zone([Card(i) for i in values[6:]])
-
-    return (length+1,
-            Building(foundation, site, materials, stairway_materials, complete))
-
-
 _ARG_PLAYER, _ARG_ACTION, _ARG_ROLE = range(3)
+
 _FRAME_ARG_TYPE_MAPPING = {
         '_advance_turn': (),
         '_await_action': (_ARG_ACTION, _ARG_PLAYER),
@@ -158,13 +306,64 @@ _FRAME_ARG_TYPE_MAPPING = {
         '_take_turn_stacked': (_ARG_PLAYER,),
         }
 
-def convert_frame_args(frame, players):
+_STACK_FUNC_TO_INT = {
+        '_advance_turn' : 0,
+        '_await_action' : 1,
+        '_do_end_turn' : 2,
+        '_do_kids_in_pool' : 3,
+        '_do_senate' : 4,
+        '_end_turn' : 5,
+        '_kids_in_pool' : 6,
+        '_perform_clientele_action' : 7,
+        '_perform_patron_action' : 8,
+        '_perform_role_action' : 9,
+        '_perform_role_being_led' : 10,
+        '_perform_thinker_action' : 11,
+        '_take_turn_stacked' : 12,
+}
+
+_MATERIAL_TO_INT = {
+        'Marble':0, 'Rubble':1, 'Concrete':2,
+        'Wood':3, 'Brick':4, 'Stone':5,
+        None: 0xFF
+        }
+
+_INT_TO_MATERIAL = {v:k for k,v in _MATERIAL_TO_INT.items()}
+def site_to_int(site):
+    return _MATERIAL_TO_INT[site]
+
+def int_to_site(i):
+    return _INT_TO_MATERIAL[i]
+
+
+_INT_TO_STACK_FUNC = {v:k for k,v in _STACK_FUNC_TO_INT.items()}
+def frame_func_to_int(func_name):
+    return _STACK_FUNC_TO_INT[func_name]
+
+def int_to_frame_func(i):
+    return _INT_TO_STACK_FUNC[i]
+
+
+_ROLE_TO_INT = {
+        'Patron':0, 'Laborer':1, 'Architect':2,
+        'Craftsman':3, 'Legionary':4, 'Merchant':5,
+        None: 0xFF
+        }
+_INT_TO_ROLE = {v:k for k,v in _ROLE_TO_INT.items()}
+def role_to_int(role):
+    return _ROLE_TO_INT[role]
+
+def int_to_role(i):
+    return _INT_TO_ROLE[i]
+
+
+def _encode_frame_args(frame, players):
     """Convert the Frame arguments to numerical values using the 
     data from `game`. Return a list of the new args.
     """
     # Roles are strings, but in case they change to an enum or integer
-    # represenation, we will not use that to distinguish from numbered
-    # actions.
+    # represenation, we will not use that to distinguish from actions,
+    # which are integers.
     # Roles are arguments in the following cases:
     #   - 2nd argument of _perform_clientele_action
     #   - 2nd argument of _perform_role_action
@@ -181,7 +380,10 @@ def convert_frame_args(frame, players):
         elif arg_type == _ARG_PLAYER:
             new_args.append(0x10 + players.index(arg))
         elif arg_type == _ARG_ROLE:
-            new_args.append(0x20 + role_to_int(arg))
+            if arg is None:
+                newargs.append(0x26)
+            else:
+                new_args.append(0x20 + role_to_int(arg))
         elif arg_type == _ARG_ACTION:
             new_args.append(0x30 + arg)
         else:
@@ -189,9 +391,10 @@ def convert_frame_args(frame, players):
 
     return new_args
 
-def unconvert_frame_args(args, function_name, players):
+
+def _decode_frame_args(args, function_name, players):
     """Convert frame args from the serialized (integer) types
-    to python types. See `convert_frame_args` for format.
+    to python types. See `_encode_frame_args` for format.
     """
     new_args = []
     arg_types = _FRAME_ARG_TYPE_MAPPING[function_name]
@@ -209,39 +412,100 @@ def unconvert_frame_args(args, function_name, players):
 
     return new_args
 
-def encode_frame(obj):
-    """Encodes frame as the following
 
-        <len> : (unsigned char) length of struct
-        <function> : (unsigned char) function enum
-        <executed> : (unsigned char) boolean
-        <arg1> : (unsigned char) argument 1
-        <arg2> : (unsigned char) argument 2
-        ...
-    
-    Frame arguments are players, roles, and actions.
-    These all must be pre-converted to integers with the following mapping:
+def encode_zone(obj):
+    """Encode a Zone object and return a bytestring.
 
-        0: None
-        0x10 -> 0x14: Player indices 0-5.
-        0x20 -> 0x26: Roles 0-6 (None, pat, lab, arc, cra, leg, mer)
-        0x30 + : GameActions 0-?
+    Zones with all anonymous cards are stored as only a length.
 
-    Returns number of bytes written to buffer starting at offset.
-
-    If the frame is None, the length is 0
+    See module documentation for format specification.
     """
-    if obj is None:
+    all_anon = next((False for c in obj.cards if not c.is_anon), True)
+    visible = not(len(obj.cards) and all_anon)
+
+    if visible:
+        return _encode_visible_zone(obj)
+    else:
+        return _encode_hidden_zone(obj)
+
+
+def decode_zone(buffer, offset):
+    """Decode a Zone object from `buffer` starting at `offset` and
+    return a tuple (<bytes>. <zone>) where <bytes> is the number of bytes
+    consumed.
+    """
+    length = struct.unpack_from('!B', buffer, offset)[0]
+    hidden = False
+    if length:
+        first_byte = struct.unpack_from('!B', buffer, offset+1)[0]
+
+        hidden = (first_byte == 0xFF)
+
+    if hidden:
+        return (2, Zone([Card(-1)]*length))
+    else:
+        idents = struct.unpack_from('!'+str(length)+'B', buffer, offset+1)
+        cards = [Card(i) for i in idents]
+        return (length+1, Zone(cards))
+
+
+def encode_building(obj):
+    """Encode a building object and return a bytestring.
+
+    See module documentation for format specification.
+    """
+    mat_cards = [c.ident for c in obj.materials]
+    mat_cards += [0]*(3-len(mat_cards))
+
+    stairway_mat_cards = [c.ident for c in obj.stairway_materials]
+
+    fmt = '!7B' + str(len(stairway_mat_cards)) + 'B'
+
+    return struct.pack(fmt, 6+len(stairway_mat_cards),
+            obj.foundation.ident,
+            site_to_int(obj.site),
+            int(obj.complete),
+            *(mat_cards+stairway_mat_cards))
+
+
+def decode_building(buffer, offset):
+    """Decode a Building object from `buffer` starting at `offset` and
+    return a tuple (<bytes>. <building>) where <bytes> is the total number
+    of bytes consumed from the buffer.
+    """
+    length = struct.unpack_from('!B', buffer, offset)[0]
+
+    fmt = '!'+str(length)+'B'
+    values = struct.unpack_from(fmt, buffer, offset+1)
+    foundation = Card(values[0])
+    site = int_to_site(values[1])
+    complete = bool(values[2])
+    materials = Zone([Card(i) for i in values[3:6] if i != 0])
+    stairway_materials = Zone([Card(i) for i in values[6:]])
+
+    return (length+1,
+            Building(foundation, site, materials, stairway_materials, complete))
+
+
+def encode_frame(frame, players):
+    """Encode a Frame object and return a bytestring.
+
+    The list of players from this frame's game is needed to convert
+    the function args. See module documentation for format specification.
+    """
+    if frame is None:
         return struct.pack('!B', 0)
 
-    func_int = stack_func_to_int(obj.function_name)
-    fmt = '!'+str(3+len(obj.args))+'B'
-    length = 2+len(obj.args)
+    new_args = _encode_frame_args(frame, players)
 
-    return struct.pack(fmt, length, func_int, int(obj.executed), *obj.args)
+    func_int = frame_func_to_int(frame.function_name)
+    fmt = '!'+str(3+len(new_args))+'B'
+    length = 2+len(new_args)
+
+    return struct.pack(fmt, length, func_int, int(frame.executed), *new_args)
             
 
-def decode_frame(buffer, offset):
+def decode_frame(buffer, offset, players):
     """Decode a stack frame. See `encode_frame` for format.
 
     Returns a tuple (<bytes>. <frame>) where <bytes> is the total number
@@ -254,67 +518,66 @@ def decode_frame(buffer, offset):
 
     fmt = '!'+str(length)+'B'
     values = struct.unpack_from(fmt, buffer, offset+1)
-    func_name = int_to_stack_func(values[0])
+    function_name = int_to_frame_func(values[0])
     executed = bool(values[1])
     args = values[2:]
 
-    return (length+1, Frame(func_name, args=args, executed=executed))
+    new_args = _decode_frame_args(args, function_name, players)
+
+    return (length+1, Frame(function_name, args=args, executed=executed))
 
 
-_STACK_FUNC_TO_INT = {
-        '_advance_turn' : 0,
-        '_await_action' : 1,
-        '_do_end_turn' : 2,
-        '_do_kids_in_pool' : 3,
-        '_do_senate' : 4,
-        '_end_turn' : 5,
-        '_kids_in_pool' : 6,
-        '_perform_clientele_action' : 7,
-        '_perform_patron_action' : 8,
-        '_perform_role_action' : 9,
-        '_perform_role_being_led' : 10,
-        '_perform_thinker_action' : 11,
-        '_take_turn_stacked' : 12,
-}
-_INT_TO_STACK_FUNC = {v:k for k,v in _STACK_FUNC_TO_INT.items()}
-def stack_func_to_int(func_name):
-    return _STACK_FUNC_TO_INT[func_name]
+def encode_player(obj):
+    """Encode a Player object and return a bytestring.
+    
+    See module documentation for format specification.
+    """
+    chunks = []
 
-def int_to_stack_func(i):
-    return _INT_TO_STACK_FUNC[i]
+    fmt = '!21p16sBBB6B'
 
+    chunks.append(struct.pack(fmt,
+            obj.name,
+            uuid.UUID(int=obj.uid).bytes,
+            obj.fountain_card.ident if obj.fountain_card is not None else 254,
+            obj.n_camp_actions,
+            obj.performed_craftsman,
+            *_encode_sites(obj.influence)))
 
-_SITE_TO_INT = {
-        'Marble':0, 'Rubble':1, 'Concrete':2,
-        'Wood':3, 'Brick':4, 'Stone':5,
-        None: 0xFF
-        }
-_INT_TO_SITE = {v:k for k,v in _SITE_TO_INT.items()}
-def site_to_int(site):
-    return _SITE_TO_INT[site]
+    chunks.append(encode_zone(obj.camp))
 
-def int_to_site(i):
-    return _INT_TO_SITE[i]
+    # Split hand into Jacks and non-jacks
+    non_jack_hand = []
+    jack_hand = []
+    for c in obj.hand:
+        if c.is_jack:
+            jack_hand.append(c)
+        else:
+            non_jack_hand.append(c)
 
-_ROLE_TO_INT = {
-        'Patron':0, 'Laborer':1, 'Architect':2,
-        'Craftsman':3, 'Legionary':4, 'Merchant':5,
-        None: 0xFF
-        }
-_INT_TO_ROLE = {v:k for k,v in _ROLE_TO_INT.items()}
-def role_to_int(role):
-    return _ROLE_TO_INT[role]
+    chunks.append(encode_zone(Zone(jack_hand)))
+    chunks.append(encode_zone(Zone(non_jack_hand)))
+    chunks.append(encode_zone(obj.stockpile))
+    chunks.append(encode_zone(obj.clientele))
+    chunks.append(encode_zone(obj.revealed))
+    chunks.append(encode_zone(obj.prev_revealed))
+    chunks.append(encode_zone(obj.clients_given))
+    chunks.append(encode_zone(obj.vault))
 
-def int_to_role(i):
-    return _INT_TO_ROLE[i]
+    # Number of buildings
+    fmt = '!B'
+    chunks.append(struct.pack(fmt, len(obj.buildings)))
+    
+    for b in obj.buildings:
+        chunks.append(encode_building(b))
 
+    return ''.join(chunks)
 
 
 def decode_player(buffer, offset):
-    """Decode a Player. See `encode_player` for format.
-
-    Returns a tuple (<bytes>. <Player>) where <bytes> is the total number
-    of bytes consumed from the buffer and <Player> is a Player object.
+    """Decode a Player object from `buffer` starting at `offset` and
+    return a tuple (<bytes>. <Player>) where <bytes> is the total number
+    of bytes consumed from the buffer.
     """
     offset_orig = offset
     fmt = '!21p16sBBB6B'
@@ -324,7 +587,13 @@ def decode_player(buffer, offset):
 
     name = values[0]
     uid = uuid.UUID(bytes=values[1]).int
-    fountain_card = None if values[2] == 0xFF else Card(values[2])
+    if values[2] == 0xFF:
+        fountain_card = Card(-1)
+    elif values[2] == 0xFE:
+        fountain_card = None
+    else:
+        fountain_card = Card(values[2])
+
     n_camp_actions = values[3]
     performed_craftsman = values[4]
     influence_site_counts = values[5:]
@@ -378,85 +647,39 @@ def decode_player(buffer, offset):
     return (offset-offset_orig, p)
 
 
+def encode_stack(stack, players):
+    """Encode a Stack object and return a bytestring.
 
-def encode_player(obj):
-    """Encodes Player as the following ? bytes. The length is unsigned,
-    but the remaining bytes are signed.
-
-        <name> : (21 byte pascal string), player name (must be 3-20 char)
-        <uid> : (16 bytes), player user id
-        <fountain_card> : (unsigned char) card ident
-        <n_actions> : (unsigned char) camp actions
-        <performed_craftsman> : (unsigned char) 1 or 0
-        <influence> : (6 bytes) counts of sites in influence (mar, rub, woo, con, bri, sto)
-
-    Followed by the zones in the following order. The hand is split into
-    Jacks and non-Jacks so that hidden hands can be compressed.
-
-        <camp> : (Zone)
-        <jack_hand> : (Zone)
-        <non_jack_hand> : (Zone)
-        <stockpile> : (Zone)
-        <clientele> : (Zone)
-        <revealed> : (Zone)
-        <prev_revealed> : (Zone)
-        <clients_given> : (Zone)
-        <vault> : (Zone)
-
-    Following these, the number of buildings and the buildings are listed
-    in order. Each building writes its length first.
-
-        <n_buildings> : (unsigned char) number of buildings
-        <building1> : (Building)
-        <building2> : (Building)
-        ...
-    
-    Returns bytestring for the player.
+    The list of Player objects from the Game this stack belongs to is required
+    for serialization of the Frame arguments. See module documentation for
+    format specification.
     """
     chunks = []
-
-    fmt = '!21p16sBBB6B'
-
-    chunks.append(struct.pack(fmt,
-            obj.name,
-            uuid.UUID(int=obj.uid).bytes,
-            obj.fountain_card.ident if obj.fountain_card is not None else 0xFF,
-            obj.n_camp_actions,
-            obj.performed_craftsman,
-            *_convert_sites(obj.influence)))
-
-    chunks.append(encode_zone(obj.camp))
-
-    # Split hand into Jacks and non-jacks
-    non_jack_hand = []
-    jack_hand = []
-    for c in obj.hand:
-        if c.is_jack:
-            jack_hand.append(c)
-        else:
-            non_jack_hand.append(c)
-
-    chunks.append(encode_zone(Zone(jack_hand)))
-    chunks.append(encode_zone(Zone(non_jack_hand)))
-    chunks.append(encode_zone(obj.stockpile))
-    chunks.append(encode_zone(obj.clientele))
-    chunks.append(encode_zone(obj.revealed))
-    chunks.append(encode_zone(obj.prev_revealed))
-    chunks.append(encode_zone(obj.clients_given))
-    chunks.append(encode_zone(obj.vault))
-
-    # Number of buildings
-    fmt = '!B'
-    chunks.append(struct.pack(fmt, len(obj.buildings)))
-    
-    for b in obj.buildings:
-        chunks.append(encode_building(b))
+    chunks.append(struct.pack('!B', len(stack.stack)))
+    for f in stack.stack:
+        chunks.append(encode_frame(f, players))
 
     return ''.join(chunks)
 
 
-def decode_game(bytes):
-    """Decode a Game. See `encode_game` for format.
+def decode_stack(buffer, offset, players):
+    offset_orig = offset
+
+    fmt = '!B'
+    n_stack_frames = struct.unpack_from(fmt, buffer, offset)[0]
+    offset += struct.calcsize(fmt)
+
+    stack_frames = []
+    for i in range(n_stack_frames):
+        length, f = decode_frame(buffer, offset, players)
+        offset += length
+        stack_frames.append(f)
+
+    return (offset-offset_orig, Stack(stack_frames))
+
+
+def decode_game(buffer, offset=0):
+    """Decode and return a Game object from `buffer` starting at `offset`
 
     Returns a tuple (<bytes>. <game>) where <bytes> is the total number
     of bytes consumed from the buffer and <game> is a Game object.
@@ -464,7 +687,7 @@ def decode_game(bytes):
     fmt = '!III21pBBBBBBBB'
     offset = struct.calcsize(fmt)
 
-    values = struct.unpack(fmt, bytes[:offset])
+    values = struct.unpack(fmt, buffer[:offset])
 
     game_id, turn_number, action_number, hostname, legionary_count, used_oot, \
             oot_allowed, role_led, expected_action, legionary_player_index, \
@@ -481,9 +704,9 @@ def decode_game(bytes):
 
     fmt = '!6B'
     length = struct.calcsize(fmt)
-    in_town_site_counts = struct.unpack(fmt, bytes[offset:offset+length])
+    in_town_site_counts = struct.unpack(fmt, buffer[offset:offset+length])
     offset += length
-    out_of_town_site_counts = struct.unpack(fmt, bytes[offset:offset+length])
+    out_of_town_site_counts = struct.unpack(fmt, buffer[offset:offset+length])
     offset += length
 
     in_town_sites = _decode_sites(in_town_site_counts)
@@ -491,54 +714,42 @@ def decode_game(bytes):
 
     fmt = '!5B'
     length = struct.calcsize(fmt)
-    winners = struct.unpack(fmt, bytes[offset:offset+length])
+    winner_flags = struct.unpack(fmt, buffer[offset:offset+length])
     offset += length
 
-    length, jacks = decode_zone(bytes, offset)
+    length, jacks = decode_zone(buffer, offset)
     jacks.name = 'jacks'
     offset += length
 
-    length, library = decode_zone(bytes, offset)
+    length, library = decode_zone(buffer, offset)
     library.name = 'library'
     offset += length
     
-    length, pool = decode_zone(bytes, offset)
+    length, pool = decode_zone(buffer, offset)
     pool.name = 'pool'
     offset += length
 
     fmt = '!B'
-    n_players = struct.unpack_from(fmt, bytes, offset)[0]
+    n_players = struct.unpack_from(fmt, buffer, offset)[0]
     offset += struct.calcsize(fmt)
 
     players = []
     for i in range(n_players):
-        length, p = decode_player(bytes, offset)
+        length, p = decode_player(buffer, offset)
         players.append(p)
         offset += length
 
-    length, current_frame = decode_frame(bytes, offset)
+    winners = _decode_winners(winner_flags, players)
+
+    length, current_frame = decode_frame(buffer, offset, players)
     offset += length
     if current_frame is not None:
-        new_args = unconvert_frame_args(current_frame.args,
+        new_args = _decode_frame_args(current_frame.args,
                 current_frame.function_name, players)
         # Frame.args must be a tuple
         current_frame.args = tuple(new_args)
     
-    fmt = '!B'
-    n_stack_frames = struct.unpack_from(fmt, bytes, offset)[0]
-    offset += struct.calcsize(fmt)
-
-    stack_frames = []
-    for i in range(n_stack_frames):
-        length, f = decode_frame(bytes, offset)
-        offset += length
-        if f is not None:
-            new_args = unconvert_frame_args(f.args, f.function_name, players)
-            # Frame.args must be a tuple
-            f.args = tuple(new_args)
-        stack_frames.append(f)
-
-    stack = Stack(stack_frames)
+    length, stack = decode_stack(buffer, offset, players)
     
     game = Game(
             game_id = game_id,
@@ -566,72 +777,30 @@ def decode_game(bytes):
     return game
 
 
+def _encode_winners(winners, players):
+    """Encode the winning player list and return a list of 5 flags."""
+    if winners is None:
+        return [0]*5
+
+    flags = [0]*5
+    for p in winners:
+        flags[players.index(p)] = 1
+
+    return flags
+
+
+def _decode_winners(winner_flags, players):
+    """Decode the list of flags and return a list of winning Player objects."""
+    return [p for p, win in zip(players, winner_flags) if win]
+
+
+
 def encode_game(obj):
-    """
-    Encodes Game as the following ? bytes.
-    Canonical order for roles is Patron, Laborer, Architect, Craftsman,
-    Legionary, Merchant. The same for the corresponding materials.
+    """Encode the game object and return a bytestring.
 
-        <game_id> : (4 byte integer)
-        <turn_number> : (4 byte integer)
-        <action_number> : (4 byte integer)
-
-        <host> : (21 byte pascal string) name of host or empty string for None
-
-        <legionary_count> : (1 byte integer)
-        <used_oot> : (1 byte boolean) 0 or 1
-        <oot_allowed> : (1 byte boolean) 0 or 1
-        <role_led> : (1 byte integer) 255 for None, 0-5 in canonical order
-        <expected_action> : (1 byte integer) 255 for None or action #.
-        <legionary_player_index> : (1 byte integer) 255 for None or index 0-4
-        <leader_index> : (1 byte integer) 255 for None or index 0-4
-        <active_player_index> : (1 byte integer) 255 for None or index 0-4
-
-        <in_town_sites> : (6 bytes) count of sites in canonical order
-        <out_of_town_sites> : (6 bytes) count of sites in canonical order
-        <winners> : (5 bytes) byte is True if that player is a winner.
-            All False if no winner.
-
-    followed by the global zones,
-
-        <jacks> : (Zone)
-        <library> : (Zone)
-        <pool> : (Zone)
-
-    the players,
-
-        <n_players> : (1 byte) # of players
-        <player1> : (Player)
-        ...
-
-    the current frame:
-
-        <current_frame> : (Frame) current frame or 0-length frame if it's None
-
-    and the stack,
-
-        <n_stack_frames> : (4 bytes) # of stack frames. 0 for empty stack.
-        <stack_frame1> : (Frame)
-        ...
-
-    The Game object sometimes contains zones with hidden cards, such as
-    vaults, opponent's hands, and the library.
-    When the Zone contains only anonymous cards (with ident -1), only
-    the length of the zone is recorded.
-    See `encode_zone` for details.
+    See module documentation for format specification.
     """
     chunks = []
-
-    def convert_winners(winners):
-        if winners is None:
-            return [0]*5
-
-        flags = [0]*5
-        for p in winners:
-            flags[obj.players.index(p)] = 1
-
-        return flags
-
 
     fmt = '!III21pBBBBBBBB'
     chunks.append(struct.pack(fmt,
@@ -651,9 +820,9 @@ def encode_game(obj):
     
     fmt = '!6B6B5B'
     chunks.append(struct.pack(fmt,
-            *(_convert_sites(obj.in_town_sites) +\
-            _convert_sites(obj.out_of_town_sites) +\
-            convert_winners(obj.winners))
+            *(_encode_sites(obj.in_town_sites) +\
+            _encode_sites(obj.out_of_town_sites) +\
+            _encode_winners(obj.winners, obj.players))
             ))
 
     chunks.append(encode_zone(obj.jacks))
@@ -666,26 +835,17 @@ def encode_game(obj):
     for p in obj.players:
         chunks.append(encode_player(p))
 
-    f = obj._current_frame
-    if f is None:
-        chunks.append(encode_frame(f))
-    else:
-        new_args = convert_frame_args(f, obj.players)
-        new_frame = Frame(f.function_name, args=new_args, executed=f.executed)
-        chunks.append(encode_frame(new_frame))
+    chunks.append(encode_frame(obj._current_frame, obj.players))
+    chunks.append(encode_stack(obj.stack, obj.players))
 
-    fmt = '!B'
-    chunks.append(struct.pack(fmt, len(obj.stack.stack)))
 
-    for f in obj.stack.stack:
-        if f is None:
-            chunks.append(encode_frame(f))
-        else:
-            new_args = convert_frame_args(f, obj.players)
-            new_frame = Frame(f.function_name, args=new_args, executed=f.executed)
-            chunks.append(encode_frame(new_frame))
+    game_bytes = ''.join(chunks)
+    checksum = bytearray(md5(game_bytes).digest())
+    version = 1
 
-    return ''.join(chunks)
+    header = struct.pack('!I17B', MAGIC_NUMBER, version, *checksum)
+
+    return ''.join([header, game_bytes])
 
 
 def game_to_str(game):
@@ -696,8 +856,32 @@ def game_to_str(game):
     # print len(encode_game(game))
     return base64.b64encode(encode_game(game))
 
+
 def str_to_game(s):
     bytestring = base64.b64decode(s)
+    offset=0
 
-    return decode_game(bytestring)
+    # Check magic number
+    magic_number = struct.unpack_from('!I', bytestring, offset)[0]
+    offset += 4
+
+    if magic_number != MAGIC_NUMBER:
+        raise GTREncodingError('Decoding error: invalid record format')
+
+    version = struct.unpack_from('!B', bytestring, offset)[0]
+    offset += 1
+
+    if version != 1:
+        raise GTREncodingError('Decoding error: format version {0:d} unsupported'.format(version))
+
+    record_md5 = bytearray(struct.unpack_from('!16B', bytestring, offset))
+    offset += 16
+
+    computed_md5 = bytearray(md5(bytestring[offset:]).digest())
+    if record_md5 != computed_md5:
+        raise GTREncodingError('Decoding error: checksum mismatch.')
+
+    game = decode_game(bytestring[offset:])
+
+    return game
 
