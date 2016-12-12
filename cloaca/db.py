@@ -1,13 +1,110 @@
-import json
+"""Redis database interface for cloaca.
+
+All database manipulation is done with this API.
+
+Integer types
+-------------
+Redis stores all keys and values as strings, so for integral types,
+like user and game IDs, this API converts to Python int. This applies
+to the following:
+
+    user_id
+    game_id
+
+which are returned by the functions:
+
+    retrieve_user()
+    retrieve_user_id_from_username()
+    retrieve_userid_from_session_auth()
+
+    retrieve_games_hosted_by_user
+
+
+
+Users
+=====
+Users are stored as hashes, with the following fields:
+
+    <username> : user name
+    <date_added> : Unix time stamp, UTC
+    <last_login> : Unix time stamp, UTC
+    <auth> : authentication token (salted password hash)
+    <session_auth> : session token
+
+User hashes and specific fields are retrieved with the following:
+
+    retrieve_user() : get the entire user hash
+    retrieve_user_session_auth()
+    retrieve_user_auth()
+
+Users are created with:
+
+    add_user()
+
+which calls `register_user()` to evaluate the Lua script that registers a user.
+The method `register_user()` should not be called directly.
+
+User info is modified with:
+
+    update_user_last_login()
+    update_user_session()
+
+Usernames
+=========
+A reverse-lookup table of username to user_id is accessed with:
+
+    retrieve_user_id_from_username()
+
+
+Sessions
+========
+Session tokens are stored in the user hash and in a reverse-mapping
+of session token to user_id.
+User session tokens are obtained with the functions described
+in the "Users" section. To read session token from the user id:
+
+    retrieve_user_session_auth()
+
+and to update the session token:
+
+    update_user_session()
+
+The reverse mapping is accessed with:
+
+    retrieve_userid_from_session_auth()
+
+Games
+=====
+Games are hashes with the following fields:
+
+    <game_id>
+    <host> : host user ID
+    <date_created> : unix time stamp, UTC
+    <game_json> : encoded game state as a string. (Not necessarily JSON!)
+
+Games are created via the function:
+
+    create_game_with_host()
+
+which calls the `create_game` Lua script. This script also pushes the game ID
+onto the list of games and the list of games hosted by that particular user.
+Also, the user ID is pushed onto the list of game_hosts.
+
+Games are retrieved and stored with the functions:
+
+    retrieve_game()
+    retrieve_games()
+    retrieve_games_hosted_by_user() : Returns list of game IDs
+    retrieve_latest_games() : Returns list of game IDs
+    store_game()
+"""
 import time
 
-import tornado
 from tornado import gen
 import tornadis
 from tornadis.exceptions import TornadisException
 
 from cloaca.error import GTRDBError
-import cloaca.encode
 
 from cloaca import lua_scripts
 
@@ -17,6 +114,7 @@ GAMES = 'games'
 GAMES_HOSTED_PREFIX = 'games_hosted:'
 GAMES_JOINED_PREFIX = 'games_joined:'
 GAME_HOSTS = 'game_hosts'
+GAME_DATA_KEY = 'game_json'
 
 USERID = 'userid'
 USERPREFIX='user:'
@@ -78,18 +176,18 @@ class GTRDBTornadis(object):
             raise GTRDBError('Host user (ID {0:d}) does not exist.'.format(host_user_id))
 
         now = int(time.mktime(time.gmtime()))
-        yield self.r.call('HMSET', self.prefix+GAMEPREFIX+str(game_id), 'date_created', now, 'game_json', '')
+        yield self.r.call('HMSET', self.prefix+GAMEPREFIX+str(game_id),
+                'date_created', now, GAME_DATA_KEY, '')
 
         raise gen.Return(game_id)
 
 
     @gen.coroutine
-    def store_game(self, game_id, game_json):
-        """Stores JSON-encoded Game object. Raise GTRDBError if an error occurs.
+    def store_game(self, game_id, encoded_game):
+        """Store a Game object encoded as a string. Raise GTRDBError if an error occurs.
         """
-        #game_json = encode.game_to_json(game)
-
-        res = yield self.r.call('HSET', self.prefix+GAMEPREFIX+str(game_id), 'game_json', game_json)
+        res = yield self.r.call('HSET', self.prefix+GAMEPREFIX+str(game_id),
+                GAME_DATA_KEY, encoded_game)
 
         if isinstance(res, TornadisException):
             raise GTRDBError('Failed to store game {0!s}: "{1}"'
@@ -98,25 +196,25 @@ class GTRDBTornadis(object):
 
     @gen.coroutine
     def retrieve_game(self, game_id):
-        """Retrieves a game, returning the JSON-encoding of the Game object.
+        """Retrieve a game, returning the encoded bytestring.
 
-        Raises GTRDBError if the game does not exist or if there is an error
+        Raise GTRDBError if the game does not exist or if there is an error
         communicating with the database.
         """
-        game_json = yield self.r.call('HGET', self.prefix+GAMEPREFIX+str(game_id), 'game_json')
-        if isinstance(game_json, TornadisException):
+        encoded_game = yield self.r.call('HGET',
+                self.prefix+GAMEPREFIX+str(game_id), GAME_DATA_KEY)
+        if isinstance(encoded_game, TornadisException):
             raise GTRDBError('Failed to retrieve game {0!s}: "{1}"'
-                    .format(game_json.message))
-        elif game_json is None:
+                    .format(encoded_game.message))
+        elif encoded_game is None:
             raise GTRDBError('Game {0!s} does not exist.'.format(game_id))
 
-        #game_obj = encode.decode_game(json.loads(game_json))
-        raise gen.Return(game_json)
+        raise gen.Return(encoded_game)
 
 
     @gen.coroutine
     def retrieve_games(self, game_ids):
-        """Retrieves a list of games as the JSON-encoding of the Game object.
+        """Return a list of games as the JSON-encoding of the Game object.
 
         If a game doesn't exist, None will be returned in its place.
         """
@@ -126,7 +224,8 @@ class GTRDBTornadis(object):
             pipeline = tornadis.Pipeline()
 
             for game_id in game_ids:
-                pipeline.stack_call('HGET', self.prefix+GAMEPREFIX+str(game_id), 'game_json')
+                pipeline.stack_call('HGET',
+                        self.prefix+GAMEPREFIX+str(game_id), GAME_DATA_KEY)
 
             pipeline = yield self.r.call(pipeline)
 
@@ -186,11 +285,27 @@ class GTRDBTornadis(object):
         if isinstance(result, TornadisException):
             raise GTRDBError(result.message)
 
+        # register_user already converts to an int, so we can just return here.
         raise gen.Return(user_id)
 
 
     @gen.coroutine
     def register_user(self, username):
+        """Evaluate the register_user lua script. Return the new user ID as an
+        integer.
+
+        The register_user script does the following:
+            1) Check if the username exists and return None if it does.
+            2) Increment the last-used user ID. Set this as the new user's ID.
+            3) Set a hash for the user ID with one field "username" equal to
+            <username>.
+            4) Set the reverse-mapping from username to user ID.
+            5) Return the user id.
+
+        This function calls the script and checks the return/exception, 
+        raising a GTRDBError if the username exists or if registering
+        fails for another reason.
+        """
         result = yield self.r.call('EVALSHA', self.scripts_sha['register'],
                 2, self.prefix+USERID, self.prefix+USERNAMES, username)
 
@@ -222,7 +337,6 @@ class GTRDBTornadis(object):
         Raise GTRDBError if user doesn't exist.
         """
         yield self.r.call('HSET', self.prefix+USERPREFIX+str(user_id), 'last_login', last_login_time)
-
 
 
     @gen.coroutine
@@ -262,12 +376,13 @@ class GTRDBTornadis(object):
     @gen.coroutine
     def retrieve_userid_from_session_auth(self, session_auth):
         user_id = yield self.r.call('HGET', self.prefix+SESSIONS, session_auth)
+        # Redis values are strings, must convert to str
         raise gen.Return(user_id)
 
 
     @gen.coroutine
     def retrieve_user(self, user_id):
-        """Return the entire User dictionary.
+        """Return the entire User dictionary, formatted as a Python dict.
         """
         res = yield self.r.call('HGETALL', self.prefix+USERPREFIX+str(user_id))
         if isinstance(res, TornadisException):
