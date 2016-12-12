@@ -43,7 +43,7 @@ class Game(object):
 
     leader = property(lambda self : self.players[self.leader_index])
     started = property(lambda self : self.turn_number > 0)
-    finished = property(lambda self : self.winners is not None)
+    finished = property(lambda self : len(self.winners) > 0)
 
     def __init__(self, game_id=0, players=None, leader_index=None,
             turn_number=0, role_led=None, active_player_index=None,
@@ -2126,7 +2126,7 @@ class Game(object):
         """Clean up Game flags and push a _do_end_turn for each player.
         """
         self.role_led = None
-        self.legionary_count = None
+        self.legionary_count = 0
         self.legionary_player_index = None
         self.used_oot = False
         self.oot_allowed = False
