@@ -179,7 +179,8 @@ class GTRDBTornadis(object):
         yield self.r.call('HMSET', self.prefix+GAMEPREFIX+str(game_id),
                 'date_created', now, GAME_DATA_KEY, '')
 
-        raise gen.Return(game_id)
+        # Redis stores the id as a string, so we have to convert to an int
+        raise gen.Return(int(game_id))
 
 
     @gen.coroutine
@@ -241,7 +242,7 @@ class GTRDBTornadis(object):
             raise GTRDBError('Failed to retrieve games hosted by user: {0}'
                     .format(user_id))
         else:
-            raise gen.Return(game_ids)
+            raise gen.Return(map(int,game_ids))
 
 
     @gen.coroutine
@@ -249,7 +250,7 @@ class GTRDBTornadis(object):
         """Get the n_games most recently-created games.
         """
         game_ids = yield self.r.call('LRANGE', self.prefix+GAMES, 0, n_games)
-        raise gen.Return(game_ids)
+        raise gen.Return(map(int,game_ids))
 
     
     @gen.coroutine
@@ -326,7 +327,8 @@ class GTRDBTornadis(object):
             raise GTRDBError('Failed to register new user {0}'
                     .format(username))
         else:
-            raise gen.Return(result)
+            # User ids should be integers
+            raise gen.Return(int(result))
 
 
     @gen.coroutine
@@ -349,7 +351,7 @@ class GTRDBTornadis(object):
             raise GTRDBError('Failed to get user ID for {0}: {1}'
                     .format(username, user_id.message))
         else:
-            raise gen.Return(user_id)
+            raise gen.Return(int(user_id))
 
 
     @gen.coroutine
@@ -377,7 +379,7 @@ class GTRDBTornadis(object):
     def retrieve_userid_from_session_auth(self, session_auth):
         user_id = yield self.r.call('HGET', self.prefix+SESSIONS, session_auth)
         # Redis values are strings, must convert to str
-        raise gen.Return(user_id)
+        raise gen.Return(int(user_id))
 
 
     @gen.coroutine
