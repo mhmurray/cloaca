@@ -1,5 +1,5 @@
-define(['jquery', 'jqueryui', 'util', 'display', 'games', 'fsm', 'game', 'net'],
-function($, _, Util, Display, Games, FSM, Game, Net){
+define(['jquery', 'jqueryui', 'util', 'display', 'games', 'fsm', 'game', 'net', 'encode'],
+function($, _, Util, Display, Games, FSM, Game, Net, Encode){
     var App = {
         game_id: null,
         playerIndex: null,
@@ -34,10 +34,12 @@ function($, _, Util, Display, Games, FSM, Game, Net){
         }
 
         // Handle messages sent by the server.
-        function handleCommand(game, action, args) {
+        function handleCommand(game_id, action, args) {
             
             if (action == Util.Action.GAMESTATE) {
-                update_game_state(game, JSON.parse(args[0]));
+                var game_encoded_base64 = args[0];
+                game = Encode.decode_game(game_encoded_base64);
+                update_game_state(game_id, game);
 
             } else if (action == Util.Action.GAMELIST) {
                 update_game_list(args);

@@ -91,7 +91,6 @@ function() {
         var building_length;
         var buildings = [];
         for(var i=0; i<n_buildings; i++) {
-            console.log('decoding building ', i, 'at offset', offset);
             building_length = decode_building(data, offset);
             buildings.push(building_length.building);
             offset+=building_length.length;
@@ -145,8 +144,6 @@ function() {
     }
 
     function decode_building(data, offset) {
-        console.log(new Uint8Array(data.buffer.slice()));
-        console.log(new Uint8Array(data.buffer.slice(offset)));
         var length = data.getUint8(offset);
         offset+=1;
         var foundation = data.getUint8(offset);
@@ -162,7 +159,6 @@ function() {
         var mat3 = data.getUint8(offset);
         offset+=1;
         var stairway_materials = [];
-        console.log(data.byteLength, offset, length);
         for(var i=6; i<length; i++) {
             var mat = data.getUint8(offset);
             offset+=1;
@@ -218,7 +214,6 @@ function() {
     ];
 
     function decode_frame(data, offset, players) {
-        console.log('decoding frame at offset', offset);
         var length = data.getUint8(offset);
         offset+=1;
         var function_id = data.getUint8(offset);
