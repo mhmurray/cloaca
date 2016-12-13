@@ -234,10 +234,10 @@ def decode_frame(obj):
     return frame_obj
 
 
-def game_to_json(game, indent=None):
+def game_to_json(game):
     """Transform a Game object into JSON.
     """
-    return json.dumps(encode(game), sort_keys=True, indent=indent)
+    return json.dumps(encode(game), sort_keys=True, indent=None)
 
 def json_to_game(game_json):
     """Transform JSON into game object.
@@ -248,3 +248,7 @@ def json_to_game(game_json):
         raise GTREncodingError(e.message)
 
     return decode_game(game_dict)
+
+# Alias to have the same interface methods as encode_binary.
+game_to_str = game_to_json
+str_to_game = json_to_game

@@ -65,19 +65,13 @@ class TestEncodeGame(unittest.TestCase):
         game._init_common_piles(2)
         self.encode_decode_compare_game(game)
 
-    # @unittest.skip('fails...')
     def test_start_frames(self):
         game = Game()
         game.add_player(0, 'p0')
         game.add_player(1, 'p1')
         game.start()
 
-        from pprint import pprint
-        pprint(encode.encode(game))
-        pprint(encode.decode_game(encode.encode(game)).__dict__)
-        pprint(game.__dict__)
-
-        # self.encode_decode_compare_game(game)
+        self.encode_decode_compare_game(game)
 
     def test_frame(self):
         game = Game()
