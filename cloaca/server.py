@@ -1,16 +1,9 @@
 from cloaca.game import Game
-from cloaca.player import Player
-from cloaca.game_record import GameRecord
 from cloaca.message import GameAction, Command
 import cloaca.message as message
 from cloaca.error import GTRError, GameOver
 import cloaca.encode as encode
 
-import uuid
-import functools
-
-import json
-import pickle
 import logging
 import datetime
 
@@ -196,16 +189,16 @@ class GTRServer(object):
             self._game_locks[game_id] = lock
         
         with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
-            game_json = yield self.db.retrieve_game(game_id)
+            game_encoded = yield self.db.retrieve_game(game_id)
 
             username = userdict['username']
 
-            if game_json is None:
+            if game_encoded is None:
                 msg = 'Invalid game id: ' + str(game_id)
                 lg.warning(msg)
                 return
 
-            game = encode.json_to_game(game_json)
+            game = encode.str_to_game(game_encoded)
 
             player_index = game.find_player_index(username)
             if player_index is None:
@@ -282,16 +275,18 @@ class GTRServer(object):
     def join_game(self, user_id, game_id):
         """Joins an existing game"""
         userdict = yield self.db.retrieve_user(user_id)
-        game_json = yield self.db.retrieve_game(game_id)
+        game_encoded = yield self.db.retrieve_game(game_id)
 
         username = userdict['username']
 
-        if game_json is None:
+        if game_encoded is None:
             msg = 'Invalid game id: ' + str(game_id)
             lg.warning(msg)
             return
 
-        game = encode.json_to_game(game_json)
+        game = encode.str_to_game(game_encoded)
+
+        lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
 
         player_index = game.add_player(user_id, username)
         yield self.store_game(game)
@@ -300,16 +295,16 @@ class GTRServer(object):
     @gen.coroutine
     def get_game(self, user_id, game_id):
         userdict = yield self.db.retrieve_user(user_id)
-        game_json = yield self.db.retrieve_game(game_id)
+        game_encoded = yield self.db.retrieve_game(game_id)
 
         username = userdict['username']
 
-        if game_json is None:
+        if game_encoded is None:
             msg = 'Invalid game id: ' + str(game_id)
             lg.warning(msg)
             raise GTRError(msg)
             
-        game = encode.json_to_game(game_json)
+        game = encode.str_to_game(game_encoded)
 
         player_index = game.find_player_index(username)
         if player_index is None:
@@ -331,21 +326,21 @@ class GTRServer(object):
         lg.debug('User {0!s} requests game {1!s}'.format(user_id, game_id))
         game = yield self.get_game(user_id, game_id)
         if game is None:
-            game_json = ''
+            game_encoded = ''
         else:
-            game_json = encode.game_to_json(game)
+            game_encoded = encode.game_to_str(game)
 
-        raise gen.Return(game_json)
+        raise gen.Return(game_encoded)
 
 
     def _send_game(self, user_id, game):
         """Sends the game to the user as a GAMESTATE command."""
         if game is None:
-            gs_json = ''
+            gs_encoded = ''
         else:
-            gs_json = encode.game_to_json(game)
+            gs_encoded = encode.game_to_str(game)
 
-        resp = Command(game.game_id, None, GameAction(message.GAMESTATE, gs_json))
+        resp = Command(game.game_id, None, GameAction(message.GAMESTATE, gs_encoded))
         self.send_command(user_id, resp)
         
 
@@ -384,6 +379,8 @@ class GTRServer(object):
         game.game_id = game_id
         game.host = username
 
+        lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
+
         player_index = game.add_player(user_id, username)
 
         yield self.store_game(game)
@@ -397,23 +394,23 @@ class GTRServer(object):
         via self.db.store_game().
         """
         game_id = game.game_id
-        game_json = encode.game_to_json(game)
-        yield self.db.store_game(game_id, game_json)
+        game_encoded = encode.game_to_str(game)
+        yield self.db.store_game(game_id, game_encoded)
     
 
     @gen.coroutine
     def start_game(self, user_id, game_id):
         userdict = yield self.db.retrieve_user(user_id)
-        game_json = yield self.db.retrieve_game(game_id)
+        game_encoded = yield self.db.retrieve_game(game_id)
 
         username = userdict['username']
 
-        if game_json is None:
+        if game_encoded is None:
             msg = 'Invalid game id: ' + str(game_id)
             lg.warning(msg)
             return
 
-        game = encode.json_to_game(game_json)
+        game = encode.str_to_game(game_encoded)
 
         if game.started:
             raise GTRError('Game already started.')

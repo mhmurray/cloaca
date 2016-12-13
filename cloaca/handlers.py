@@ -4,7 +4,7 @@ from cloaca.error import ParsingError, GTRDBError, GTRError
 from cloaca.server import GTRServer
 from cloaca.game_record import GameRecord
 import cloaca.db
-import cloaca.encode
+import cloaca.encode as encode
 
 import tornado
 from tornado.web import RequestHandler
@@ -184,15 +184,15 @@ class GameListHandler(BaseHandler):
     def get(self):
         N_GAMES_TO_RETRIEVE = 100
         game_ids = yield self.db.retrieve_latest_games(N_GAMES_TO_RETRIEVE)
-        games_json = yield self.db.retrieve_games(game_ids)
+        games_encoded = yield self.db.retrieve_games(game_ids)
 
         records = []
-        for game_json in games_json:
-            if game_json is None:
+        for game_encoded in games_encoded:
+            if game_encoded is None:
                 continue
             try:
-                game = cloaca.encode.json_to_game(game_json)
-            except cloaca.encode.GTREncodingError as e:
+                game = encode.str_to_game(game_encoded)
+            except encode.GTREncodingError as e:
                 lg.debug('Error decoding game JSON.')
                 continue
 
@@ -403,12 +403,12 @@ class GameWSHandler(WebSocketHandler):
             elif commands[0].action.action == cloaca.message.REQGAMESTATE:
                 lg.debug('Received request for game {0!s}.'.format(game_id))
                 try:
-                    game_json = yield self.server.get_game_json(user_id, game_id)
+                    game_encoded = yield self.server.get_game_json(user_id, game_id)
                 except GTRError as e:
                     lg.debug('Sending error')
                     self.send_error(e.message)
                 else:
-                    resp = Command(game_id, None, GameAction(cloaca.message.GAMESTATE, game_json))
+                    resp = Command(game_id, None, GameAction(cloaca.message.GAMESTATE, game_encoded))
                     lg.debug('Sending game '+str(game_id))
                     self.send_command(resp)
             else:
