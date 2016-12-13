@@ -29,9 +29,6 @@ version is manipulated with:
     - make_header(encoded_game)
     - decode_header(data)
 
-The magic number that prefixes all encoded games is available as the
-module-level property MAGIC_NUMBER.
-
 The following functions are available for formatting help,
 but these are specific to the encoding format, and may change
 in future versions:
@@ -50,6 +47,13 @@ in future versions:
 
 Encoding and decoding errors are reported by raising GTREncodingError.
 
+There are a few module-level variables that are useful.
+The magic number that prefixes all encoded games is available as the
+module-level property MAGIC_NUMBER.
+The byte-sized encoding for anonymous cards is ANONCARD and values like None
+or the null byte for hidden zones are represented with NULLCODE.
+These are simply 0xFE and 0xFF, respectively.
+
 
 Full format specification
 =========================
@@ -59,11 +63,17 @@ places. They are placed in canonical order, which is Patron, Laborer,
 Architect, Craftsman, Legionary, Merchant, and likewise for the
 corresponding material or site.
 
+All numbers are unsigned integers unless otherwise specified.
+
+The <length> field for stack frames, buildings, and players is the
+number of all of the _other_ bytes, not including the length field
+itself.
+
 Header
 ------
 A header includes non-game meta-information.
     
-    0x47745221 : (4 bytes) magic number to identify Game encodings
+    <magic_number> : (4 bytes) magic number to identify Game encodings
     <encoding_version> : (4 bytes) version of this encoding.
     <checksum> : (4 bytes) CRC32 checksum of the remaining data section
 
@@ -78,11 +88,11 @@ First the fixed size set of game properties:
     <legionary_count> : (1 byte integer)
     <used_oot> : (1 byte boolean) 0 or 1
     <oot_allowed> : (1 byte boolean) 0 or 1
-    <role_led> : (1 byte integer) 255 for None or Role 0-5 in canonical order
-    <expected_action> : (1 byte integer) 255 for None or action #.
-    <legionary_player_index> : (1 byte integer) 255 for None or player index 0-4
-    <leader_index> : (1 byte integer) 255 for None or player index 0-4
-    <active_player_index> : (1 byte integer) 255 for None or player index 0-4
+    <role_led> : (1 byte integer) 0xFF for None or Role 0-5 in canonical order
+    <expected_action> : (1 byte integer) 0xFF for None or action #.
+    <legionary_player_index> : (1 byte integer) 0xFF for None or player index 0-4
+    <leader_index> : (1 byte integer) 0xFF for None or player index 0-4
+    <active_player_index> : (1 byte integer) 0xFF for None or player index 0-4
 
     <in_town_sites> : (6 bytes) count of Sites in canonical order.
     <out_of_town_sites> : (6 bytes) count of Sites in canonical order
@@ -117,12 +127,13 @@ Zone
 A zone is either of the following two formats:
 
     <length> (1 byte) number of cards in the zone.
-    <card1> (1 byte) Card.ident, or 254 if the card is anonymous (ident = -1).
+    <card1> (1 byte) Card.ident, or 0xFE if the card is anonymous (ident = -1).
+    ...
 
 OR, if all cards in the zone are anonymous (ident = -1):
 
     <length> (1 byte) number of cards
-    <0xFF> (1 byte) Fixed byte with value 255.
+    <0xFF> (1 byte) Fixed byte with value 0xFF.
 
 Note that anonymous cards can be stored in a zone alongside non-anonymous
 cards, but the second format cannot be used. The intention is to compress
@@ -135,8 +146,8 @@ Player
 A player is stored first as the fixed-length properties
 
     <name> : (21 byte pascal string)
-    <uid> : (16 bytes), player user id
-    <fountain_card> : (1 byte) fountain card ident or 254 for None or 255 for anonymous
+    <uid> : (4 bytes), player user id
+    <fountain_card> : (1 byte) fountain card ident or 0xFF for None or 0xFE for anonymous
     <n_actions> : (1 byte) camp actions
     <performed_craftsman> : (1 byte) 1 or 0
     <influence> : (6 bytes) Count of sites in canonical order
@@ -166,7 +177,7 @@ See Building encoding for details.
 
 Building
 --------
-A building is encoded as the building lenght and the fixed-length properties,
+A building is encoded as the building length and the fixed-length properties,
 including the materials, where invalid material slots are marked. There can be
 an arbitrary number of stairway materials following these.
 The site, foundation, materials, and stairway materials cannot be anonymous or
@@ -176,7 +187,7 @@ None.
         <foundation> : (1 byte) Card ident
         <site> : (1 byte) Site as canonically-numbered material.
         <complete> : (1 byte) 1 or 0
-        <mat1> : (1 byte) Card ident
+        <mat1> : (1 byte) Card ident or 0 if material slot is empty.
         <mat2> : (1 byte) Card ident
         <mat3> : (1 byte) Card ident
         <stairway_mat1> : (1 byte) Card ident
@@ -237,9 +248,7 @@ the number of frames first.
     ...
 """
 
-import json
 import copy
-import uuid
 import struct
 from collections import Counter
 import base64
@@ -250,10 +259,11 @@ from cloaca.building import Building
 from cloaca.game import Game
 from cloaca.card import Card
 from cloaca.player import Player
-from cloaca.stack import Stack
-from cloaca.stack import Frame
+from cloaca.stack import Stack, Frame
 
-MAGIC_NUMBER = 0x47745221
+MAGIC_NUMBER = 0x89477452
+NULLCODE = 0xFF;
+ANONCARD = 0xFE;
 
 class GTREncodingError(Exception):
     pass
@@ -272,7 +282,7 @@ def _decode_sites(list_of_counts):
 
 def _encode_visible_zone(obj):
     """Encode a zone of cards and return the bytestring."""
-    cards = [254 if c.ident == -1 else c.ident for c in obj.cards]
+    cards = [ANONCARD if c.ident == -1 else c.ident for c in obj.cards]
 
     fmt = '!B'+str(len(cards))+'B'
     return struct.pack(fmt, len(cards), *cards)
@@ -285,7 +295,7 @@ def _encode_hidden_zone(obj):
     n_cards = len(obj.cards)
 
     fmt = '!BB'
-    return struct.pack(fmt, n_cards, 0xFF)
+    return struct.pack(fmt, n_cards, NULLCODE)
 
 
 _ARG_PLAYER, _ARG_ACTION, _ARG_ROLE = range(3)
@@ -325,7 +335,7 @@ _STACK_FUNC_TO_INT = {
 _MATERIAL_TO_INT = {
         'Marble':0, 'Rubble':1, 'Concrete':2,
         'Wood':3, 'Brick':4, 'Stone':5,
-        None: 0xFF
+        None: NULLCODE
         }
 
 _INT_TO_MATERIAL = {v:k for k,v in _MATERIAL_TO_INT.items()}
@@ -347,7 +357,7 @@ def int_to_frame_func(i):
 _ROLE_TO_INT = {
         'Patron':0, 'Laborer':1, 'Architect':2,
         'Craftsman':3, 'Legionary':4, 'Merchant':5,
-        None: 0xFF
+        None: NULLCODE
         }
 _INT_TO_ROLE = {v:k for k,v in _ROLE_TO_INT.items()}
 def role_to_int(role):
@@ -439,7 +449,7 @@ def decode_zone(buffer, offset):
     if length:
         first_byte = struct.unpack_from('!B', buffer, offset+1)[0]
 
-        hidden = (first_byte == 0xFF)
+        hidden = (first_byte == NULLCODE)
 
     if hidden:
         return (2, Zone([Card(-1)]*length))
@@ -524,7 +534,7 @@ def decode_frame(buffer, offset, players):
 
     new_args = _decode_frame_args(args, function_name, players)
 
-    return (length+1, Frame(function_name, args=args, executed=executed))
+    return (length+1, Frame(function_name, args=new_args, executed=executed))
 
 
 def encode_player(obj):
@@ -534,12 +544,19 @@ def encode_player(obj):
     """
     chunks = []
 
-    fmt = '!21p16sBBB6B'
+    fmt = '!21pIBBB6B'
+
+    if obj.fountain_card is None:
+        fountain_int = NULLCODE;
+    elif obj.fountain_card.is_anon:
+        fountain_int = ANONCARD
+    else:
+        fountain_int = obj.fountain_card.ident
 
     chunks.append(struct.pack(fmt,
             obj.name,
-            uuid.UUID(int=obj.uid).bytes,
-            obj.fountain_card.ident if obj.fountain_card is not None else 254,
+            obj.uid,
+            fountain_int,
             obj.n_camp_actions,
             obj.performed_craftsman,
             *_encode_sites(obj.influence)))
@@ -580,16 +597,16 @@ def decode_player(buffer, offset):
     of bytes consumed from the buffer.
     """
     offset_orig = offset
-    fmt = '!21p16sBBB6B'
+    fmt = '!21pIBBB6B'
 
     values = struct.unpack_from(fmt, buffer, offset)
     offset += struct.calcsize(fmt)
 
     name = values[0]
-    uid = uuid.UUID(bytes=values[1]).int
-    if values[2] == 0xFF:
+    uid = values[1]
+    if values[2] == ANONCARD:
         fountain_card = Card(-1)
-    elif values[2] == 0xFE:
+    elif values[2] == NULLCODE:
         fountain_card = None
     else:
         fountain_card = Card(values[2])
@@ -697,10 +714,10 @@ def decode_game(buffer, offset=0):
     oot_allowed = bool(oot_allowed)
     role_led = int_to_role(role_led)
     
-    if expected_action == 0xFF: expected_action = None
-    if legionary_player_index == 0xFF: legionary_player_index = None
-    if leader_index == 0xFF: leader_index = None
-    if active_player_index == 0xFF: active_player_index = None
+    if expected_action == NULLCODE: expected_action = None
+    if legionary_player_index == NULLCODE: legionary_player_index = None
+    if leader_index == NULLCODE: leader_index = None
+    if active_player_index == NULLCODE: active_player_index = None
 
     fmt = '!6B'
     length = struct.calcsize(fmt)
@@ -743,11 +760,6 @@ def decode_game(buffer, offset=0):
 
     length, current_frame = decode_frame(buffer, offset, players)
     offset += length
-    if current_frame is not None:
-        new_args = _decode_frame_args(current_frame.args,
-                current_frame.function_name, players)
-        # Frame.args must be a tuple
-        current_frame.args = tuple(new_args)
     
     length, stack = decode_stack(buffer, offset, players)
     
@@ -812,10 +824,10 @@ def encode_game(obj):
             int(obj.used_oot),
             int(obj.oot_allowed),
             role_to_int(obj.role_led),
-            obj.expected_action if obj.expected_action is not None else 0xFF,
-            obj.legionary_player_index if obj.legionary_player_index is not None else 0xFF,
-            obj.leader_index if obj.leader_index is not None else 0xFF,
-            obj.active_player_index if obj.active_player_index is not None else 0xFF,
+            obj.expected_action if obj.expected_action is not None else NULLCODE,
+            obj.legionary_player_index if obj.legionary_player_index is not None else NULLCODE,
+            obj.leader_index if obj.leader_index is not None else NULLCODE,
+            obj.active_player_index if obj.active_player_index is not None else NULLCODE,
             ))
     
     fmt = '!6B6B5B'
@@ -858,34 +870,56 @@ def game_to_str(game):
     return base64.b64encode(encode_game(game))
 
 
+def decode_header(buffer):
+    """Decode the header and return a tuple (magic_number, version, checksum).
+    """
+
+
 def str_to_game(s):
-    bytestring = base64.b64decode(s)
+    try:
+        bytestring = base64.b64decode(s)
+    except TypeError as e:
+        raise GTREncodingError('Invalid base64.')
+
     offset=0
 
     # Check magic number
     fmt='!I'
-    magic_number = struct.unpack_from(fmt, bytestring, offset)[0]
+    try:
+        magic_number = struct.unpack_from(fmt, bytestring, offset)[0]
+    except struct.error as e:
+        raise GTREncodingError('Error unpacking header: ' + e.message)
+
     offset += struct.calcsize(fmt)
 
     if magic_number != MAGIC_NUMBER:
         raise GTREncodingError('Decoding error: invalid record format')
 
     fmt = '!I'
-    version = struct.unpack_from(fmt, bytestring, offset)[0]
+    try:
+        version = struct.unpack_from(fmt, bytestring, offset)[0]
+    except struct.error as e:
+        raise GTREncodingError('Error unpacking header: ' + e.message)
     offset += struct.calcsize(fmt)
 
     if version != 1:
         raise GTREncodingError('Decoding error: format version {0:d} unsupported'.format(version))
 
     fmt = '!i'
-    record_checksum = struct.unpack_from(fmt, bytestring, offset)[0]
+    try:
+        record_checksum = struct.unpack_from(fmt, bytestring, offset)[0]
+    except struct.error as e:
+        raise GTREncodingError('Error unpacking header: ' + e.message)
     offset += struct.calcsize(fmt)
 
     computed_checksum = crc32(bytestring[offset:])
     if record_checksum != computed_checksum:
         raise GTREncodingError('Decoding error: checksum mismatch.')
 
-    game = decode_game(bytestring[offset:])
+    try:
+        game = decode_game(bytestring[offset:])
+    except struct.error as e:
+        raise GTREncodingError('Error unpacking game: ' + e.message)
 
     return game
 

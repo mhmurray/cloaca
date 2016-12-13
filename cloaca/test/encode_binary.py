@@ -20,6 +20,8 @@ from cloaca.test.test_setup import TestDeck
 import unittest
 import copy
 import struct
+import base64
+import binascii
 
 
 class TestObjectComparison(unittest.TestCase):
@@ -164,6 +166,11 @@ class TestEncodeDecodeGame(unittest.TestCase):
         self.encode_decode_compare_game(game)
         self.encode_decode_compare_game(game.privatized_game_state_copy('p0'))
 
+    def test_game_winners(self):
+        game = test_setup.simple_two_player()
+        game.winners = list(game.players)
+        self.encode_decode_compare_game(game)
+
 
 def _encode_decode(game):
     """Encode and then decode a game."""
@@ -193,6 +200,17 @@ class TestPublicZoneEncode(unittest.TestCase):
         self.assertEqual(g.library, gpriv.library)
         self.assertEqual(g.pool, gpriv.pool)
         self.assertEqual(g.jacks, gpriv.jacks)
+
+class TestStackFrame(unittest.TestCase):
+    """Test Frame objects.
+    """
+
+    def test_frame(self):
+        players = [Player(0, 'p0')]
+        f = Frame('_perform_role_being_led', players[0], executed=False)
+        fe = encode.encode_frame(f, players)
+        length, fe_decoded = encode.decode_frame(fe, 0, players)
+        self.assertEqual(f, fe_decoded)
 
 
 class TestStack(unittest.TestCase):
@@ -366,6 +384,69 @@ class TestPlayerZone(unittest.TestCase):
             self.assertEqual(p.clients_given, q.clients_given)
 
 
+class TestEncodingHeaderFormat(unittest.TestCase):
+    """Test the header with version, magic number, and checksum.
+    """
+
+    def test_magic_number(self):
+        game = Game()
+        ge = base64.b64decode(encode.game_to_str(game))
+
+        self.assertEqual(ge[:4], struct.pack('!I', encode.MAGIC_NUMBER))
+
+
+    def test_version(self):
+        """The module encode_binary starts with version 1."""
+        game = Game()
+        ge = base64.b64decode(encode.game_to_str(game))
+
+        self.assertEqual(ge[4:8], struct.pack('!I', 1))
+
+
+    def test_checksum(self):
+        game = Game()
+        ge = base64.b64decode(encode.game_to_str(game))
+
+        record_checksum = struct.unpack('!i', ge[8:12])[0]
+        game_bytes = ge[12:]
+
+        computed_checksum = binascii.crc32(game_bytes)
+
+        self.assertEqual(record_checksum, computed_checksum)
+
+    
+    def test_checksum_error(self):
+        """Remove a byte at the end of the encoded game so the checksum fails.
+        """
+        game = Game()
+        ge = base64.b64decode(encode.game_to_str(game))
+
+        ge_corrupted = base64.b64encode(ge[:-1])
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(ge_corrupted)
+
+    def test_magic_number_error(self):
+        """Alter the magic number at the beginning of the formatted string.
+        """
+        game = Game()
+        ge = base64.b64decode(encode.game_to_str(game))
+        ge_corrupted = base64.b64encode(struct.pack('!B', 0x46) + ge[1:])
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(ge_corrupted)
+
+    def test_encoding_version_error(self):
+        """Versions != 1 cannot be decoded.
+        """
+        game = Game()
+        ge = base64.b64decode(encode.game_to_str(game))
+        ge_version = base64.b64encode(ge[:4] + struct.pack('!B', 2) + ge[5:])
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(ge_version)
+
+
 class TestEncodingFormat(unittest.TestCase):
     """Test the binary output of the encoding.
     """
@@ -403,6 +484,42 @@ class TestEncodingFormat(unittest.TestCase):
         self.assertEqual(ze, str(bytes))
 
 
+    def test_game_properties(self):
+        game = Game(
+                game_id=24,
+                turn_number=74,
+                action_number=124,
+                host='Player1',
+                legionary_count=1,
+                used_oot=False,
+                oot_allowed=True,
+                role_led=None,
+                expected_action=14,
+                legionary_player_index=0,
+                leader_index=0,
+                active_player_index=1,
+                players=[Player(0, 'p0'), Player(1,'p1')]
+                )
+        ge = encode.encode_game(game)
+
+        # Skip the header
+        fmt = '!III21p8B'
+        values = struct.unpack_from(fmt, ge[12:], 0)
+
+        self.assertEqual(values[0], 24)
+        self.assertEqual(values[1], 74)
+        self.assertEqual(values[2], 124)
+        self.assertEqual(values[3], 'Player1')
+        self.assertEqual(values[4], 1)
+        self.assertEqual(values[5], 0)
+        self.assertEqual(values[6], 1)
+        self.assertEqual(values[7], 255)
+        self.assertEqual(values[8], 14)
+        self.assertEqual(values[9], 0)
+        self.assertEqual(values[10], 0)
+        self.assertEqual(values[11], 1)
+
+
     def test_complete_building(self):
         """Buildings are the following bytes: <len>, <foundation>, <site>,
         <complete>, <mat1>, <mat2>, <mat3>, [<stairway_mat1>], ...
@@ -438,13 +555,14 @@ class TestEncodingFormat(unittest.TestCase):
         originating Game object. 
         """
         f = Frame('_advance_turn', executed=False)
-        fe = encode.encode_frame(f)
+        # Ignore the players arg, since _advance_turn doesnt have args.
+        fe = encode.encode_frame(f, [])
         bytes = bytearray([2, 0, 0])
         self.assertEqual(fe, str(bytes))
 
 
     def test_stack_frame_none(self):
-        fe = encode.encode_frame(None)
+        fe = encode.encode_frame(None, [])
         bytes = bytearray([0])
         self.assertEqual(fe, str(bytes))
 
@@ -454,8 +572,7 @@ class TestEncodingFormat(unittest.TestCase):
         f = Frame('_await_action', message.THINKERORLEAD,
                 game.players[1], executed=False)
 
-        f.args = encode.convert_frame_args(f, game.players)
-        fe = encode.encode_frame(f)
+        fe = encode.encode_frame(f, game.players)
         bytes = bytearray([4, 1, 0, 0x30+message.THINKERORLEAD, 0x11])
         self.assertEqual(fe, str(bytes))
 
@@ -465,8 +582,7 @@ class TestEncodingFormat(unittest.TestCase):
         f = Frame('_perform_role_action', game.players[1],
                 'Craftsman', executed=False)
 
-        f.args = encode.convert_frame_args(f, game.players)
-        fe = encode.encode_frame(f)
+        fe = encode.encode_frame(f, game.players)
         bytes = bytearray([0x04, 0x09, 0x00, 0x11, 0x23])
         self.assertEqual(fe, str(bytes))
 
@@ -476,7 +592,9 @@ class TestEncodingFormat(unittest.TestCase):
         game.in_town_sites = []
         game.out_of_town_sites = ['Rubble', 'Rubble', 'Wood']
         ge = encode.encode_game(game)
-        SITES_OFFSET = struct.calcsize('!III21pBBBBBBBB')
+
+        # Offset the 12 header bytes and then the the Game properties
+        SITES_OFFSET = struct.calcsize('!IIiIII21pBBBBBBBB')
 
         in_town_sites = ge[SITES_OFFSET:SITES_OFFSET+6]
         bytes = bytearray([0,0,0,0,0,0])
@@ -485,6 +603,41 @@ class TestEncodingFormat(unittest.TestCase):
         out_of_town_sites = ge[SITES_OFFSET+6:SITES_OFFSET+12]
         bytes = bytearray([0,2,0,1,0,0])
         self.assertEqual(out_of_town_sites, str(bytes))
+
+    
+class TestEncodingErrors(unittest.TestCase):
+
+    def test_base64_encoding_error(self):
+        # Base64 padding doesn't allow only three characters in the output
+        game_encoded = 'ABD'
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(game_encoded)
+
+    def test_struct_unpacking_error(self):
+        # Not enough bytes for magic number
+        game_encoded = base64.b64encode('\x00\x01\x01')
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(game_encoded)
+
+        # Not enough bytes for version
+        game_encoded = base64.b64encode(struct.pack('!I', encode.MAGIC_NUMBER)+'\x00\x01\x00')
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(game_encoded)
+
+        # Not enough bytes for checksum
+        game_encoded = base64.b64encode(struct.pack('!II', encode.MAGIC_NUMBER, 1)+'\x00\x01\x00')
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(game_encoded)
+
+        # Not enough bytes for game_data
+        game_encoded = base64.b64encode(struct.pack('!II', encode.MAGIC_NUMBER, 1)+'\x00\x01\x00\x01')
+
+        with self.assertRaises(encode.GTREncodingError):
+            encode.str_to_game(game_encoded)
 
 
 if __name__ == '__main__':
