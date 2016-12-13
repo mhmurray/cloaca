@@ -74,16 +74,18 @@ def make_app(database):
             xsrf_cookies=True,
 
             )
+    WEBSOCKET_URI = '/ws/'
     return tornado.web.Application([
         (r'/(favicon.ico)', tornado.web.StaticFileHandler, {'path':site_path}),
         (r'/newgame', CreateGameHandler, {'database':database, 'server':server}),
         (r'/joingame/([0-9]+)', JoinGameHandler, {'database':database, 'server':server}),
         (r'/startgame/([0-9]+)', StartGameHandler, {'database':database, 'server':server}),
-        (r'/game/([0-9]+)', GameHandler, {'database':database, 'server':server}),
+        (r'/game/([0-9]+)', GameHandler, {'database':database, 'server':server,
+            'websocket_uri':WEBSOCKET_URI}),
         (r'/(style.css)', tornado.web.StaticFileHandler, {'path':site_path}),
         (r'/js/(.*)', tornado.web.StaticFileHandler, {'path':js_path}),
         (r'/', GameListHandler, {'database':database}),
-        (r'/ws', GameWSHandler, {'database':database, 'server':server}),
+        (WEBSOCKET_URI, GameWSHandler, {'database':database, 'server':server}),
         (r'/register', RegisterHandler, {'database': database}),
         (r'/login', LoginPageHandler, {'database': database}),
         (r'/auth', AuthenticateHandler, {'database': database}),

@@ -159,9 +159,10 @@ class StartGameHandler(BaseHandler):
 
 
 class GameHandler(BaseHandler):
-    def initialize(self, database, server):
+    def initialize(self, database, server, websocket_uri):
         super(GameHandler, self).initialize(database)
         self.server = server
+        self.websocket_uri = websocket_uri
 
 
     @tornado.web.authenticated
@@ -173,7 +174,7 @@ class GameHandler(BaseHandler):
         self.render('site/templates/game.html',
                 game_id=game_id,
                 username=self.current_user['username'],
-                websocket_uri='/ws/')
+                websocket_uri=self.websocket_uri)
         return
 
 
