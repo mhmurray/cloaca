@@ -4,7 +4,7 @@ from cloaca.error import ParsingError, GTRDBError, GTRError
 from cloaca.server import GTRServer
 from cloaca.game_record import GameRecord
 import cloaca.db
-import cloaca.encode as encode
+import cloaca.encode_binary as encode
 
 import tornado
 from tornado.web import RequestHandler

@@ -2,7 +2,7 @@ from cloaca.game import Game
 from cloaca.message import GameAction, Command
 import cloaca.message as message
 from cloaca.error import GTRError, GameOver
-import cloaca.encode as encode
+import cloaca.encode_binary as encode
 
 import logging
 import datetime
