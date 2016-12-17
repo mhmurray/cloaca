@@ -1,5 +1,5 @@
-define(['jquery', 'jqueryui', 'fsm', 'util', 'selectable'],
-function($, _, FSM, Util, Selectable){
+define(['jquery', 'fsm', 'util', 'selectable'],
+function($, FSM, Util, Selectable){
     var AB = {
         playerIndex: null
     };

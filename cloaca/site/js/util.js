@@ -1,4 +1,4 @@
-define(['jquery', 'jqueryui'],
+define(['jquery'],
 function($){
     var util = {
         _cardDictionary: {},

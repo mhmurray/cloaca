@@ -1,5 +1,5 @@
-define(['util', 'jquery', 'jqueryui'],
-function(Util, $, _){
+define(['util', 'jquery'],
+function(Util, $){
     function Display(id, username, players) {
         this.id = id;
         this.players = players;
@@ -387,12 +387,6 @@ function(Util, $, _){
 
         this.gameLog.html(gs.game_log.join('<br>'));
         this.gameLog[0].scrollTop = this.gameLog[0].scrollHeight;
-                        
-        $('.card-container').sortable({
-            tolerance: 'intersect',
-            //connectWith: $('.card-container') // Drag-and-drop
-        });
-        $('.card-container').disableSelection();
     };
 
     return Display;
