@@ -6,6 +6,7 @@ function(Util, $){
         //this.id = record.id;
         //this.players = record.players;
         this.user = username;
+        this.log_waypoints = [];
     };
 
     // Return card objects from zone of player with specified index, counted from
@@ -206,12 +207,14 @@ function(Util, $){
         this.dialogBtns.append(this.roleBtns, this.choiceBtns)
         this.dialogWrapper.append(this.dialog, this.dialogBtns);
 
-        this.gameLog = $('<div/>').attr('id', 'log').addClass('log');
+        this.gameLogWrapper = $('<div/>').attr('id', 'log').addClass('log');
+        this.gameLog = $('<ul/>');
+        this.gameLogWrapper.append(this.gameLog);
 
         this.cardsPanel.append(this.gameControls, this.poolWrapper, this.playerInfo);
 
         this.gamePanel.append(this.gameInfo, this.decks, this.sites,
-            this.dialogWrapper, this.gameLog);
+            this.dialogWrapper, this.gameLogWrapper);
 
         this.gameWrapper.append(this.cardsPanel, this.gamePanel);
 
@@ -384,9 +387,6 @@ function(Util, $){
         this.deck.data({nCards: library.length});
         this.jacks.children('.pile-count').text(jacks.length);
         this.jacks.data({nCards: jacks.length});
-
-        this.gameLog.html(gs.game_log.join('<br>'));
-        this.gameLog[0].scrollTop = this.gameLog[0].scrollHeight;
     };
 
     return Display;

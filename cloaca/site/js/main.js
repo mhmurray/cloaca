@@ -2,6 +2,7 @@ require.config({
     paths: {
 //        jquery: 'libs/jquery/jquery',
         jquery: "https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min",
+        jquerywaypoints: 'libs/jquery/jquery.waypoints.min',
         fsm: "libs/javascript-state-machine/state-machine.min"
     },
 });

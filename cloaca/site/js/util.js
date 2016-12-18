@@ -310,7 +310,9 @@ function($){
         SERVERERROR     : 34,
         PRISON          : 35,
         TAKEPOOLCARDS   : 36,
-        TAKECLIENTS     : 37
+        TAKECLIENTS     : 37,
+        REQGAMELOG      : 38,
+        GAMELOG         : 39
     };
 
     util._cardDictionary = {

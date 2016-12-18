@@ -41,6 +41,15 @@ function($, Util, Display, Games, FSM, Game, Net, Encode){
                 game = Encode.decode_game(game_encoded_base64);
                 update_game_state(game_id, game);
 
+            } else if (action == Util.Action.GAMELOG) {
+                var n_total = args[0];
+                var n_start = args[1];
+                var messages = [];
+                if(args[2] !== null) {
+                    messages = args[2].split(/\n/g);
+                };
+                update_game_log(game_id, n_total, n_start, messages);
+
             } else if (action == Util.Action.GAMELIST) {
                 update_game_list(args);
 
@@ -58,6 +67,8 @@ function($, Util, Display, Games, FSM, Game, Net, Encode){
             } else if (action == Util.Action.SERVERERROR) {
                 var message = args[0];
                 displayError(message);
+            } else {
+                console.debug('Unknown action type:', action);
             }
         };
 
@@ -228,6 +239,16 @@ function($, Util, Display, Games, FSM, Game, Net, Encode){
             }
         };
 
+        function update_game_log(game_id, n_total, n_start, messages ) {
+            if(!(game_id in Games.games)) {
+                console.log('Tried to update game log, but game doesn\'t exist');
+                return;
+            }
+
+            var game = Games.games[game_id];
+            game.updateLog(n_total, n_start, messages);
+        };
+        
         function update_game_state(game_id, gameState) {
             console.dir(gameState);
             if(!(game_id in Games.games)) {
