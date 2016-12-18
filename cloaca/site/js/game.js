@@ -101,8 +101,10 @@ function($, _, AB, Games, Display, Net, Util) {
                     return;
                 }
 
-                this_game.requestLogMessages(first_missing+1, 0);
-                this.disable();
+                if(!this_game.requested_log_messages) {
+                    this_game.requestLogMessages(first_missing+1, 0);
+                    this.disable();
+                }
             },
             context: this_game.display.gameLogWrapper[0]
         });
