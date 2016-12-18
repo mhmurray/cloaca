@@ -412,6 +412,11 @@ class GameWSHandler(WebSocketHandler):
                     resp = Command(game_id, None, GameAction(cloaca.message.GAMESTATE, game_encoded))
                     lg.debug('Sending game '+str(game_id))
                     self.send_command(resp)
+            elif commands[0].action.action == cloaca.message.REQGAMELOG:
+                lg.debug('Received request for log game {0!s}.'.format(game_id))
+                n_messages, n_start = commands[0].action.args
+                yield self.server.retrieve_and_send_log_messages(
+                        user_id, game_id, n_messages, n_start)
             else:
                 yield self.server.handle_game_actions(
                         game_id, user_id, [[c.number, c.action] for c in commands])
