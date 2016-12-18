@@ -354,7 +354,7 @@ function() {
                 role_led: role_led,
                 expected_action: expected_action,
                 legionary_player_index: legionary_player_index,
-                leader_index, leader_index,
+                leader_index: leader_index,
                 active_player_index: active_player_index,
                 in_town_sites: in_town_sites,
                 out_of_town_sites: out_of_town_sites,

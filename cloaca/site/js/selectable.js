@@ -96,7 +96,8 @@ function($) {
      * to be made even after the limit is reached, activating the callback
      * every time N items are selected.
      */
-    Selectable.prototype.makeSelectN = function(n, callback, allowBackout=false) {
+    Selectable.prototype.makeSelectN = function(n, callback, allowBackout) {
+        allowBackout = typeof allowBackout !== 'undefined' ? allowBackout : false;
         var $selection = this.$selection;
         this.makeSelectable($selection);
         this.limit = n;

@@ -63,7 +63,9 @@ function(Util, FSM) {
         Net.socket.send(s);
     };
 
-    Net.sendAction = function(game_id, number, action, args=[]) {
+    // args defaults to []
+    Net.sendAction = function(game_id, number, action, args) {
+        args = typeof args !== 'undefined' ? args : [];
         var s = {'game':game_id, 'number':number, 'action':{'action':action, 'args':args}};
         console.log('Sending action: ' + JSON.stringify(s));
         Net._sendString(JSON.stringify(s));
