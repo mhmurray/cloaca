@@ -86,6 +86,24 @@ class GTRServer(object):
         Game ID isn't a valid game.
 
 
+    REQGAMELOG: Get the next several messages from the game log for a specified ID.
+        <n_messages>, <n_start>, game ID required
+
+        Response
+        GAMELOG: newline-delimited list of game log messages for the given game ID.
+            If the number of messages requested is <= 0 or >=30, then 30 messages are
+            requested.
+            The <n_start> parameter requests log messages starting with the <n_start>'th
+            message since the beginning of the game.
+            If <n_start> is greater than the number of messages in the game, none
+            are returned.
+            If <n_start> + <n_messages> is greater than the total number in the game,
+            then the latest messages since <n_start> are returned.
+
+        Errors
+        Game ID isn't a valid game.
+
+
     REQCREATEGAME: Create a new game with unspecified game ID.
         No Parameters, game ID not required
 
@@ -264,11 +282,16 @@ class GTRServer(object):
                     did_one = True
 
             if did_one:
+                new_log_messages = game.game_log
+                combined = '\n'.join(new_log_messages)
+                n_total = yield self.db.append_log_messages(game_id, new_log_messages)
+                n_start = n_total - len(new_log_messages)
+
                 yield self.store_game(game)
 
                 for u in [p.uid for p in game.players]:
                     yield self._retrieve_and_send_game(u, game_id)
-
+                    self._send_log(game_id, u, combined, n_total, n_start)
 
 
     @gen.coroutine
@@ -331,6 +354,63 @@ class GTRServer(object):
             game_encoded = encode.game_to_str(game)
 
         raise gen.Return(game_encoded)
+
+
+    @gen.coroutine
+    def get_game_log_messages(self, user_id, game_id, n_messages, n_start):
+        """Return <n_messages> messages from game with ID <game_id> starting
+        at the <n_start>'th message as a new-line delimited string.
+
+        If the user is not a part of the game, an error is raised.
+        """
+        userdict = yield self.db.retrieve_user(user_id)
+        game_encoded = yield self.db.retrieve_game(game_id)
+
+        username = userdict['username']
+
+        if game_encoded is None:
+            msg = 'Invalid game id: ' + str(game_id)
+            lg.warning(msg)
+            raise GTRError(msg)
+            
+        game = encode.str_to_game(game_encoded)
+
+        player_index = game.find_player_index(username)
+        if player_index is None:
+            msg = 'User {0:s} is not part of game {1:d}'.format(username, game_id)
+            lg.warning(msg)
+            raise GTRError(msg)
+
+        messages = yield self.db.retrieve_log_messages(
+                game_id, n_messages, n_start)
+
+        combined = '\n'.join(messages)
+        raise gen.Return(combined)
+
+
+    def _send_log(self, game_id, user_id, messages, n_total, n_start):
+        """Send the log messages as a GAMELOG command."""
+        resp = Command(game_id, None, GameAction(message.GAMELOG, n_total,
+            n_start, messages))
+        self.send_command(user_id, resp)
+
+
+    @gen.coroutine
+    def retrieve_and_send_log_messages(
+            self, user_id, game_id, n_messages, n_start):
+        """If 0 messages are requested, just return the number of log messages.
+        """
+        n_total = yield self.db.retrieve_log_length(game_id)
+        if n_messages == 0:
+            self._send_log(game_id, user_id, None, n_total, 0)
+        else:
+            try:
+                messages = yield self.get_game_log_messages(
+                        user_id, game_id, n_messages, n_start)
+            except GTRError as e:
+                self._send_error(user, e.message)
+            else:
+                self._send_log(game_id, user_id, messages, n_total, n_start)
 
 
     def _send_game(self, user_id, game):

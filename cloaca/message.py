@@ -42,6 +42,8 @@ SERVERERROR     = 34
 PRISON          = 35
 TAKEPOOLCARDS   = 36
 TAKECLIENTS     = 37
+REQGAMELOG      = 38
+GAMELOG         = 39
 
 # A dictionary of the number of arguments for each action type
 # and their signature.
@@ -117,6 +119,7 @@ _action_args_dict = {
     REQGAMELIST    : GTRActionSpec('reqgamelist',    (), () ),
     GAMELIST       : GTRActionSpec('gamelist',       ( (str, 'game_list'), ), () ),
     SERVERERROR    : GTRActionSpec('servererror',    ( (str, 'err_msg'), ), () ),
+    REQGAMELOG     : GTRActionSpec('reqgamelog',     ( (int, 'n_messages'), (int, 'n_start') ), () ),
 
     THINKERORLEAD  : GTRActionSpec('thinkerorlead',  ( (bool, 'do_thinker'), ), () ),
     THINKERTYPE    : GTRActionSpec('thinkertype',    ( (bool, 'for_jack'), ), () ),
@@ -158,6 +161,9 @@ _action_args_dict = {
 
     STAIRWAY       : GTRActionSpec('stairway',
         (   (Card, 'building'), (Card, 'material') ), () ),
+
+    GAMELOG        : GTRActionSpec('gamelog',
+        ( (int, 'n_total'), (int, 'n_start'), (str, 'log_messages') ), () ),
     }
 
 
