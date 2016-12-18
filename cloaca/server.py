@@ -282,16 +282,15 @@ class GTRServer(object):
                     did_one = True
 
             if did_one:
-                new_log_messages = game.game_log
-                combined = '\n'.join(new_log_messages)
-                n_total = yield self.db.append_log_messages(game_id, new_log_messages)
-                n_start = n_total - len(new_log_messages)
+                n_total = yield self.db.append_log_messages(game_id, game.game_log)
+                n_start = n_total - len(game.game_log)
 
                 yield self.store_game(game)
 
+                new_log_messages_combined = '\n'.join(game.game_log)
                 for u in [p.uid for p in game.players]:
                     yield self._retrieve_and_send_game(u, game_id)
-                    self._send_log(game_id, u, combined, n_total, n_start)
+                    self._send_log(game_id, u, new_log_messages_combined, n_total, n_start)
 
 
     @gen.coroutine
@@ -312,6 +311,10 @@ class GTRServer(object):
         lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
 
         player_index = game.add_player(user_id, username)
+
+        if len(game.game_log):
+            yield self.db.append_log_messages(game_id, game.game_log)
+
         yield self.store_game(game)
 
 
@@ -463,6 +466,9 @@ class GTRServer(object):
 
         player_index = game.add_player(user_id, username)
 
+        if len(game.game_log):
+            yield self.db.append_log_messages(game_id, game.game_log)
+
         yield self.store_game(game)
 
         raise gen.Return(game_id)
@@ -472,6 +478,11 @@ class GTRServer(object):
     def store_game(self, game):
         """Convert a Game object to JSON and store in the database
         via self.db.store_game().
+
+        Note that the Game.game_log is stored separately, so usually this function
+        will be called in conjunction with:
+        
+            yield self.db.append_log_messages(game_id, game.game_log)
         """
         game_id = game.game_id
         game_encoded = encode.game_to_str(game)
@@ -507,6 +518,8 @@ class GTRServer(object):
                     .format(username, game_id, game.host))
 
         game.start()
-        self.store_game(game)
+
+        yield self.db.append_log_messages(game_id, game.game_log)
+        yield self.store_game(game)
 
         raise gen.Return(game)
