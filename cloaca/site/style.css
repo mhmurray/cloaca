@@ -27,6 +27,12 @@ html {
   overflow-y:scroll;
 }
 
+.log > ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
 #heading {
   background: #333;
   color: #98A098;
