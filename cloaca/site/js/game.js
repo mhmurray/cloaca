@@ -1,8 +1,10 @@
-define(['jquery', 'action_builder', 'games', 'display', 'net', 'util'],
-function($, AB, Games, Display, Net, Util) {
+define(['jquery', 'jquerywaypoints', 'action_builder', 'games', 'display', 'net', 'util'],
+function($, _, AB, Games, Display, Net, Util) {
     function Game(id, players) {
         this.id = id;
         this.display = new Display(id, Games.user, players);
+        this.game_log = [];
+        this.requested_log_messages = false;
     };
 
     // Build the game state HTML
@@ -33,6 +35,79 @@ function($, AB, Games, Display, Net, Util) {
     };
 
 
+    // Check whether more log messages are needed.
+    // Return -1 if none are needed, or the index of the
+    // most recent missing message.
+    Game.prototype.checkLogNeeded = function() {
+        var last_null = this.game_log.lastIndexOf(null);
+        if(last_null === -1) {
+            return -1;
+        } else if(this.game_log.length - last_null > 50) {
+            return -1;
+        } else {
+            return last_null;
+        }
+    };
+
+    Game.prototype.updateLog = function(n_total, n_start, messages) {
+        // Add null values for missing + new messages
+        for(var i=this.game_log.length; i<n_total; i++) {
+            this.game_log.push(null);
+        }
+        // Set new messages to received values.
+        for(var i=0; i<messages.length; i++) {
+            this.game_log[i+n_start] = messages[i];
+        }
+        this.drawLog();
+        var first_missing = this.checkLogNeeded();
+        if(first_missing === -1) {
+            this.requested_log_messages = false;
+        } else if(!this.requested_log_messages) {
+            this.requestLogMessages(50, Math.max(0,first_missing-49));
+        } else {
+            console.debug('Backing off of log requests');
+        }
+    };
+
+    Game.prototype.requestLogMessages = function(n_messages, n_start) {
+        console.log('Requesting more ', n_messages, 'more log messages, starting at', n_start);
+        Net.sendAction(this.id, null, Util.Action.REQGAMELOG, [n_messages, n_start]);
+        this.requested_log_messages = true;
+    };
+
+    Game.prototype.drawLog = function() {
+        var els = [];
+        var first_missing = this.game_log.lastIndexOf(null);
+        for(var i=first_missing+1; i<this.game_log.length; i++) {
+            els.push($('<li />').text(this.game_log[i]));
+        }
+        this.display.gameLog.empty();
+        this.display.gameLog.append(els);
+        this.display.gameLogWrapper.scrollTop(this.display.gameLogWrapper[0].scrollHeight);
+        if(this.display.log_waypoints !== null) {
+            for(var i=0; i<this.display.log_waypoints.length; i++) {
+                this.display.log_waypoints[i].destroy();
+            }
+        }
+        if(first_missing === -1 || this.game_log.length-first_missing < 50) return;
+        var this_game = this;
+        var wp = new Waypoint({
+            element: this_game.display.gameLog.children()[0],
+            handler: function(direction) {
+                if(direction === 'down') return;
+                var first_missing = this_game.game_log.lastIndexOf(null);
+                if(first_missing === -1) {
+                    this.disable();
+                    return;
+                }
+
+                this_game.requestLogMessages(first_missing+1, 0);
+                this.disable();
+            },
+            context: this_game.display.gameLogWrapper[0]
+        });
+    };
+
     Game.prototype.updateState = function(gs) {
         console.log('GameState received');
         console.dir(gs);
@@ -59,6 +134,11 @@ function($, AB, Games, Display, Net, Util) {
         this.display.updateGameState(gs);
 
         current_game_id = Display.game_id;
+
+        if(this.game_log.length === 0) {
+            this.requestLogMessages(0, 0);
+            this.requested_log_messages = false;
+        }
 
         var game_over = (gs.winners !== null) && (gs.winners.length>0);
         if(game_over) {
