@@ -206,116 +206,133 @@ class GTRServer(object):
             lock = locks.Lock()
             self._game_locks[game_id] = lock
         
-        with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
-            game_encoded = yield self.db.retrieve_game(game_id)
+        try:
+            with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
+                game_encoded = yield self.db.retrieve_game(game_id)
 
-            username = userdict['username']
+                username = userdict['username']
 
-            if game_encoded is None:
-                msg = 'Invalid game id: ' + str(game_id)
-                lg.warning(msg)
-                return
+                if game_encoded is None:
+                    msg = 'Invalid game id: ' + str(game_id)
+                    lg.warning(msg)
+                    return
 
-            game = encode.str_to_game(game_encoded)
+                game = encode.str_to_game(game_encoded)
 
-            player_index = game.find_player_index(username)
-            if player_index is None:
-                msg = ('User {0} is not part of game {1:d}, players: {2!s}'
-                        ).format(name, game_id,
-                            [p.name for p in game.players])
-                lg.warning(msg)
-                self._send_error(user_id, msg)
-                return
-
-            # Ignore actions if they're old, with too-low action_number.
-            # It's probably the client re-sending a list of actions.
-            # However, if no actions are applicable, send an error.
-            if(game.action_number > actions[-1][0]):
-                msg = ('Received latest action_number {0:d}, but require {1:d}.'
-                        ).format(actions[-1][0], game.action_number)
-                self._send_error(user_id, msg)
-                return
-
-            did_one = False
-            for action_number, action in actions:
-                if action_number > game.action_number:
-                    msg = ('Received action_number {0:d}, but require {1:d}.'
-                            ).format(action_number, game.action_number)
+                player_index = game.find_player_index(username)
+                if player_index is None:
+                    msg = ('User {0} is not part of game {1:d}, players: {2!s}'
+                            ).format(name, game_id,
+                                [p.name for p in game.players])
                     lg.warning(msg)
                     self._send_error(user_id, msg)
                     return
-                elif action_number < game.action_number:
-                    lg.debug('Skipping action {0:d}, {1}. (Game.action_number'
-                            ' = {2}): '.format(action_number, repr(action),
-                                    game.action_number))
-                    continue
 
-                lg.debug('Handling action: {0}'.format(repr(action)))
-
-                if game.finished:
-                    msg = 'Game {0} has finished.'.format(game_id)
-                    lg.debug(msg)
+                # Ignore actions if they're old, with too-low action_number.
+                # It's probably the client re-sending a list of actions.
+                # However, if no actions are applicable, send an error.
+                if(game.action_number > actions[-1][0]):
+                    msg = ('Received latest action_number {0:d}, but require {1:d}.'
+                            ).format(actions[-1][0], game.action_number)
                     self._send_error(user_id, msg)
+                    return
 
-                i_active_p = game.active_player_index
+                did_one = False
+                for action_number, action in actions:
+                    if action_number > game.action_number:
+                        msg = ('Received action_number {0:d}, but require {1:d}.'
+                                ).format(action_number, game.action_number)
+                        lg.warning(msg)
+                        self._send_error(user_id, msg)
+                        return
+                    elif action_number < game.action_number:
+                        lg.debug('Skipping action {0:d}, {1}. (Game.action_number'
+                                ' = {2}): '.format(action_number, repr(action),
+                                        game.action_number))
+                        continue
 
-                if i_active_p != player_index:
-                    msg = ('Received action for player {0!s} ({1}), '
-                        'but waiting on player {2!s} ({3}).'
-                        ).format(player_index, game.players[player_index].name,
-                                i_active_p, game.players[i_active_p].name)
+                    lg.debug('Handling action: {0}'.format(repr(action)))
 
-                    lg.warning(msg)
-                    self._send_error(user_id, msg)
-                    break
+                    if game.finished:
+                        msg = 'Game {0} has finished.'.format(game_id)
+                        lg.debug(msg)
+                        self._send_error(user_id, msg)
 
-                try:
-                    game.handle(action)
-                except GTRError as e:
-                    lg.warning(e.message)
-                    self._send_error(user_id, e.message)
-                    break
-                except GameOver:
-                    lg.info('Game {0} has ended.'.format(game_id))
-                    did_one = True
-                else:
-                    did_one = True
+                    i_active_p = game.active_player_index
 
-            if did_one:
-                n_total = yield self.db.append_log_messages(game_id, game.game_log)
-                n_start = n_total - len(game.game_log)
+                    if i_active_p != player_index:
+                        msg = ('Received action for player {0!s} ({1}), '
+                            'but waiting on player {2!s} ({3}).'
+                            ).format(player_index, game.players[player_index].name,
+                                    i_active_p, game.players[i_active_p].name)
 
-                yield self.store_game(game)
+                        lg.warning(msg)
+                        self._send_error(user_id, msg)
+                        break
 
-                new_log_messages_combined = '\n'.join(game.game_log)
-                for u in [p.uid for p in game.players]:
-                    yield self._retrieve_and_send_game(u, game_id)
-                    self._send_log(game_id, u, new_log_messages_combined, n_total, n_start)
+                    try:
+                        game.handle(action)
+                    except GTRError as e:
+                        lg.warning(e.message)
+                        self._send_error(user_id, e.message)
+                        break
+                    except GameOver:
+                        lg.info('Game {0} has ended.'.format(game_id))
+                        did_one = True
+                    else:
+                        did_one = True
+
+                if did_one:
+                    n_total = yield self.db.append_log_messages(game_id, game.game_log)
+                    n_start = n_total - len(game.game_log)
+
+                    yield self._store_game(game)
+
+                    new_log_messages_combined = '\n'.join(game.game_log)
+                    for u in [p.uid for p in game.players]:
+                        yield self._retrieve_and_send_game(u, game_id)
+                        self._send_log(game_id, u, new_log_messages_combined, n_total, n_start)
+
+        except gen.TimeoutError:
+            raise GTRError('Timeout acquiring lock to handle game action.')
 
 
     @gen.coroutine
     def join_game(self, user_id, game_id):
         """Joins an existing game"""
         userdict = yield self.db.retrieve_user(user_id)
-        game_encoded = yield self.db.retrieve_game(game_id)
+        # Check the lock to see if the game is in use.
+        try:
+            lock = self._game_locks[game_id]
+        except KeyError:
+            lock = locks.Lock()
+            self._game_locks[game_id] = lock
+        
+        try:
+            with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
+                game_encoded = yield self.db.retrieve_game(game_id)
 
-        username = userdict['username']
+                username = userdict['username']
 
-        if game_encoded is None:
-            msg = 'Invalid game id: ' + str(game_id)
-            lg.warning(msg)
-            return
+                if game_encoded is None:
+                    msg = 'Invalid game id: ' + str(game_id)
+                    lg.warning(msg)
+                    return
 
-        game = encode.str_to_game(game_encoded)
+                game = encode.str_to_game(game_encoded)
 
-        lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
+                lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
 
-        player_index = game.add_player(user_id, username)
+                player_index = game.add_player(user_id, username)
 
-        if len(game.game_log):
-            yield self.db.append_log_messages(game_id, game.game_log)
+                if len(game.game_log):
+                    yield self.db.append_log_messages(game_id, game.game_log)
 
-        yield self.store_game(game)
+                yield self._store_game(game)
+
+        except gen.TimeoutError:
+            raise GTRError('Timeout acquiring lock to join game.')
+
 
 
     @gen.coroutine
@@ -449,33 +466,47 @@ class GTRServer(object):
     @gen.coroutine
     def create_game(self, user_id):
         """Create a new game, return the new game ID."""
+        userdict = yield self.db.retrieve_user(user_id)
 
         game_id = yield self.db.create_game_with_host(user_id)
+        # If another coroutine locks this game between getting the id from
+        # the DB and acquiring the lock, then blocks so acquiring the lock
+        # times out, we raise an exception and the game never gets stored.
+        # The DB will contain an empty stub for this game ID.
+        try:
+            lock = self._game_locks[game_id]
+        except KeyError:
+            lock = locks.Lock()
+            self._game_locks[game_id] = lock
+        
+        try:
+            with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
+                username = userdict['username']
 
-        userdict = yield self.db.retrieve_user(user_id)
-        username = userdict['username']
+                lg.info('Creating new game {0:d} with host {1}'.format(
+                    game_id, username))
 
-        lg.info('Creating new game {0:d} with host {1}'.format(
-            game_id, username))
+                game = Game()
+                game.game_id = game_id
+                game.host = username
 
-        game = Game()
-        game.game_id = game_id
-        game.host = username
+                lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
 
-        lg.debug('Adding player {0!s} with ID {1!s}'.format(username, user_id))
+                player_index = game.add_player(user_id, username)
 
-        player_index = game.add_player(user_id, username)
+                if len(game.game_log):
+                    yield self.db.append_log_messages(game_id, game.game_log)
 
-        if len(game.game_log):
-            yield self.db.append_log_messages(game_id, game.game_log)
+                yield self._store_game(game)
 
-        yield self.store_game(game)
+                raise gen.Return(game_id)
 
-        raise gen.Return(game_id)
+        except gen.TimeoutError:
+            raise GTRError('Timeout acquiring lock to create game.')
         
 
     @gen.coroutine
-    def store_game(self, game):
+    def _store_game(self, game):
         """Convert a Game object to JSON and store in the database
         via self.db.store_game().
 
@@ -492,34 +523,46 @@ class GTRServer(object):
     @gen.coroutine
     def start_game(self, user_id, game_id):
         userdict = yield self.db.retrieve_user(user_id)
-        game_encoded = yield self.db.retrieve_game(game_id)
 
-        username = userdict['username']
+        try:
+            lock = self._game_locks[game_id]
+        except KeyError:
+            lock = locks.Lock()
+            self._game_locks[game_id] = lock
 
-        if game_encoded is None:
-            msg = 'Invalid game id: ' + str(game_id)
-            lg.warning(msg)
-            return
+        try:
+            with (yield lock.acquire(GTRServer.GAME_WAIT_TIMEOUT)):
+                game_encoded = yield self.db.retrieve_game(game_id)
 
-        game = encode.str_to_game(game_encoded)
+                username = userdict['username']
 
-        if game.started:
-            raise GTRError('Game already started.')
+                if game_encoded is None:
+                    msg = 'Invalid game id: ' + str(game_id)
+                    lg.warning(msg)
+                    return
 
-        p = game.find_player_index(username)
-        if p is None:
-            raise GTRError('Player {0} cannot start game {1} '
-                    'that they haven\'t joined.'
-                    .format(username, game_id))
+                game = encode.str_to_game(game_encoded)
 
-        if username != game.host:
-            raise GTRError('Player {0} cannot start game {1} '
-                    'if they are not the host ({2}).'
-                    .format(username, game_id, game.host))
+                if game.started:
+                    raise GTRError('Game already started.')
 
-        game.start()
+                p = game.find_player_index(username)
+                if p is None:
+                    raise GTRError('Player {0} cannot start game {1} '
+                            'that they haven\'t joined.'
+                            .format(username, game_id))
 
-        yield self.db.append_log_messages(game_id, game.game_log)
-        yield self.store_game(game)
+                if username != game.host:
+                    raise GTRError('Player {0} cannot start game {1} '
+                            'if they are not the host ({2}).'
+                            .format(username, game_id, game.host))
 
-        raise gen.Return(game)
+                game.start()
+
+                yield self.db.append_log_messages(game_id, game.game_log)
+                yield self._store_game(game)
+
+                raise gen.Return(game)
+
+        except gen.TimeoutError:
+            raise GTRError('Timeout acquiring lock to start game.')
