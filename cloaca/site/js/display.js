@@ -74,17 +74,9 @@ function(Util, $){
                 influence: Util.makeCardZone('p'+ip+'-influence', 'Influence')
             };
 
-            /*
-            playerZones.influence = $('<div />', {
-                id: 'p'+ip+'-influence',
-                class: 'influence'
-            }).text('Influence');
-            */
-
             playerZones.buildings = $('<div />', {
-                id: 'p'+ip+'-buildings',
-                class: 'building-container'
-            }).text('Buildings');
+                id: 'p'+ip+'-buildings'
+            }).addClass('building-container').text('Buildings');
 
             this.playerZones.push(playerZones);
         };
@@ -158,16 +150,14 @@ function(Util, $){
         this.decks = $('<div/>').attr('id', 'decks').addClass('deck-container');
         this.deck = $('<div/>', {
             id: 'deck',
-            class: 'pile orders',
             html: '<div class="pile-title">Deck</div>'+
                   '<div class="pile-count">0</div>'
-        });
+        }).addClass('pile orders');
         this.jacks = $('<div/>', {
             id: 'jacks',
-            class: 'pile jack',
             html: '<div class="pile-title">Jacks</div>'+
                   '<div class="pile-count">0</div>'
-        });
+        }).addClass('pile jack');
         this.decks.append(this.deck, this.jacks);
 
         this.sites = $('<div/>').attr('id', 'sites')
