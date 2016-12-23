@@ -1,4 +1,5 @@
 from setuptools import setup
+import minify.command
 
 setup(name='cloaca',
         version='0.1.0',
@@ -17,5 +18,10 @@ setup(name='cloaca',
             'tornadis>=0.7.0',
             'bcrypt>=2.0.0',
             'futures>=3.0.5',
+            'minify',
             ],
+        cmdclass={
+            'minify_js' : minify.command.minify_js,
+            'minify_css' : minify.command.minify_css,
+            },
         )
