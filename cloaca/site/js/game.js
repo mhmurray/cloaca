@@ -288,9 +288,9 @@ function($, _, AB, Games, Display, Net, Util) {
 
         } else if (gs.expected_action === Util.Action.PATRONFROMHAND) {
             var limit = clienteleLimit[AB.playerIndex];
-            function callback(card) {
+            var callback = function(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMHAND, [card]);
-            }
+            };
             if(gs.players[AB.playerIndex].clientele.length < limit) {
                 AB.patronFromHand(this.display, limit, callback);
             } else {
@@ -299,9 +299,9 @@ function($, _, AB, Games, Display, Net, Util) {
 
         } else if (gs.expected_action === Util.Action.PATRONFROMPOOL) {
             var limit = clienteleLimit[AB.playerIndex];
-            function callback(card) {
+            var callback = function(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMPOOL, [card]);
-            }
+            };
             if(gs.players[AB.playerIndex].clientele.length < limit) {
                 AB.patronFromPool(this.display, limit, callback);
             } else {
@@ -309,9 +309,9 @@ function($, _, AB, Games, Display, Net, Util) {
             }
 
         } else if (false && gs.expected_action === Util.Action.USELATRINE) {
-            function callback(card) {
+            var callback = function(card) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USELATRINE, [card]);
-            }
+            };
             if(gs.players[AB.playerIndex].hand.length > 0) {
                 AB.useLatrine(this.display, callback);
             } else {
@@ -325,9 +325,9 @@ function($, _, AB, Games, Display, Net, Util) {
 
         } else if (gs.expected_action === Util.Action.PATRONFROMDECK) {
             var limit = clienteleLimit[AB.playerIndex];
-            function callback(useBar) {
+            var callback = function(useBar) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.PATRONFROMDECK, [useBar]);
-            }
+            };
             if(gs.players[AB.playerIndex].clientele.length < limit) {
                 AB.singleChoice(this.display, 'Patron from deck using Bar?',
                         [{text: 'Yes', result: true},
@@ -338,9 +338,9 @@ function($, _, AB, Games, Display, Net, Util) {
             }
 
         } else if (false && gs.expected_action === Util.Action.USEVOMITORIUM) {
-            function callback(use) {
+            var callback = function(use) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.USEVOMITORIUM, [use]);
-            }
+            };
             if(gs.players[AB.playerIndex].hand.length > 0) {
                 AB.singleChoice(this.display,
                         'Discard hand before thinking with Vomitorium?',
@@ -352,7 +352,7 @@ function($, _, AB, Games, Display, Net, Util) {
             }
 
         } else if (gs.expected_action === Util.Action.BARORAQUEDUCT) {
-            function callback(use) {
+            var callback = function(use) {
                 Net.sendAction(gs.game_id, gs.action_number, Util.Action.BARORAQUEDUCT, [use]);
             }
             var hasNonJackInHand = false;
@@ -437,7 +437,7 @@ function($, _, AB, Games, Display, Net, Util) {
         } else if (gs.expected_action === Util.Action.MERCHANT) {
             var hasBasilica = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Basilica');
             var hasAtrium = Util.playerHasActiveBuilding(gs, AB.playerIndex, 'Atrium');
-            function callback(fromStockpile, fromHand, fromDeck) {
+            var callback = function(fromStockpile, fromHand, fromDeck) {
                 var cards = [];
                 if(!(fromHand === null)) {
                     cards.push(fromHand);

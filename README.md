@@ -11,7 +11,7 @@ Initialize a virtualenv and install cloaca.
 Set up a [Redis instance](http://redis.io/topics/quickstart), on port 6379.
 
 
-Optionally minify the CSS file.
+Optionally minify the CSS file (Requires Java to run YUI compressor)
 
     (venv.cloaca) python setup.py minify_css
 
