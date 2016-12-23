@@ -49,8 +49,8 @@ setup_logging()
 
 
 def make_app(database):
-    path = cloaca.handlers.APPDIR
-    site_path = os.path.join(path, 'site')
+    app_path = cloaca.handlers.APPDIR
+    site_path = os.path.join(app_path, 'site')
     js_path = os.path.join(site_path, 'js')
     ioloop = tornado.ioloop.IOLoop.current()
     ioloop.run_sync(database.load_scripts)
@@ -75,15 +75,32 @@ def make_app(database):
 
             )
     WEBSOCKET_URI = '/ws/'
+    JS_MIN = 'cloaca.min.js'
+    CSS_MIN = 'style.min.css'
+
+    # Check if minified files have been built and use them in GameHandler.
+    js_main_path = '/js/main'
+    if os.path.exists(os.path.join(site_path, JS_MIN)):
+        js_main_path = os.path.join('/', JS_MIN.rstrip('.js'))
+
+    css_path = '/style.css'
+    if os.path.exists(os.path.join(site_path, CSS_MIN)):
+        css_path = os.path.join('/', CSS_MIN)
+
     return tornado.web.Application([
         (r'/(favicon.ico)', tornado.web.StaticFileHandler, {'path':site_path}),
         (r'/newgame', CreateGameHandler, {'database':database, 'server':server}),
         (r'/joingame/([0-9]+)', JoinGameHandler, {'database':database, 'server':server}),
         (r'/startgame/([0-9]+)', StartGameHandler, {'database':database, 'server':server}),
         (r'/game/([0-9]+)', GameHandler, {'database':database, 'server':server,
-            'websocket_uri':WEBSOCKET_URI}),
+            'websocket_uri':WEBSOCKET_URI,
+            'js_main_path': js_main_path,
+            'stylesheet_path': css_path,
+            }),
         (r'/(style.css)', tornado.web.StaticFileHandler, {'path':site_path}),
+        (r'/(style.min.css)', tornado.web.StaticFileHandler, {'path':site_path}),
         (r'/js/(.*)', tornado.web.StaticFileHandler, {'path':js_path}),
+        (r'/(cloaca.min.js)', tornado.web.StaticFileHandler, {'path':site_path}),
         (r'/', GameListHandler, {'database':database}),
         (WEBSOCKET_URI, GameWSHandler, {'database':database, 'server':server}),
         (r'/register', RegisterHandler, {'database': database}),

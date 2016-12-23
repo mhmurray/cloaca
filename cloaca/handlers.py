@@ -159,10 +159,18 @@ class StartGameHandler(BaseHandler):
 
 
 class GameHandler(BaseHandler):
-    def initialize(self, database, server, websocket_uri):
+    """Handler to serve HTML for a single game.
+
+    The path to minified CSS and JS files can be provided, but by default
+    the cloaca/site/main.js will be used for data-main with require.js.
+    """
+    def initialize(self, database, server, websocket_uri,
+            stylesheet_path=None, js_main_path=None):
         super(GameHandler, self).initialize(database)
         self.server = server
         self.websocket_uri = websocket_uri
+        self.stylesheet_path = '/style.css' if stylesheet_path is None else stylesheet_path
+        self.js_main_path = '/js/main' if js_main_path is None else js_main_path
 
 
     @tornado.web.authenticated
@@ -174,8 +182,10 @@ class GameHandler(BaseHandler):
         self.render('site/templates/game.html',
                 game_id=game_id,
                 username=self.current_user['username'],
-                websocket_uri=self.websocket_uri)
-        return
+                websocket_uri=self.websocket_uri,
+                data_main_path=self.js_main_path,
+                stylesheet_path=self.stylesheet_path
+                )
 
 
 class GameListHandler(BaseHandler):

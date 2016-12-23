@@ -7,8 +7,10 @@
 
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
 
-    <link rel="stylesheet" href="/style.css">
-    <script data-main="/js/main" src="/js/libs/require/require.js"></script>
+    <link rel="stylesheet" href="{{ stylesheet_path }}">
+    <script data-main="{{ data_main_path }}"
+        src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.2/require.min.js">
+    </script>
 </head>
 <body>
     <h1 id="the_game_id">{{ escape(str(game_id)) }}</h1><span id="the_username">{{ escape(username) }}</span>
