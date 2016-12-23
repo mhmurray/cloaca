@@ -190,22 +190,18 @@ function($, Util, Display, Games, FSM, Game, Net, Encode){
 
                 var gamelist = $('#gamelist');
                 var $li = $('<li/>', {
-                    
-                    class:'received',
                     id: 'game-rec-'+game_id,
-                });
+                }).addClass('received');
                 var $joinbtn = $('<button/>', {
                     text: 'Join',
                     id: 'join-btn-'+game_id,
-                    class:'submit',
                     click: join(game_id)
-                });
+                }).addClass('submit');
                 var $startbtn = $('<button/>', {
                     text: 'Start',
                     id: 'start-btn-'+game_id,
-                    class:'submit',
                     click: start(game_id)
-                });
+                }).addClass('submit');
                 var text = 'Game '+game_id;
                 if(isStarted) {
                     text+= ' (in progress...)';

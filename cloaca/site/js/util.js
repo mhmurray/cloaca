@@ -107,11 +107,8 @@ function($){
     util.makeCardZone = function (id_, title) {
         var $container = $('<div />', {
             id: id_,
-            class: 'card-container'
-        });
-        var $zone = $('<div />', {
-            class: 'card-zone',
-        });
+        }).addClass('card-container');
+        var $zone = $('<div />').addClass('card-zone');
         var $zonetitle = $('<span />', {
             id: id_+'-title',
             text: title
@@ -121,9 +118,8 @@ function($){
     };
 
     util.makeSite = function(material) {
-        return $('<div />', {
-            class: 'site ' + material.toLowerCase(),
-        }).text(material[0].toUpperCase() + material.slice(1));
+        return $('<div />').addClass('site '+material.toLowerCase())
+                .text(material[0].toUpperCase() + material.slice(1));
     };
 
 
@@ -183,8 +179,7 @@ function($){
 
         var $container = $('<div />', {
             id: id_,
-            class: 'building',
-        });
+        }).addClass('building');
 
         if(complete) {
             $container.addClass('complete');
@@ -216,24 +211,21 @@ function($){
 
         if(typeof(materials) !== 'undefined') {
             $.each(materials, function(i, card) {
-                $container.append($('<div />', {
-                    class: 'material',
-                }).addClass(util.cardProperties(card).material.toLowerCase()));
+                $container.append($('<div />')
+                        .addClass('material '+util.cardProperties(card).material.toLowerCase()));
             });
         }
 
         for(var i=0; i<value-n_materials; i++) {
-            $container.append($('<div />', {
-                class: 'material',
-            }).addClass('missing'));
+            $container.append($('<div />').addClass('material missing'));
         }
         
         if(typeof(stairwayMaterials) !== 'undefined') {
             $.each(stairwayMaterials, function(i, card) {
                 $container.append($('<div />', {
-                    class: 'material stairway',
                     text: '(stairway)',
-                }).addClass(util.cardProperties(card).material.toLowerCase()));
+                }).addClass('material stairway')
+                    .addClass(util.cardProperties(card).material.toLowerCase()));
             });
         }
         
@@ -244,10 +236,10 @@ function($){
         var material_lower = material.toLowerCase();
         return $('<div />', {
                 id: _id,
-                class: 'site ' + material_lower,
                 data: {material: material, inTown : nInTown, outOfTown: nOutOfTown}
-        }).append($('<span/>').text(material).addClass('site-title'),
-                  $('<span/>').text(nInTown+'/'+nOutOfTown).addClass('site-count'));
+        }).addClass('site '+material_lower)
+            .append($('<span/>').text(material).addClass('site-title'),
+                    $('<span/>').text(nInTown+'/'+nOutOfTown).addClass('site-count'));
     };
 
     // Return a jQuery object representing a card.
@@ -255,16 +247,15 @@ function($){
         var $card;
         var name = util.cardName(ident);
         if(ident < 0) {
-            $card = $('<div />', {text: 'Card', class: 'card orders'});
+            $card = $('<div />', {text: 'Card'}).addClass('card orders');
         } else if(ident < 6) {
-            $card = $('<div />', {id: 'card'+ident, text: 'Jack', class: 'card jack'});
+            $card = $('<div />', {id: 'card'+ident, text: 'Jack'}).addClass('card jack');
         } else {
             var material = util.cardProperties(name).material.toLowerCase();
             $card = $('<div />', {
                 id: 'card'+ident,
                 text: name,
-                class: 'card ' + material,
-            });
+            }).addClass('card '+material);
         }
 
         $card.data({ident: ident, name: name})

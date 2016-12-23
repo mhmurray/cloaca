@@ -1,4 +1,4 @@
-define(['jquery', 'jquerywaypoints', 'action_builder', 'games', 'display', 'net', 'util'],
+define(['jquery', 'waypoints', 'action_builder', 'games', 'display', 'net', 'util'],
 function($, _, AB, Games, Display, Net, Util) {
     function Game(id, players) {
         this.id = id;
