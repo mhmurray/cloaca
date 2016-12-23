@@ -21,7 +21,6 @@ setup(name='cloaca',
             'minify',
             ],
         cmdclass={
-            'minify_js' : minify.command.minify_js,
             'minify_css' : minify.command.minify_css,
             },
         )
