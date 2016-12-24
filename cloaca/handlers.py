@@ -414,7 +414,7 @@ class GameWSHandler(WebSocketHandler):
             elif commands[0].action.action == cloaca.message.REQGAMESTATE:
                 lg.debug('Received request for game {0!s}.'.format(game_id))
                 try:
-                    game_encoded = yield self.server.get_game_json(user_id, game_id)
+                    game_encoded = yield self.server.get_game_data(user_id, game_id)
                 except GTRError as e:
                     lg.debug('Sending error')
                     self.send_error(e.message)

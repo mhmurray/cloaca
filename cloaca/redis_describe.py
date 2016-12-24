@@ -5,6 +5,7 @@ GAMEPREFIX = 'game:'
 GAMES = 'games'
 GAMES_HOSTED_PREFIX = 'games_hosted:'
 GAME_HOSTS = 'game_hosts'
+GAME_DATA_KEY = 'game_data'
 
 USERID = 'userid'
 USERPREFIX='user:'
@@ -101,7 +102,7 @@ def describe():
                     game_id,
                     game_dict.get('host', '<MISSING>'),
                     game_dict.get('date_created', '<MISSING>'),
-                    game_dict.get('game_json', '<MISSING>'),
+                    game_dict.get('game_data', '<MISSING>'),
                     )
                     
             print info_str
@@ -165,7 +166,7 @@ def add_game(user_id):
 
     game_id = r.incr(GAMEID)
     now = int(time.mktime(time.gmtime()))
-    r.hmset(GAMEPREFIX+str(game_id), {'host':user_id, 'date_created' : now, 'game_json' : ''})
+    r.hmset(GAMEPREFIX+str(game_id), {'host':user_id, 'date_created' : now, 'game_data' : ''})
     r.lpush(GAMES_HOSTED_PREFIX+str(user_id), game_id)
     r.lpush(GAME_HOSTS, user_id)
     r.lpush(GAMES, game_id)

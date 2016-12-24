@@ -365,7 +365,7 @@ class GTRServer(object):
 
 
     @gen.coroutine
-    def get_game_json(self, user_id, game_id):
+    def get_game_data(self, user_id, game_id):
         lg.debug('User {0!s} requests game {1!s}'.format(user_id, game_id))
         game = yield self.get_game(user_id, game_id)
         if game is None:

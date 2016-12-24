@@ -80,7 +80,7 @@ Games are hashes with the following fields:
     <game_id>
     <host> : host user ID
     <date_created> : unix time stamp, UTC
-    <game_json> : encoded game state as a string. (Not necessarily JSON!)
+    <game_data> : encoded game state as a string. (Not necessarily JSON!)
 
 Games are created via the function:
 
@@ -132,7 +132,7 @@ GAMES = 'games'
 GAMES_HOSTED_PREFIX = 'games_hosted:'
 GAMES_JOINED_PREFIX = 'games_joined:'
 GAME_HOSTS = 'game_hosts'
-GAME_DATA_KEY = 'game_json'
+GAME_DATA_KEY = 'game_data'
 
 LOG_PREFIX = 'game_log:'
 

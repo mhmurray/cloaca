@@ -23,7 +23,7 @@ end
 """
 
 # Creates a new game with given host user ID. Sets the 'host' field,
-# but not the 'date_created' or 'game_json' fields.
+# but not the 'date_created' or 'game_data' fields.
 #
 # KEYS[1] is 'gameid'
 # KEYS[2] is 'user:<host_user_id>'
