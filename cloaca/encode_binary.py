@@ -93,6 +93,8 @@ First the fixed size set of game properties:
     <legionary_player_index> : (1 byte integer) 0xFF for None or player index 0-4
     <leader_index> : (1 byte integer) 0xFF for None or player index 0-4
     <active_player_index> : (1 byte integer) 0xFF for None or player index 0-4
+    <log_length> : (4 byte integer) Total # of log messages that have been generated
+        for this game.
 
     <in_town_sites> : (6 bytes) count of Sites in canonical order.
     <out_of_town_sites> : (6 bytes) count of Sites in canonical order
@@ -455,7 +457,11 @@ def decode_zone(buffer, offset):
         return (2, Zone([Card(-1)]*length))
     else:
         idents = struct.unpack_from('!'+str(length)+'B', buffer, offset+1)
-        cards = [Card(i) for i in idents]
+        try:
+            cards = [Card(i) for i in idents]
+        except TypeError as e:
+            raise GTREncodingError(e.message)
+
         return (length+1, Zone(cards))
 
 
@@ -487,11 +493,16 @@ def decode_building(buffer, offset):
 
     fmt = '!'+str(length)+'B'
     values = struct.unpack_from(fmt, buffer, offset+1)
-    foundation = Card(values[0])
+
     site = int_to_site(values[1])
     complete = bool(values[2])
-    materials = Zone([Card(i) for i in values[3:6] if i != 0])
-    stairway_materials = Zone([Card(i) for i in values[6:]])
+
+    try:
+        foundation = Card(values[0])
+        materials = Zone([Card(i) for i in values[3:6] if i != 0])
+        stairway_materials = Zone([Card(i) for i in values[6:]])
+    except TypeError as e:
+        raise GTREncodingError(e.message)
 
     return (length+1,
             Building(foundation, site, materials, stairway_materials, complete))
@@ -609,7 +620,10 @@ def decode_player(buffer, offset):
     elif values[2] == NULLCODE:
         fountain_card = None
     else:
-        fountain_card = Card(values[2])
+        try:
+            fountain_card = Card(values[2])
+        except TypeError as e:
+            raise GTREncodingError(e.message)
 
     n_camp_actions = values[3]
     performed_craftsman = values[4]
@@ -701,14 +715,14 @@ def decode_game(buffer, offset=0):
     Returns a tuple (<bytes>. <game>) where <bytes> is the total number
     of bytes consumed from the buffer and <game> is a Game object.
     """
-    fmt = '!III21pBBBBBBBB'
+    fmt = '!III21pBBBBBBBBI'
     offset = struct.calcsize(fmt)
 
     values = struct.unpack(fmt, buffer[:offset])
 
     game_id, turn_number, action_number, hostname, legionary_count, used_oot, \
             oot_allowed, role_led, expected_action, legionary_player_index, \
-            leader_index, active_player_index = values
+            leader_index, active_player_index, log_length = values
 
     used_oot = bool(used_oot)
     oot_allowed = bool(oot_allowed)
@@ -784,7 +798,9 @@ def decode_game(buffer, offset=0):
             pool = pool,
             players = players,
             current_frame = current_frame,
-            stack = stack)
+            stack = stack,
+            log_length=log_length,
+            )
 
     return game
 
@@ -814,7 +830,7 @@ def encode_game(obj):
     """
     chunks = []
 
-    fmt = '!III21pBBBBBBBB'
+    fmt = '!III21pBBBBBBBBI'
     chunks.append(struct.pack(fmt,
             obj.game_id,
             obj.turn_number,
@@ -828,6 +844,7 @@ def encode_game(obj):
             obj.legionary_player_index if obj.legionary_player_index is not None else NULLCODE,
             obj.leader_index if obj.leader_index is not None else NULLCODE,
             obj.active_player_index if obj.active_player_index is not None else NULLCODE,
+            obj.log_length,
             ))
     
     fmt = '!6B6B5B'

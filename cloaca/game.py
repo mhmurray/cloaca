@@ -51,7 +51,7 @@ class Game(object):
             out_of_town_sites=None, oot_allowed=False, used_oot=False,
             stack=None, legionary_count=0, legionary_player_index=None,
             expected_action=None, host='', winners=None, action_number=0,
-            current_frame=None, game_log=None):
+            current_frame=None, game_log=None, log_length=None):
         """
         Initialize Game object. Summary of arguments:
 
@@ -84,6 +84,9 @@ class Game(object):
             action_number -- (int) number of actions that have been executed this game
             current_frame -- (Frame object) Frame that is currently being executed
             game_log -- (list of strings) log messages as list of string
+            log_length -- (int) Total # of log messages for this game.
+                This is used to mark the total number of log messages from this
+                game, in case the (potentially long) game_log isn't stored.
         """
         self.game_id = game_id
         self.players = [] if players is None else players
@@ -110,6 +113,7 @@ class Game(object):
         self._current_frame = current_frame
 
         self.game_log = [] if game_log is None else game_log
+        self.log_length = len(self.game_log) if log_length is None else log_length
 
     @property
     def active_player(self):
@@ -588,6 +592,7 @@ class Game(object):
         """
         time = datetime.now().time().strftime('%H:%M:%S ')
         self.game_log.append(time+msg)
+        self.log_length += 1
         lg.debug(time+msg)
 
     def _pump(self):
