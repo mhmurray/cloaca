@@ -284,6 +284,9 @@ function() {
         offset+=1;
         var active_player_index = data.getUint8(offset);
         offset+=1;
+        var log_length = data.getUint32(offset);
+        offset+=4;
+
         var in_town_site_counts = Array.from(new Uint8Array(data.buffer, offset, 6));
         var in_town_sites = site_counts_to_strings(in_town_site_counts);
         offset+=6;
@@ -365,6 +368,7 @@ function() {
                 players: players,
                 _current_frame: current_frame,
                 stack: {stack:stack_frames},
+                log_length: log_length,
                 game_log: []
             }
         };
