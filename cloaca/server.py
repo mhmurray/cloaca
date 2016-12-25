@@ -1,8 +1,9 @@
 from cloaca.game import Game
 from cloaca.message import GameAction, Command
 import cloaca.message as message
-from cloaca.error import GTRError, GameOver
+from cloaca.error import GTRError, GameOver, GTRDBError
 import cloaca.encode_binary as encode
+import cloaca.encode_move as encode_move
 
 import logging
 import datetime
@@ -237,7 +238,8 @@ class GTRServer(object):
                     self._send_error(user_id, msg)
                     return
 
-                did_one = False
+                actions_executed = []
+                initial_action_number = game.action_number
                 for action_number, action in actions:
                     if action_number > game.action_number:
                         msg = ('Received action_number {0:d}, but require {1:d}.'
@@ -254,7 +256,7 @@ class GTRServer(object):
                     lg.debug('Handling action: {0}'.format(repr(action)))
 
                     if game.finished:
-                        msg = 'Game {0} has finished.'.format(game_id)
+                        msg = 'Game {0:d} has finished.'.format(game_id)
                         lg.debug(msg)
                         self._send_error(user_id, msg)
 
@@ -277,12 +279,21 @@ class GTRServer(object):
                         self._send_error(user_id, e.message)
                         break
                     except GameOver:
-                        lg.info('Game {0} has ended.'.format(game_id))
-                        did_one = True
+                        lg.info('Game {0:d} has ended.'.format(game_id))
+                        actions_executed.append(action)
                     else:
-                        did_one = True
+                        actions_executed.append(action)
 
-                if did_one:
+                # Store game, actions, and log only if some actions succeeded
+                if len(actions_executed):
+                    for i, action in enumerate(actions_executed):
+                        n = i + initial_action_number
+                        move_encoded = encode_move.game_action_to_str(action)
+                        try:
+                            yield self.db.set_game_action(game_id, n, move_encoded)
+                        except GTRDBError as e:
+                            lg.warn(e.message)
+
                     n_total = yield self.db.append_log_messages(game_id, game.game_log)
                     n_start = n_total - len(game.game_log)
 

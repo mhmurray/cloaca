@@ -115,6 +115,17 @@ is loaded, and appending the new messages as a game is modified.
 Occasionally, when the user reconnects, and scrolls up to see
 old messages, the entire list may need to be traversed, which has
 time complexity O(N).
+
+Game actions
+============
+Actions are recorded with the function:
+
+    set_game_action()
+
+Actions are encoded in the encode_move module to a JSON string after converting
+roles and materials (sites) to integers.
+In Redis, the encoded moves are pushed to a hash of moves for each game, with
+the index of the move as the field name.
 """
 import time
 
@@ -133,6 +144,8 @@ GAMES_HOSTED_PREFIX = 'games_hosted:'
 GAMES_JOINED_PREFIX = 'games_joined:'
 GAME_HOSTS = 'game_hosts'
 GAME_DATA_KEY = 'game_data'
+
+GAME_MOVE_PREFIX = 'game_actions:'
 
 LOG_PREFIX = 'game_log:'
 
@@ -504,3 +517,31 @@ class GTRDBTornadis(object):
 
         pipeline.stack_call('HSET', self.prefix+SESSIONS, session_auth, user_id)
         res = yield self.r.call(pipeline)
+
+    @gen.coroutine
+    def set_game_action(self, game_id, action_number, action_encoded):
+        """Set `action_encoded` for given action number for game with id
+        `game_id`. This will overwrite another action if it exists.
+        """
+        res = yield self.r.call('HSET', self.prefix+GAME_MOVE_PREFIX+str(game_id),
+                action_number, action_encoded)
+
+        if isinstance(res, TornadisException):
+            raise GTRDBError('Failed to set game action {0:d}:{1:d}: {2}'
+                    .format(game_id, action_number, action_encoded))
+
+
+    @gen.coroutine
+    def retrieve_game_actions(self, game_id, action_numbers):
+        """Return the encoded actions (as strings) for the specified game for
+        each action number in the sequence `action_numbers`.
+        """
+        fields = map(str, action_numbers)
+        res = yield res.r.call('HMGET', self.prefix+GAME_MOVE_PREFIX+str(game_id),
+                *fields)
+
+        if isinstance(res, TornadisException):
+            raise GTRDBError('Failed to retrieve game actions {0:d}:{1!s}'
+                    .format(game_id, action_numbers))
+        else:
+            raise gen.Return(res)
