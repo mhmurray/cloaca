@@ -3,7 +3,7 @@ from cloaca.message import GameAction, Command
 import cloaca.message as message
 from cloaca.error import GTRError, GameOver, GTRDBError
 import cloaca.encode_binary as encode
-import cloaca.encode_move as encode_move
+import cloaca.encode_action as encode_action
 
 import logging
 import datetime
@@ -288,7 +288,7 @@ class GTRServer(object):
                 if len(actions_executed):
                     for i, action in enumerate(actions_executed):
                         n = i + initial_action_number
-                        move_encoded = encode_move.game_action_to_str(action)
+                        move_encoded = encode_action.game_action_to_str(action)
                         try:
                             yield self.db.set_game_action(game_id, n, move_encoded)
                         except GTRDBError as e:
