@@ -122,10 +122,10 @@ Actions are recorded with the function:
 
     set_game_action()
 
-Actions are encoded in the encode_move module to a JSON string after converting
+Actions are encoded in the encode_action module to a JSON string after converting
 roles and materials (sites) to integers.
-In Redis, the encoded moves are pushed to a hash of moves for each game, with
-the index of the move as the field name.
+In Redis, the encoded actions are pushed to a hash of actions for each game, with
+the index of the action as the field name.
 """
 import time
 
