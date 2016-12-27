@@ -1,6 +1,6 @@
 include README.md
 include LICENSE.txt
 include cloaca/GTR_cards.json
-include cloaca/logging.json
+include cloaca/logging_default.json
 include cloaca/site/favicon.ico
 recursive-include cloaca/site *.js *.html *.css
