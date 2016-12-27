@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import re
 import logging
 import collections
@@ -11,7 +9,6 @@ import cloaca.card_manager as cm
 """
 
 lg = logging.getLogger(__name__)
-lg.addHandler(logging.NullHandler())
 
 def get_card_from_zone(card, zone):
     """ Wrapper around the possible exception caused by trying to

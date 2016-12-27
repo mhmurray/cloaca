@@ -1,6 +1,5 @@
 {
     "version": 1,
-    "disable_existing_loggers": false,
     "formatters": {
         "simple": {
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -37,10 +36,25 @@
     },
 
     "loggers": {
+        "tornado": {
+            "level": "WARNING"
+        },
+        "cloaca": {
+            "level": "WARNING"
+        },
+        "cloacaapp": {
+            "level": "INFO"
+        },
+        "handlers": {
+            "level": "WARNING"
+        },
+        "tornadis" : {
+            "level" : "WARNING"
+        }
     },
 
     "root": {
-        "level": "DEBUG",
+        "level": "INFO",
         "handlers": ["console"]
     }
 }

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """
 This module reads data from a json file and returns card properties as strings,
 except card value, which is returned as an int.
@@ -7,10 +5,11 @@ There is barely any error handling!
 """
 
 import json
-import logging
 from os import path
 
 from collections import Counter
+
+from cloaca.error import GTRError
 
 _deck = ()
 
@@ -180,7 +179,7 @@ def get_role_of_material(material):
     elif material is None:
         return None
     else:
-        logging.error('----> Role of {0} not found!'.format(material))
+        raise GTRError('----> Role of {0} not found!'.format(material))
 
 def get_role_of_card(card_name):
     material = get_material_of_card(card_name)
@@ -203,7 +202,7 @@ def get_value_of_material(material):
     elif material is None:
         return None
     else:
-        logging.error('----> Value of {0} not found!'.format(material))
+        raise GTRError('----> Value of {0} not found!'.format(material))
 
 def get_value_of_card(card_name):
     material = get_material_of_card(card_name)

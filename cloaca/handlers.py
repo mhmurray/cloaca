@@ -17,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import os.path
 import logging
-import logging.config
 import time
 import json
 import binascii
@@ -27,29 +26,9 @@ import re
 SESSION_AUTH_LENGTH_BYTES = 16
 SESSION_MAX_AGE_DAYS = 1
 
-lg = logging.getLogger('handlers')
+lg = logging.getLogger(__name__)
 
 pool = ThreadPoolExecutor(cpu_count())
-
-# Set up logging. See logging.json for config
-def setup_logging(
-        default_path='logging.json',
-        default_level=logging.INFO,
-        env_key='GTR_LOG_CFG'):
-    """Setup logging configuration
-    """
-    path = default_path
-    value = os.getenv(env_key, None)
-    if value is not None:
-        path = value
-    if os.path.exists(path):
-        with open(path, 'rt') as f:
-            config = json.load(f)
-        logging.config.dictConfig(config)
-    else:
-        logging.basicConfig(level=default_level)
-
-setup_logging()
 
 APPDIR = os.path.dirname(__file__)
 

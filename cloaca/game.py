@@ -16,7 +16,6 @@ from datetime import datetime
 import itertools
 
 lg = logging.getLogger(__name__)
-lg.addHandler(logging.NullHandler())
 
 class Game(object):
     """Controls the operation of a single game.

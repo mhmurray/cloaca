@@ -12,7 +12,6 @@ from tornado import gen, locks
 import tornado.ioloop
 
 lg = logging.getLogger(__name__)
-lg.addHandler(logging.NullHandler())
 
 class GTRServer(object):
     """Manages multiple Game objects including non-game actions related to

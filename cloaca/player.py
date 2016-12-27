@@ -16,7 +16,6 @@ from collections import Counter
 import copy
 
 lg = logging.getLogger(__name__)
-lg.addHandler(logging.NullHandler())
 
 class Player(object):
     """ Contains the piles and items controlled by a player. """
