@@ -656,7 +656,7 @@ class Game(object):
             self._pump()
 
         else:
-            self._perform_thinker_action(self.leader)
+            self._perform_thinker_action(p)
 
 
     def _perform_thinker_action(self, player):
