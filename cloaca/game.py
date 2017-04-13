@@ -666,6 +666,7 @@ class Game(object):
             self._await_action(message.USEVOMITORIUM, player)
 
         else:
+            self.active_player = player
             a = message.GameAction(message.USEVOMITORIUM, False)
             self._handle_usevomitorium(a)
 
