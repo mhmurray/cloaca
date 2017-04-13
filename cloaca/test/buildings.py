@@ -805,18 +805,25 @@ class TestAcademy(unittest.TestCase):
         d = self.deck
 
         self.game = test_setup.two_player_lead('Craftsman',
-                buildings=[['academy0'],[]],
-                deck = self.deck)
+                buildings=[['academy0'],['academy1']],
+                deck = self.deck,
+                follow=True)
 
         self.p1, self.p2 = self.game.players
 
         self.p1.hand.set_content([d.dock0])
+        self.p2.hand.set_content([d.dock1])
 
 
     def test_thinker_after_craftsman(self):
         d = self.deck
 
+        # p1 craftsman
         a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
+        self.game.handle(a)
+
+        # p2 skips craftsman
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
         self.game.handle(a)
 
         self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
@@ -843,6 +850,10 @@ class TestAcademy(unittest.TestCase):
         a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
         self.game.handle(a)
 
+        # p2 skips craftsman
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
         self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
         self.assertEqual(self.game.active_player, self.p1)
 
@@ -859,6 +870,10 @@ class TestAcademy(unittest.TestCase):
         a = message.GameAction(message.CRAFTSMAN, d.dock0, None, 'Wood')
         self.game.handle(a)
 
+        # p2 skips craftsman
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
         self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
         self.assertEqual(self.game.active_player, self.p1)
 
@@ -871,6 +886,39 @@ class TestAcademy(unittest.TestCase):
         a = message.GameAction(message.CRAFTSMAN, None, None, None)
         self.game.handle(a)
 
+        # p2 skips craftsman
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
+        self.assertEqual(self.game.active_player, self.p2)
+
+
+    def test_thinker_after_following_craftsman(self):
+        d = self.deck
+
+        # p1 skips craftsman
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
+        # p2 craftsman
+        a = message.GameAction(message.CRAFTSMAN, d.dock1, None, 'Wood')
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
+        self.assertEqual(self.game.active_player, self.p2)
+
+        a = message.GameAction(message.SKIPTHINKER, False)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.THINKERTYPE)
+        self.assertEqual(self.game.active_player, self.p2)
+
+        # thinker for jack
+        a = message.GameAction(message.THINKERTYPE, True)
+        self.game.handle(a)
+
+        self.assertIn('Jack', self.p2.hand)
         self.assertEqual(self.game.expected_action, message.THINKERORLEAD)
         self.assertEqual(self.game.active_player, self.p2)
 
@@ -3199,6 +3247,52 @@ class TestWall(unittest.TestCase):
         # Round down
         p1.stockpile.set_content([d.road0, d.road1, d.road2])
         self.assertEqual(game._player_score(p1), 3)
+
+
+class TestAcademyVomitorium(unittest.TestCase):
+    """There was a bug with the Vomitorium and Academy, where the active player
+    is not set correctly for one branch of the player-has-vomitorium check.
+    This occurred only when the following player has a Vomitorium and an Academy.
+     
+    It doesn't matter whether or not the player uses the Vomitorium, the active
+    player was set as the leader instead of the following player for the 
+    _perform_thinker_action() call in _handle_skipthinker().
+    """
+
+    def setUp(self):
+        self.deck = TestDeck()
+        d = self.deck
+
+        self.game = test_setup.two_player_lead('Craftsman',
+                buildings=[['academy0'],['academy1', 'vomitorium0']],
+                deck = self.deck,
+                follow=True)
+
+        self.p1, self.p2 = self.game.players
+
+        self.p1.hand.set_content([d.dock0])
+        self.p2.hand.set_content([d.dock1])
+
+
+    def test_academy_following_craftsman_with_vomitorium(self):
+        d = self.deck
+
+        # p1 skips craftsman
+        a = message.GameAction(message.CRAFTSMAN, None, None, None)
+        self.game.handle(a)
+
+        # p2 craftsman
+        a = message.GameAction(message.CRAFTSMAN, d.dock1, None, 'Wood')
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.SKIPTHINKER)
+        self.assertEqual(self.game.active_player, self.p2)
+
+        a = message.GameAction(message.SKIPTHINKER, False)
+        self.game.handle(a)
+
+        self.assertEqual(self.game.expected_action, message.USEVOMITORIUM)
+        self.assertEqual(self.game.active_player, self.p2)
 
 
 
